@@ -8,19 +8,19 @@
 #define VK_ERROR_STRING(x) case (int)x: return #x;
 
 #define VK_CHECK(x) { \
-    VkResult ret = x; \
-    if(ret != VK_SUCCESS) printf("VkResult: %s is %s in %s at line %d\n", #x, VulkanErrorToString(x), __FILE__, __LINE__); \
+VkResult ret = x; \
+if(ret != VK_SUCCESS) QB_LOG_WARN("VkResult: %s is %s in %s at line %d", #x, VulkanErrorToString(x), __FILE__, __LINE__); \
 }
 
 #define VK_VALIDATE(x, msg) { \
-	if(!(x)) printf("VK: %s - %s\n", msg, #x); \
+if(!(x)) QB_LOG_WARN("VK: %s - %s", msg, #x); \
 }
 
 #ifdef QBDEBUG
 constexpr int VALIDATION_LAYER_COUNT = 2;
 constexpr const char* VALIDATION_LAYERS[VALIDATION_LAYER_COUNT]{
-	"VK_LAYER_LUNARG_standard_validation",
-	"VK_LAYER_LUNARG_monitor",
+"VK_LAYER_LUNARG_standard_validation",
+"VK_LAYER_LUNARG_monitor",
 };
 #else
 constexpr int VALIDATION_LAYER_COUNT = 1;
@@ -84,97 +84,99 @@ constexpr const char* VulkanErrorToString(VkResult vkResult) {
 	}
 }
 
-enum QbVkMemoryUsage {
-	QBVK_MEMORY_USAGE_UNKNOWN,
-	QBVK_MEMORY_USAGE_CPU_ONLY,
-	QBVK_MEMORY_USAGE_GPU_ONLY,
-	QBVK_MEMORY_USAGE_CPU_TO_GPU,
-	QBVK_MEMORY_USAGE_GPU_TO_CPU
-};
+namespace Quadbit {
+	enum QbVkMemoryUsage {
+		QBVK_MEMORY_USAGE_UNKNOWN,
+		QBVK_MEMORY_USAGE_CPU_ONLY,
+		QBVK_MEMORY_USAGE_GPU_ONLY,
+		QBVK_MEMORY_USAGE_CPU_TO_GPU,
+		QBVK_MEMORY_USAGE_GPU_TO_CPU
+	};
 
-enum QbVkAllocationType {
-	QBVK_ALLOCATION_TYPE_UNKNOWN,
-	QBVK_ALLOCATION_TYPE_FREE,
-	QBVK_ALLOCATION_TYPE_BUFFER,
-	QBVK_ALLOCATION_TYPE_IMAGE_UNKNOWN,
-	QBVK_ALLOCATION_TYPE_IMAGE_LINEAR,
-	QBVK_ALLOCATION_TYPE_IMAGE_OPTIMAL,
-};
+	enum QbVkAllocationType {
+		QBVK_ALLOCATION_TYPE_UNKNOWN,
+		QBVK_ALLOCATION_TYPE_FREE,
+		QBVK_ALLOCATION_TYPE_BUFFER,
+		QBVK_ALLOCATION_TYPE_IMAGE_UNKNOWN,
+		QBVK_ALLOCATION_TYPE_IMAGE_LINEAR,
+		QBVK_ALLOCATION_TYPE_IMAGE_OPTIMAL,
+	};
 
-class QbVkPool;
-struct QbVkAllocation {
-	std::shared_ptr<QbVkPool> pool = nullptr;
-	uint32_t id = 0;
-	VkDeviceMemory deviceMemory = VK_NULL_HANDLE;
-	VkDeviceSize offset = 0;
-	VkDeviceSize size = 0;
-	std::byte* data = nullptr;
-};
+	class QbVkPool;
+	struct QbVkAllocation {
+		std::shared_ptr<QbVkPool> pool = nullptr;
+		uint32_t id = 0;
+		VkDeviceMemory deviceMemory = VK_NULL_HANDLE;
+		VkDeviceSize offset = 0;
+		VkDeviceSize size = 0;
+		std::byte* data = nullptr;
+	};
 
-struct QbVkBuffer {
-	VkBuffer buf = VK_NULL_HANDLE;
-	QbVkAllocation alloc{};
-};
+	struct QbVkBuffer {
+		VkBuffer buf = VK_NULL_HANDLE;
+		QbVkAllocation alloc{};
+	};
 
-struct QbVkImage {
-	VkImage img = VK_NULL_HANDLE;
-	QbVkAllocation alloc{};
-};
+	struct QbVkImage {
+		VkImage img = VK_NULL_HANDLE;
+		QbVkAllocation alloc{};
+	};
 
-struct GPU {
-	VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+	struct GPU {
+		VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 
-	VkSurfaceCapabilitiesKHR surfaceCapabilities{};
-	VkPhysicalDeviceProperties deviceProps{};
-	VkPhysicalDeviceMemoryProperties memoryProps{};
-	VkPhysicalDeviceFeatures features{};
+		VkSurfaceCapabilitiesKHR surfaceCapabilities{};
+		VkPhysicalDeviceProperties deviceProps{};
+		VkPhysicalDeviceMemoryProperties memoryProps{};
+		VkPhysicalDeviceFeatures features{};
 
-	std::vector<VkSurfaceFormatKHR> surfaceFormats;
-	std::vector<VkPresentModeKHR> presentModes;
+		std::vector<VkSurfaceFormatKHR> surfaceFormats;
+		std::vector<VkPresentModeKHR> presentModes;
 
-	std::vector<VkQueueFamilyProperties> queueProps;
-	std::vector<VkExtensionProperties> extensionProps;
+		std::vector<VkQueueFamilyProperties> queueProps;
+		std::vector<VkExtensionProperties> extensionProps;
 
-	int graphicsFamilyIdx = -1;
-	int presentFamilyIdx = -1;
-};
+		int graphicsFamilyIdx = -1;
+		int presentFamilyIdx = -1;
+	};
 
-struct Swapchain {
-	VkSwapchainKHR swapchain = VK_NULL_HANDLE;
-	VkFormat imageFormat{};
-	VkPresentModeKHR presentMode{};
-	VkExtent2D extent{};
-	std::vector<VkImage> images;
-	std::vector<VkImageView> imageViews;
-};
+	struct Swapchain {
+		VkSwapchainKHR swapchain = VK_NULL_HANDLE;
+		VkFormat imageFormat{};
+		VkPresentModeKHR presentMode{};
+		VkExtent2D extent{};
+		std::vector<VkImage> images;
+		std::vector<VkImageView> imageViews;
+	};
 
-struct DepthResources {
-	QbVkImage depthImage{};
-	VkImageView imageView = VK_NULL_HANDLE;
-};
+	struct DepthResources {
+		QbVkImage depthImage{};
+		VkImageView imageView = VK_NULL_HANDLE;
+	};
 
-struct RenderingResources {
-	VkFramebuffer framebuffer = VK_NULL_HANDLE;
-	VkCommandBuffer commandbuffer = VK_NULL_HANDLE;
-	VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
-	VkSemaphore renderFinishedSemaphore = VK_NULL_HANDLE;
-	VkFence fence = VK_NULL_HANDLE;
-};
+	struct RenderingResources {
+		VkFramebuffer framebuffer = VK_NULL_HANDLE;
+		VkCommandBuffer commandbuffer = VK_NULL_HANDLE;
+		VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
+		VkSemaphore renderFinishedSemaphore = VK_NULL_HANDLE;
+		VkFence fence = VK_NULL_HANDLE;
+	};
 
-class QbVkAllocator;
-struct QbVkContext {
-	std::unique_ptr<GPU> gpu;
-	std::unique_ptr<QbVkAllocator> allocator;
-	VkDevice device = VK_NULL_HANDLE;
-	VkSurfaceKHR surface = VK_NULL_HANDLE;
-	VkQueue graphicsQueue = VK_NULL_HANDLE;
-	VkQueue presentQueue = VK_NULL_HANDLE;
+	class QbVkAllocator;
+	struct QbVkContext {
+		std::unique_ptr<GPU> gpu;
+		std::unique_ptr<QbVkAllocator> allocator;
+		VkDevice device = VK_NULL_HANDLE;
+		VkSurfaceKHR surface = VK_NULL_HANDLE;
+		VkQueue graphicsQueue = VK_NULL_HANDLE;
+		VkQueue presentQueue = VK_NULL_HANDLE;
 
-	DepthResources depthResources{};
-	Swapchain swapchain{};
+		DepthResources depthResources{};
+		Swapchain swapchain{};
 
-	VkCommandPool commandPool = VK_NULL_HANDLE;
-	VkRenderPass mainRenderPass = VK_NULL_HANDLE;
+		VkCommandPool commandPool = VK_NULL_HANDLE;
+		VkRenderPass mainRenderPass = VK_NULL_HANDLE;
 
-	std::array<RenderingResources, MAX_FRAMES_IN_FLIGHT> renderingResources;
-};
+		std::array<RenderingResources, MAX_FRAMES_IN_FLIGHT> renderingResources;
+	};
+}

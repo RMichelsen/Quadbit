@@ -1,10 +1,10 @@
 #include <PCH.h>
 #include "Camera.h"
 
-#include "../Global/InputHandler.h"
-#include "../Global/Time.h"
+#include "../Application/InputHandler.h"
+#include "../Application/Time.h"
 
-namespace Camera {
+namespace Quadbit::Camera {
 	// Anonymous namespace used for camera data
 	namespace {
 		glm::vec3 cameraPos = glm::vec3(0.0f, 4.0f, 6.0f);
@@ -35,7 +35,7 @@ namespace Camera {
 			InputHandler::keycodes[0x53] || InputHandler::keycodes[0x57];
 	}
 
-	void UpdateCamera() {
+	void UpdateCamera(float deltaTime) {
 		if(InputHandler::rightMouseDragging && !dragActive) {
 			dragActive = true;
 			ShowCursor(false);
@@ -48,8 +48,8 @@ namespace Camera {
 		}
 
 		if(IsMoving()) {
-			float cameraSpeed = 10.0f * Time::deltaTime;
-			float dragSpeed = 200.0f * Time::deltaTime;
+			float cameraSpeed = 10.0f * deltaTime;
+			float dragSpeed = 200.0f * deltaTime;
 
 			auto deltaMove = InputHandler::ProcessDeltaMovement();
 
@@ -96,4 +96,3 @@ namespace Camera {
 		return view;
 	}
 }
-

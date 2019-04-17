@@ -7,7 +7,7 @@
 #include "QbVkCommon.h"
 #include "../Memory/QbVkAllocator.h"
 
-namespace VkUtils {
+namespace Quadbit::VkUtils {
 	// Wrappers around various Vulkan structs
 	namespace Init {
 		inline VkCommandBufferAllocateInfo CommandBufferAllocateInfo(VkCommandPool commandPool, VkCommandBufferLevel commandBufferLevel, uint32_t bufferCount) {
@@ -197,7 +197,7 @@ namespace VkUtils {
 		}
 
 		inline VkRect2D ScissorRect(int32_t offsetX, int32_t offsetY, uint32_t height, uint32_t width) {
-			return VkRect2D {
+			return VkRect2D{
 				offsetX, offsetY,
 				height, width
 			};
@@ -402,7 +402,7 @@ namespace VkUtils {
 		return true;
 	}
 
-	inline bool FindSuitableGPU(std::shared_ptr<QbVkContext> context, const std::vector<VkPhysicalDevice> & physicalDevices) {
+	inline bool FindSuitableGPU(std::shared_ptr<QbVkContext> context, const std::vector<VkPhysicalDevice>& physicalDevices) {
 		size_t physicalDeviceCount = physicalDevices.size();
 		GPU gpu{};
 
@@ -411,7 +411,7 @@ namespace VkUtils {
 			ZeroMemory(&gpu, sizeof(gpu));
 			if(!IsSuitableGPUOfType(context, gpu, physicalDevices[i], VkPhysicalDeviceType::VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)) continue;
 
-			printf("Found Appropriate Discrete GPU: %s\n", gpu.deviceProps.deviceName);
+			QB_LOG_INFO("Found Appropriate Discrete GPU: %s\n", gpu.deviceProps.deviceName);
 			context->gpu = std::make_unique<GPU>(gpu);
 			return true;
 		}
@@ -421,7 +421,7 @@ namespace VkUtils {
 			ZeroMemory(&gpu, sizeof(gpu));
 			if(!IsSuitableGPUOfType(context, gpu, physicalDevices[i], VkPhysicalDeviceType::VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU)) continue;
 
-			printf("Found Appropriate Integrated GPU: %s\n", gpu.deviceProps.deviceName);
+			QB_LOG_INFO("Found Appropriate Integrated GPU: %s\n", gpu.deviceProps.deviceName);
 			context->gpu = std::make_unique<GPU>(gpu);
 			return true;
 		}
@@ -434,7 +434,7 @@ namespace VkUtils {
 	inline T AlignUp(T val, T alignment)
 	{
 		static_assert(std::is_unsigned<T>::value, "AlignUp requires an unsigned value");
-		return ((val + alignment - 1) / alignment) * alignment;
+		return ((val + alignment - 1) / alignment)* alignment;
 	}
 
 	// Returns whether or not the end of the first resource and the beginning of the second resource
@@ -454,7 +454,7 @@ namespace VkUtils {
 			allocTypeA = allocTypeB;
 			allocTypeB = temp;
 		}
-		
+
 		// Assume conflict for unknown alloc types
 		switch(allocTypeA) {
 		case QBVK_ALLOCATION_TYPE_UNKNOWN:
@@ -462,7 +462,7 @@ namespace VkUtils {
 		case QBVK_ALLOCATION_TYPE_FREE:
 			return false;
 		case QBVK_ALLOCATION_TYPE_BUFFER:
-			return 
+			return
 				allocTypeB == QBVK_ALLOCATION_TYPE_IMAGE_UNKNOWN ||
 				allocTypeB == QBVK_ALLOCATION_TYPE_IMAGE_OPTIMAL;
 		case QBVK_ALLOCATION_TYPE_IMAGE_UNKNOWN:
@@ -546,7 +546,7 @@ namespace VkUtils {
 	inline std::vector<char> ReadShader(const char* filename) {
 		FILE* pFile = fopen(filename, "rb");
 		if(pFile == nullptr) {
-			fprintf(stderr, "Couldn't open file %s\n", filename);
+			QB_LOG_ERROR("Couldn't open file %s\n", filename);
 			return {};
 		}
 
@@ -559,7 +559,7 @@ namespace VkUtils {
 		std::vector<char> bytecode(fileSize);
 		size_t result = fread(bytecode.data(), sizeof(char), fileSize, pFile);
 		if(result != fileSize) {
-			fprintf(stderr, "Error reading shader file %s\n", filename);
+			QB_LOG_ERROR("Error reading shader file %s\n", filename);
 			return {};
 		}
 		fclose(pFile);
@@ -694,9 +694,9 @@ namespace VkUtils {
 		VK_CHECK(vkCreateFramebuffer(context->device, &framebufferInfo, nullptr, &framebuffer))
 	}
 
-	inline void TransitionImageLayout(const std::shared_ptr<QbVkContext>& context, VkCommandBuffer commandBuffer, VkImage image, 
+	inline void TransitionImageLayout(const std::shared_ptr<QbVkContext>& context, VkCommandBuffer commandBuffer, VkImage image,
 		VkImageAspectFlags aspectFlags, VkImageLayout oldLayout, VkImageLayout newLayout, VkPipelineStageFlags srcStage, VkPipelineStageFlags dstStage) {
-		
+
 		VkImageMemoryBarrier memoryBarrier = Init::ImageMemoryBarrier();
 		memoryBarrier.oldLayout = oldLayout;
 		memoryBarrier.newLayout = newLayout;
@@ -709,64 +709,64 @@ namespace VkUtils {
 		memoryBarrier.subresourceRange.aspectMask = aspectFlags;
 
 		switch(oldLayout) {
-			case VK_IMAGE_LAYOUT_UNDEFINED:
-				// Image layout is undefined (no access mask required)
-				memoryBarrier.srcAccessMask = 0;
-				break;
-			case VK_IMAGE_LAYOUT_PREINITIALIZED:
-				// Image is preinitialized, make sure host writes have finished
-				memoryBarrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
-				break;
-			case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
-				// Image is a color attachment
-				memoryBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-				break;
-			case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
-				// Image is a depth/stencil attachment
-				memoryBarrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-				break;
-			case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
-				// Image is a transfer source
-				memoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-				break;
-			case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
-				// Image is a transfer destination
-				memoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-				break;
-			case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
-				// Image is read by a shader
-				memoryBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
-				break;
-			default:
-				break;
+		case VK_IMAGE_LAYOUT_UNDEFINED:
+			// Image layout is undefined (no access mask required)
+			memoryBarrier.srcAccessMask = 0;
+			break;
+		case VK_IMAGE_LAYOUT_PREINITIALIZED:
+			// Image is preinitialized, make sure host writes have finished
+			memoryBarrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+			// Image is a color attachment
+			memoryBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+			// Image is a depth/stencil attachment
+			memoryBarrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+			// Image is a transfer source
+			memoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+			// Image is a transfer destination
+			memoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+			// Image is read by a shader
+			memoryBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+			break;
+		default:
+			break;
 		}
 		switch(newLayout) {
-			case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
-				// image is a transfer destination
-				memoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-				break;
-			case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
-				// image is a transfer source
-				memoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-				break;
-			case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
-				// image is a color attachment
-				memoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-				break;
-			case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
-				// image is a depth/stencil attachment
-				memoryBarrier.dstAccessMask = 
-					VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-				break;
-			case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
-				// image is read in shader
-				if(memoryBarrier.srcAccessMask == 0) {
-					memoryBarrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
-				}
-				memoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-				break;
-			default:
-				break;
+		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+			// image is a transfer destination
+			memoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+			// image is a transfer source
+			memoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+			// image is a color attachment
+			memoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+			// image is a depth/stencil attachment
+			memoryBarrier.dstAccessMask =
+				VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+			// image is read in shader
+			if(memoryBarrier.srcAccessMask == 0) {
+				memoryBarrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
+			}
+			memoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+			break;
+		default:
+			break;
 		}
 
 		vkCmdPipelineBarrier(commandBuffer, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1, &memoryBarrier);

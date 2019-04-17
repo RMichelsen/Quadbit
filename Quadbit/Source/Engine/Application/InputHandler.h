@@ -1,19 +1,19 @@
 #pragma once
 
-struct MouseButtonStatus {
-	bool left;
-	bool right;
-	bool middle;
-	bool xbutton1;
-	bool xbutton2;
-};
+namespace Quadbit::InputHandler {
+	struct MouseButtonStatus {
+		bool left;
+		bool right;
+		bool middle;
+		bool xbutton1;
+		bool xbutton2;
+	};
 
-constexpr RAWINPUTDEVICE rawinputdevices[2] {
-	{0x01, 0x02, 0, 0}, // Mouse
-	{0x01, 0x06, 0, 0}	// Keyboard
-};
+	constexpr RAWINPUTDEVICE rawinputdevices[2]{
+		{0x01, 0x02, 0, 0}, // Mouse
+		{0x01, 0x06, 0, 0}	// Keyboard
+	};
 
-namespace InputHandler {
 	// Mouse variables
 	inline MouseButtonStatus mouseButtonStatus;
 	inline std::array<int32_t, 2> deltaMouseMovement{ 0, 0 };
@@ -137,4 +137,3 @@ namespace InputHandler {
 		return DefWindowProc(hwnd, uMsg, wParam, lParam);
 	}
 }
-

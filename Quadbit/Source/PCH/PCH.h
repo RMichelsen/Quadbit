@@ -6,11 +6,6 @@
 
 #define VK_USE_PLATFORM_WIN32_KHR
 #include <vulkan/vulkan.h>
-#include <vector>
-#include <forward_list>
-#include <array>
-#include <chrono>
-#include <algorithm>
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -19,3 +14,13 @@
 #include <glm/mat4x4.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+
+#include <ImGui/imgui.h>
+
+#include "../Engine/Application/Logging.h"
+
+#include <vector>
+#include <forward_list>
+#include <array>
+#include <chrono>
+#include <algorithm>

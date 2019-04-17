@@ -5,7 +5,7 @@
 
 #define IMGUI_VAR(x) ImGuiState::pointers[ImGuiState::varCount - x]
 
-namespace ImGuiState {
+namespace Quadbit::ImGuiState {
 	inline uint32_t varCount = 0;
 	inline std::vector<std::function<void()>> injectors;
 	inline std::vector<void*> pointers;
@@ -16,7 +16,7 @@ namespace ImGuiState {
 	// the macro IMGUI_VAR and pass the index of the variable in the 
 	// argument list in REVERSE order!
 	template<typename... T>
-	inline void Inject(std::function<void()> functor,  T... injections) {
+	inline void Inject(std::function<void()> functor, T... injections) {
 		for(auto&& x : { injections... }) {
 			pointers.push_back(x);
 			varCount++;

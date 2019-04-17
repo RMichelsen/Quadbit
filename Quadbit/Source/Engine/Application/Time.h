@@ -1,6 +1,6 @@
 #pragma once
 
-namespace Time {
+namespace Quadbit::Time {
 	using clock = std::chrono::high_resolution_clock;
 
 	inline auto tStart = std::chrono::time_point_cast<std::chrono::nanoseconds>(clock::now());

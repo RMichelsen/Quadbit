@@ -3,6 +3,8 @@
 #include "../Common/QbVkCommon.h"
 #include "QbVkPool.h"
 
+namespace Quadbit {
+
 class QbVkAllocator {
 public:
 	QbVkAllocator(VkDevice device, VkDeviceSize bufferImageGranularity, VkPhysicalDeviceMemoryProperties memoryProperties);
@@ -15,6 +17,8 @@ public:
 	void DestroyBuffer(QbVkBuffer& buffer);
 	void DestroyImage(QbVkImage& image);
 	void EmptyGarbage();
+
+	void ImGuiDrawState();
 
 private:
 	VkDevice device_;
@@ -33,3 +37,5 @@ private:
 		const QbVkMemoryUsage memoryUsage, QbVkAllocationType allocType);
 	void Free(QbVkAllocation& allocation);
 };
+
+}

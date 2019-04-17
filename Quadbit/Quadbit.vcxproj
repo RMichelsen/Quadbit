@@ -80,13 +80,13 @@
     <IncludePath>$(ProjectDir)\Extern;$(ProjectDir)\Source\PCH;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <OutDir>$(SolutionDir)\Bin\$(Configuration)\$(Platform)\</OutDir>
-    <IntDir>$(SolutionDir)\Bin\$(Configuration)\$(Platform)-int\</IntDir>
+    <OutDir>$(SolutionDir)Bin\$(Configuration)\$(Platform)\</OutDir>
+    <IntDir>$(SolutionDir)Bin\$(Configuration)\$(Platform)-int\</IntDir>
     <IncludePath>$(ProjectDir)\Extern;$(ProjectDir)\Source\PCH;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <OutDir>$(SolutionDir)\Bin\$(Configuration)\$(Platform)\</OutDir>
-    <IntDir>$(SolutionDir)\Bin\$(Configuration)\$(Platform)-int\</IntDir>
+    <OutDir>$(SolutionDir)Bin\$(Configuration)\$(Platform)\</OutDir>
+    <IntDir>$(SolutionDir)Bin\$(Configuration)\$(Platform)-int\</IntDir>
     <IncludePath>$(ProjectDir)\Extern;$(ProjectDir)\Source\PCH;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -158,6 +158,42 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="Extern\entt\config\config.h" />
+    <ClInclude Include="Extern\entt\config\version.h" />
+    <ClInclude Include="Extern\entt\core\algorithm.hpp" />
+    <ClInclude Include="Extern\entt\core\family.hpp" />
+    <ClInclude Include="Extern\entt\core\hashed_string.hpp" />
+    <ClInclude Include="Extern\entt\core\ident.hpp" />
+    <ClInclude Include="Extern\entt\core\monostate.hpp" />
+    <ClInclude Include="Extern\entt\core\type_traits.hpp" />
+    <ClInclude Include="Extern\entt\core\utility.hpp" />
+    <ClInclude Include="Extern\entt\entity\actor.hpp" />
+    <ClInclude Include="Extern\entt\entity\entity.hpp" />
+    <ClInclude Include="Extern\entt\entity\fwd.hpp" />
+    <ClInclude Include="Extern\entt\entity\group.hpp" />
+    <ClInclude Include="Extern\entt\entity\helper.hpp" />
+    <ClInclude Include="Extern\entt\entity\prototype.hpp" />
+    <ClInclude Include="Extern\entt\entity\registry.hpp" />
+    <ClInclude Include="Extern\entt\entity\runtime_view.hpp" />
+    <ClInclude Include="Extern\entt\entity\snapshot.hpp" />
+    <ClInclude Include="Extern\entt\entity\sparse_set.hpp" />
+    <ClInclude Include="Extern\entt\entity\view.hpp" />
+    <ClInclude Include="Extern\entt\entt.hpp" />
+    <ClInclude Include="Extern\entt\fwd.hpp" />
+    <ClInclude Include="Extern\entt\locator\locator.hpp" />
+    <ClInclude Include="Extern\entt\meta\factory.hpp" />
+    <ClInclude Include="Extern\entt\meta\meta.hpp" />
+    <ClInclude Include="Extern\entt\process\process.hpp" />
+    <ClInclude Include="Extern\entt\process\scheduler.hpp" />
+    <ClInclude Include="Extern\entt\resource\cache.hpp" />
+    <ClInclude Include="Extern\entt\resource\fwd.hpp" />
+    <ClInclude Include="Extern\entt\resource\handle.hpp" />
+    <ClInclude Include="Extern\entt\resource\loader.hpp" />
+    <ClInclude Include="Extern\entt\signal\delegate.hpp" />
+    <ClInclude Include="Extern\entt\signal\dispatcher.hpp" />
+    <ClInclude Include="Extern\entt\signal\emitter.hpp" />
+    <ClInclude Include="Extern\entt\signal\fwd.hpp" />
+    <ClInclude Include="Extern\entt\signal\sigh.hpp" />
     <ClInclude Include="Extern\glm\common.hpp" />
     <ClInclude Include="Extern\glm\detail\compute_common.hpp" />
     <ClInclude Include="Extern\glm\detail\compute_vector_relational.hpp" />
@@ -405,10 +441,15 @@
     <ClInclude Include="Extern\ImGui\imstb_rectpack.h" />
     <ClInclude Include="Extern\ImGui\imstb_textedit.h" />
     <ClInclude Include="Extern\ImGui\imstb_truetype.h" />
+    <ClInclude Include="Source\Engine\Application\Logging.h" />
     <ClInclude Include="Source\Engine\Application\Window.h" />
+    <ClInclude Include="Source\Engine\DataStructures\SparseSet.h" />
+    <ClInclude Include="Source\Engine\Entities\Component.h" />
+    <ClInclude Include="Source\Engine\Entities\Entity.h" />
+    <ClInclude Include="Source\Engine\Entities\EntityManager.h" />
     <ClInclude Include="Source\Engine\Global\ImGuiState.h" />
-    <ClInclude Include="Source\Engine\Global\InputHandler.h" />
-    <ClInclude Include="Source\Engine\Global\Time.h" />
+    <ClInclude Include="Source\Engine\Application\InputHandler.h" />
+    <ClInclude Include="Source\Engine\Application\Time.h" />
     <ClInclude Include="Source\Engine\Rendering\Common\QbVkCommon.h" />
     <ClInclude Include="Source\Engine\Rendering\Common\QbVkUtils.h" />
     <ClInclude Include="Source\Engine\Rendering\Memory\QbVkAllocator.h" />
@@ -417,6 +458,7 @@
     <ClInclude Include="Source\Engine\Rendering\Pipelines\MeshPipeline.h" />
     <ClInclude Include="Source\Engine\Rendering\QbVkRenderer.h" />
     <ClInclude Include="Source\Engine\Rendering\Camera.h" />
+    <ClInclude Include="Source\Game\Infinitum.h" />
     <ClInclude Include="Source\PCH\PCH.h" />
   </ItemGroup>
   <ItemGroup>
@@ -580,12 +622,17 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Source\Engine\Application\Window.cpp" />
+    <ClCompile Include="Source\Engine\DataStructures\SparseSet.cpp" />
+    <ClCompile Include="Source\Engine\Entities\Component.cpp" />
+    <ClCompile Include="Source\Engine\Entities\Entity.cpp" />
+    <ClCompile Include="Source\Engine\Entities\EntityManager.cpp" />
     <ClCompile Include="Source\Engine\Rendering\Memory\QbVkAllocator.cpp" />
     <ClCompile Include="Source\Engine\Rendering\Memory\QbVkPool.cpp" />
     <ClCompile Include="Source\Engine\Rendering\Pipelines\ImGuiPipeline.cpp" />
     <ClCompile Include="Source\Engine\Rendering\Pipelines\MeshPipeline.cpp" />
     <ClCompile Include="Source\Engine\Rendering\QbVkRenderer.cpp" />
     <ClCompile Include="Source\Engine\Rendering\Camera.cpp" />
+    <ClCompile Include="Source\Game\Infinitum.cpp" />
     <ClCompile Include="Source\Main.cpp" />
     <ClCompile Include="Source\PCH\PCH.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
