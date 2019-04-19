@@ -5,7 +5,10 @@
 #include "../Application/InputHandler.h"
 
 namespace Quadbit {
-	QbVkRenderer::QbVkRenderer(HINSTANCE hInstance, HWND hwnd) : localHandle_(hInstance), windowHandle_(hwnd) {
+	QbVkRenderer::QbVkRenderer(HINSTANCE hInstance, HWND hwnd, std::shared_ptr<Quadbit::EntityManager> entityManager) : 
+		localHandle_(hInstance), 
+		windowHandle_(hwnd), 
+		entityManager_(entityManager) {
 		// REMEMBER: Order matters as some functions depend on member variables being initialized.
 		CreateInstance();
 #ifdef QBDEBUG
@@ -152,7 +155,7 @@ namespace Quadbit {
 	VKAPI_ATTR VkBool32 VKAPI_CALL DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
 		VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData) {
 
-		QB_LOG_INFO("Validation Layer: %s\n", pCallbackData->pMessage);
+		QB_LOG_INFO("Vulkan Validation Layer: %s\n", pCallbackData->pMessage);
 		return VK_FALSE;
 	}
 
@@ -217,7 +220,7 @@ namespace Quadbit {
 
 		// Now find a suitable GPU
 		if(!VkUtils::FindSuitableGPU(context_, physicalDevices)) {
-			QB_LOG_ERROR("No suitable GPU's found on machine.");
+			QB_LOG_ERROR("No suitable GPU's found on machine.\n");
 		}
 	}
 

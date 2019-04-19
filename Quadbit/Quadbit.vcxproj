@@ -158,42 +158,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="Extern\entt\config\config.h" />
-    <ClInclude Include="Extern\entt\config\version.h" />
-    <ClInclude Include="Extern\entt\core\algorithm.hpp" />
-    <ClInclude Include="Extern\entt\core\family.hpp" />
-    <ClInclude Include="Extern\entt\core\hashed_string.hpp" />
-    <ClInclude Include="Extern\entt\core\ident.hpp" />
-    <ClInclude Include="Extern\entt\core\monostate.hpp" />
-    <ClInclude Include="Extern\entt\core\type_traits.hpp" />
-    <ClInclude Include="Extern\entt\core\utility.hpp" />
-    <ClInclude Include="Extern\entt\entity\actor.hpp" />
-    <ClInclude Include="Extern\entt\entity\entity.hpp" />
-    <ClInclude Include="Extern\entt\entity\fwd.hpp" />
-    <ClInclude Include="Extern\entt\entity\group.hpp" />
-    <ClInclude Include="Extern\entt\entity\helper.hpp" />
-    <ClInclude Include="Extern\entt\entity\prototype.hpp" />
-    <ClInclude Include="Extern\entt\entity\registry.hpp" />
-    <ClInclude Include="Extern\entt\entity\runtime_view.hpp" />
-    <ClInclude Include="Extern\entt\entity\snapshot.hpp" />
-    <ClInclude Include="Extern\entt\entity\sparse_set.hpp" />
-    <ClInclude Include="Extern\entt\entity\view.hpp" />
-    <ClInclude Include="Extern\entt\entt.hpp" />
-    <ClInclude Include="Extern\entt\fwd.hpp" />
-    <ClInclude Include="Extern\entt\locator\locator.hpp" />
-    <ClInclude Include="Extern\entt\meta\factory.hpp" />
-    <ClInclude Include="Extern\entt\meta\meta.hpp" />
-    <ClInclude Include="Extern\entt\process\process.hpp" />
-    <ClInclude Include="Extern\entt\process\scheduler.hpp" />
-    <ClInclude Include="Extern\entt\resource\cache.hpp" />
-    <ClInclude Include="Extern\entt\resource\fwd.hpp" />
-    <ClInclude Include="Extern\entt\resource\handle.hpp" />
-    <ClInclude Include="Extern\entt\resource\loader.hpp" />
-    <ClInclude Include="Extern\entt\signal\delegate.hpp" />
-    <ClInclude Include="Extern\entt\signal\dispatcher.hpp" />
-    <ClInclude Include="Extern\entt\signal\emitter.hpp" />
-    <ClInclude Include="Extern\entt\signal\fwd.hpp" />
-    <ClInclude Include="Extern\entt\signal\sigh.hpp" />
     <ClInclude Include="Extern\glm\common.hpp" />
     <ClInclude Include="Extern\glm\detail\compute_common.hpp" />
     <ClInclude Include="Extern\glm\detail\compute_vector_relational.hpp" />
@@ -443,10 +407,11 @@
     <ClInclude Include="Extern\ImGui\imstb_truetype.h" />
     <ClInclude Include="Source\Engine\Application\Logging.h" />
     <ClInclude Include="Source\Engine\Application\Window.h" />
-    <ClInclude Include="Source\Engine\DataStructures\SparseSet.h" />
-    <ClInclude Include="Source\Engine\Entities\Component.h" />
+    <ClInclude Include="Source\Engine\Entities\ComponentPool.h" />
+    <ClInclude Include="Source\Engine\Entities\EntitiesCommon.h" />
     <ClInclude Include="Source\Engine\Entities\Entity.h" />
     <ClInclude Include="Source\Engine\Entities\EntityManager.h" />
+    <ClInclude Include="Source\Engine\Entities\InternalTypes.h" />
     <ClInclude Include="Source\Engine\Global\ImGuiState.h" />
     <ClInclude Include="Source\Engine\Application\InputHandler.h" />
     <ClInclude Include="Source\Engine\Application\Time.h" />
@@ -622,8 +587,6 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Source\Engine\Application\Window.cpp" />
-    <ClCompile Include="Source\Engine\DataStructures\SparseSet.cpp" />
-    <ClCompile Include="Source\Engine\Entities\Component.cpp" />
     <ClCompile Include="Source\Engine\Entities\Entity.cpp" />
     <ClCompile Include="Source\Engine\Entities\EntityManager.cpp" />
     <ClCompile Include="Source\Engine\Rendering\Memory\QbVkAllocator.cpp" />

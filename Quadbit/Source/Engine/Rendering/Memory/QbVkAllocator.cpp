@@ -157,7 +157,7 @@ namespace Quadbit {
 
 		auto memoryTypeIndex = FindMemoryTypeIndex(memoryTypeBits, memoryUsage);
 		if(memoryTypeIndex == -1) {
-			QB_LOG_WARN("Couldn't find appropriate memory type for allocation request");
+			QB_LOG_WARN("Couldn't find appropriate memory type for allocation request\n");
 			return QbVkAllocation{};
 		}
 

@@ -1,25 +1,40 @@
 #pragma once
 
+#include "EntitiesCommon.h"
+
 namespace Quadbit {
-	struct EntityID {
-	public:
-		EntityID() : id(0), version(0) {}
-		EntityID(uint32_t id, uint32_t version) : id(id), version(version) {};
-
-		bool operator == (const EntityID& other) const { return id == other.id; }
-		bool operator != (const EntityID& other) const { return id != other.id; }
-
-	private:
-		uint32_t id : 24;
-		uint32_t version : 8;
-	};
-
+	class EntityManager;
 	class Entity {
 	public:
-		Entity(EntityID id) : id_(id) {}
-
-	private:
+		EntityManager* manager_;
 		EntityID id_;
 
+		Entity() : manager_(nullptr), id_(0, 1) {}
+		Entity(EntityManager* entityManager, EntityID id) : manager_(entityManager), id_(id) {}
+
+		void Destroy();
+		bool IsValid();
+
+		template<typename T>
+		void AddComponent() {
+			manager_->AddComponent<T>(*this);
+		}
+		// Aggregate initialization
+		template<typename T>
+		void AddComponent(T&& t) {
+			manager_->AddComponent<T>(*this, std::move(t));
+		}
+
+		template<typename T>
+		T* const GetComponent() {
+			return manager_->GetComponent<T>(*this);
+		}
+
+		template<typename T>
+		void RemoveComponent() {
+			manager_->RemoveComponent<T>(*this);
+		}
+
+	private:
 	};
 }

@@ -1,32 +1,34 @@
 #include <PCH.h>
 #include "Infinitum.h"
-#include "../Engine/Entities/EntityManager.h"
-#include "../Engine/Entities/Entity.h"
-#include "../Engine/Entities/Component.h"
-#include "../Engine/DataStructures/SparseSet.h"
 
-struct validComponent {
-	float xyz;
-	float xyza;
-	float xyzb;
-	float xyzc;
-	float xyzd;
+#include "../Engine/Entities/InternalTypes.h"
+
+struct Position {
+	float x;
+	float y;
+	float z;
 };
 
-struct invalidComponent {
-	float xyz;
+struct Rotation {
+	glm::vec3 rot;
 };
 
 void Infinitum::Init() {
-	Quadbit::EntityManager entityManager;
-	
-	entityManager.RegisterComponent<validComponent>();
-	entityManager.RegisterComponent<validComponent>();
+	entityManager_->RegisterComponent<Position>();
+	entityManager_->RegisterComponent<Rotation>();
 
-	auto ptr = std::static_pointer_cast<Quadbit::SparseSet<validComponent>>(entityManager.componentPools_[0]);
-	ptr->dense_.push_back(validComponent{ 0,1,2,3,4 });
-
+	for(auto i = 0; i < 1000000; i++) {
+		auto entity = entityManager_->Create();
+		entity.AddComponent<Position>();
+	}
 }
 
 void Infinitum::Simulate(float deltaTime) {
+	entityManager_->ParForEach<Position>([](auto & pos) {
+		pos.x += std::sqrt(std::sin(1.0f) * std::cos(1.0f));
+	});
+}
+
+void Infinitum::DrawFrame() {
+	renderer_->DrawFrame();
 }

@@ -132,7 +132,7 @@ namespace Quadbit {
 		// If no allocation was found matching the id we'll return,
 		// but this shouldn't happen so we throw a diagnostic msg
 		if(current == nullptr) {
-			QB_LOG_WARN("QbVkAllocator: Trying to free an unknown allocation (%i) in pool %p", allocation.id, allocation.pool.get());
+			QB_LOG_WARN("QbVkAllocator: Trying to free an unknown allocation (%i) in pool %p\n", allocation.id, allocation.pool.get());
 			return;
 		}
 

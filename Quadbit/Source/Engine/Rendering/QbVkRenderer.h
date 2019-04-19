@@ -1,19 +1,17 @@
 #pragma once
 
-#define VK_USE_PLATFORM_WIN32_KHR
-#include <vulkan/vulkan.h>
-
 #include "Common/QbVkCommon.h"
 #include "Pipelines/MeshPipeline.h"
 #include "Pipelines/ImGuiPipeline.h"
 #include "Memory/QbVkAllocator.h"
+#include "../Entities/EntityManager.h"
 
 namespace Quadbit {
 	class QbVkRenderer {
 	public:
 		bool canRender_ = false;
 
-		QbVkRenderer(HINSTANCE hInstance, HWND hwnd);
+		QbVkRenderer(HINSTANCE hInstance, HWND hwnd, std::shared_ptr<Quadbit::EntityManager> registry);
 		~QbVkRenderer();
 
 		void DrawFrame();
@@ -21,6 +19,8 @@ namespace Quadbit {
 	private:
 		HINSTANCE localHandle_ = NULL;
 		HWND windowHandle_ = NULL;
+
+		std::shared_ptr<Quadbit::EntityManager> entityManager_;
 
 		VkInstance instance_ = VK_NULL_HANDLE;
 		std::shared_ptr<QbVkContext> context_ = std::make_shared<QbVkContext>();

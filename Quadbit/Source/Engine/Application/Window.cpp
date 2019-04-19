@@ -16,14 +16,10 @@ namespace Quadbit {
 			QB_LOG_ERROR("Failed to setup the input handler\n");
 			return;
 		}
-
-		// Console will only be for debug builds
-#ifdef QBDEBUG
 		if(!SetupConsole()) {
 			QB_LOG_ERROR("Failed to setup the console\n");
 			return;
 		}
-#endif
 	}
 
 	Window::~Window() {

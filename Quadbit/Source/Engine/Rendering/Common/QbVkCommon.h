@@ -9,11 +9,11 @@
 
 #define VK_CHECK(x) { \
 VkResult ret = x; \
-if(ret != VK_SUCCESS) QB_LOG_WARN("VkResult: %s is %s in %s at line %d", #x, VulkanErrorToString(x), __FILE__, __LINE__); \
+if(ret != VK_SUCCESS) QB_LOG_WARN("VkResult: %s is %s in %s at line %d\n", #x, VulkanErrorToString(x), __FILE__, __LINE__); \
 }
 
 #define VK_VALIDATE(x, msg) { \
-if(!(x)) QB_LOG_WARN("VK: %s - %s", msg, #x); \
+if(!(x)) QB_LOG_WARN("VK: %s - %s\n", msg, #x); \
 }
 
 #ifdef QBDEBUG
