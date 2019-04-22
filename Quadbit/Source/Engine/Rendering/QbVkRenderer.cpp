@@ -30,7 +30,7 @@ namespace Quadbit {
 		CreateMainRenderPass();
 
 		// Mesh Pipeline
-		meshPipeline_ = std::make_unique<MeshPipeline>(context_);
+		meshPipeline_ = std::make_unique<MeshPipeline>(context_, entityManager_);
 
 		// ImGui Pipeline (Debug build only)
 		imGuiPipeline_ = std::make_unique<ImGuiPipeline>(context_);
@@ -80,6 +80,31 @@ namespace Quadbit {
 
 		// Destroy instance
 		vkDestroyInstance(instance_, nullptr);
+	}
+
+	RenderMesh QbVkRenderer::CreateMesh(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices, 
+		float scale, glm::vec3 position, glm::quat rotation) {
+		glm::mat4 T(1.0f);
+		glm::mat4 S(1.0f);
+
+		T = glm::translate(T, position);
+		auto R = glm::toMat4(rotation);
+		S = glm::scale(S, glm::vec3(scale, scale, scale));
+
+		return RenderMesh{
+			meshPipeline_->CreateVertexBuffer(vertices),
+			meshPipeline_->CreateIndexBuffer(indices),
+			static_cast<uint32_t>(indices.size()),
+			scale,
+			position,
+			rotation,
+			{ T * R * S }
+		};
+	}
+
+	void QbVkRenderer::DestroyMesh(const RenderMesh& mesh) {
+		meshPipeline_->DestroyVertexBuffer(mesh.vertexHandle);
+		meshPipeline_->DestroyIndexBuffer(mesh.indexHandle);
 	}
 
 	void QbVkRenderer::DrawFrame() {
@@ -188,8 +213,10 @@ namespace Quadbit {
 		VkInstanceCreateInfo instanceInfo = VkUtils::Init::InstanceCreateInfo();
 		instanceInfo.pApplicationInfo = &appInfo;
 
+#ifdef QBDEBUG
 		instanceInfo.enabledLayerCount = VALIDATION_LAYER_COUNT;
 		instanceInfo.ppEnabledLayerNames = VALIDATION_LAYERS;
+#endif
 
 		instanceInfo.enabledExtensionCount = INSTANCE_EXT_COUNT;
 		instanceInfo.ppEnabledExtensionNames = INSTANCE_EXT_NAMES;
@@ -257,8 +284,10 @@ namespace Quadbit {
 		deviceInfo.pQueueCreateInfos = deviceQueueInfo.data();
 		deviceInfo.pEnabledFeatures = &deviceFeatures;
 
+#ifdef QBDEBUG
 		deviceInfo.enabledLayerCount = VALIDATION_LAYER_COUNT;
 		deviceInfo.ppEnabledLayerNames = VALIDATION_LAYERS;
+#endif
 
 		deviceInfo.enabledExtensionCount = DEVICE_EXT_COUNT;
 		deviceInfo.ppEnabledExtensionNames = DEVICE_EXT_NAMES;
@@ -316,11 +345,8 @@ namespace Quadbit {
 			VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
 
 		context_->allocator->CreateImage(context_->depthResources.depthImage, imageInfo, QBVK_MEMORY_USAGE_GPU_ONLY);
-
-
-		//VkUtils::CreateImage(context_, context_->swapchain.extent.width, context_->swapchain.extent.height, depthFormat, VK_IMAGE_TILING_OPTIMAL,
-			//VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, context_->depthResources.image, context_->depthResources.imageMemory);
 		context_->depthResources.imageView = VkUtils::CreateImageView(context_, context_->depthResources.depthImage.img, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
+
 		// Create single time command buffer
 		VkCommandBuffer transitionBuffer = VkUtils::InitSingleTimeCommandBuffer(context_);
 		VkImageAspectFlags aspectFlags = VkUtils::HasStencilComponent(depthFormat) ? VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT : VK_IMAGE_ASPECT_DEPTH_BIT;
@@ -432,10 +458,8 @@ namespace Quadbit {
 		vkDeviceWaitIdle(context_->device);
 
 		// Destroy depth resources
-		vkDestroyImageView(context_->device, context_->depthResources.imageView, nullptr);
 		context_->allocator->DestroyImage(context_->depthResources.depthImage);
-		//vkDestroyImage(context_->device, context_->depthResources.image, nullptr);
-		//vkFreeMemory(context_->device, context_->depthResources.imageMemory, nullptr);
+		vkDestroyImageView(context_->device, context_->depthResources.imageView, nullptr);
 
 		// Recreate swapchain and dependent resources
 		CreateSwapChain();
@@ -561,7 +585,7 @@ namespace Quadbit {
 		VK_CHECK(vkBeginCommandBuffer(commandbuffer, &commandBufferInfo));
 		vkCmdBeginRenderPass(commandbuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-		meshPipeline_->DrawFrame(commandbuffer);
+		meshPipeline_->DrawFrame(resourceIndex, commandbuffer);
 
 		imGuiPipeline_->DrawFrame(resourceIndex, commandbuffer);
 

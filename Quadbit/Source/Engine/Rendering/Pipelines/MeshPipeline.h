@@ -1,32 +1,29 @@
 #pragma once
 
 #include "../Common/QbVkCommon.h"
+#include "../../Entities/EntityManager.h"
+#include "../../Entities/InternalTypes.h"
 
 namespace Quadbit {
 	struct alignas(16) UniformBufferObject {
-		glm::mat4 model;
 		glm::mat4 view;
 		glm::mat4 proj;
-	};
-
-	struct alignas(16) PushConstants {
-		glm::mat4 mvp;
 	};
 
 	struct Vertex {
 		glm::vec3 pos;
 		glm::vec3 colour;
 
-		static VkVertexInputBindingDescription getBindingDescription() {
-			VkVertexInputBindingDescription bindingDescription = {};
+		static VkVertexInputBindingDescription GetBindingDescription() {
+			VkVertexInputBindingDescription bindingDescription{};
 			bindingDescription.binding = 0;
 			bindingDescription.stride = sizeof(Vertex);
 			bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 			return bindingDescription;
 		}
 
-		static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions() {
-			std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions = {};
+		static std::array<VkVertexInputAttributeDescription, 2> GetAttributeDescriptions() {
+			std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions{};
 			// Attribute description for the position
 			attributeDescriptions[0].binding = 0;
 			attributeDescriptions[0].location = 0;
@@ -41,19 +38,19 @@ namespace Quadbit {
 		}
 	};
 
-	const std::vector<Vertex> vertices = {
-		{{-1.0f, -1.0f, 1.0f}, {1.0f, 0.0f, 0.0f}},
-		{{1.0f, -1.0f, 1.0f}, {0.0f, 1.0f, 0.0f}},
-		{{1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 1.0f}},
-		{{-1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
+	const std::vector<Vertex> cubeVertices = {
+	{{-1.0f, -1.0f, 1.0f}, {1.0f, 0.0f, 0.0f}},
+	{{1.0f, -1.0f, 1.0f}, {0.0f, 1.0f, 0.0f}},
+	{{1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 1.0f}},
+	{{-1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
 
-		{{-1.0f, -1.0f, -1.0f}, {1.0f, 0.0f, 0.0f}},
-		{{1.0f, -1.0f, -1.0f}, {0.0f, 1.0f, 0.0f}},
-		{{1.0f, 1.0f, -1.0f}, {0.0f, 0.0f, 1.0f}},
-		{{-1.0f, 1.0f, -1.0f}, {1.0f, 1.0f, 1.0f}}
+	{{-1.0f, -1.0f, -1.0f}, {1.0f, 0.0f, 0.0f}},
+	{{1.0f, -1.0f, -1.0f}, {0.0f, 1.0f, 0.0f}},
+	{{1.0f, 1.0f, -1.0f}, {0.0f, 0.0f, 1.0f}},
+	{{-1.0f, 1.0f, -1.0f}, {1.0f, 1.0f, 1.0f}}
 	};
 
-	const std::vector<uint32_t> indices = {
+	const std::vector<uint32_t> cubeIndices = {
 		0, 1, 2,
 		2, 3, 0,
 		1, 5, 6,
@@ -68,19 +65,59 @@ namespace Quadbit {
 		6, 7, 3
 	};
 
+	struct MeshBuffers {
+		VertexBufHandle vertexBufferIdx_;
+		IndexBufHandle indexBufferIdx_;
+		std::array<QbVkBuffer, MAX_MESH_COUNT> vertexBuffers_;
+		std::array<QbVkBuffer, MAX_MESH_COUNT> indexBuffers_;
+		std::deque<VertexBufHandle> vertexBufferFreeList_;
+		std::deque<IndexBufHandle> indexBufferFreeList_;
+
+		VertexBufHandle GetNextVertexHandle() {
+			VertexBufHandle next = vertexBufferIdx_;
+			if(vertexBufferFreeList_.empty()) {
+				vertexBufferIdx_++;
+				assert(next < MAX_MESH_COUNT && "Cannot get next vertex buffer handle for mesh, max number of handles in use!");
+				return next;
+			}
+			else {
+				next = vertexBufferFreeList_.front();
+				vertexBufferFreeList_.pop_front();
+				assert(next < MAX_MESH_COUNT && "Cannot get next index buffer handle for mesh, max number of handles in use!");
+				return next;
+			}
+		}
+
+		IndexBufHandle GetNextIndexHandle() {
+			IndexBufHandle next = indexBufferIdx_;
+			if(indexBufferFreeList_.empty()) {
+				indexBufferIdx_++;
+				assert(next < MAX_MESH_COUNT);
+				return next;
+			}
+			else {
+				next = indexBufferFreeList_.front();
+				indexBufferFreeList_.pop_front();
+				assert(next < MAX_MESH_COUNT);
+				return next;
+			}
+		}
+	};
+
 	class MeshPipeline {
 	public:
-		MeshPipeline(std::shared_ptr<QbVkContext> context);
+		MeshPipeline(std::shared_ptr<QbVkContext> context, std::shared_ptr<EntityManager> entityManager);
 		~MeshPipeline();
 		void RebuildPipeline();
 
-		void DrawFrame(VkCommandBuffer commandbuffer);
+		void DrawFrame(uint32_t resourceIndex, VkCommandBuffer commandbuffer);
 		void UpdateUniformBuffers(uint32_t currentImage);
 
 	private:
-		PushConstants pushConstants_{};
+		friend class QbVkRenderer;
 
 		std::shared_ptr<QbVkContext> context_ = nullptr;
+		std::shared_ptr<EntityManager> entityManager_ = nullptr;
 
 		VkDescriptorPool descriptorPool_ = VK_NULL_HANDLE;
 		VkDescriptorSetLayout descriptorSetLayout_ = VK_NULL_HANDLE;
@@ -89,19 +126,23 @@ namespace Quadbit {
 		VkPipelineLayout pipelineLayout_ = VK_NULL_HANDLE;
 		VkPipeline pipeline_ = VK_NULL_HANDLE;
 
-		QbVkBuffer vertexBuffer_;
-		QbVkBuffer indexBuffer_;
+		std::array<QbVkBuffer, MAX_FRAMES_IN_FLIGHT> uniformBuffers_;
 
-		std::array<VkBuffer, MAX_FRAMES_IN_FLIGHT> uniformBuffers_;
-		std::array<VkDeviceMemory, MAX_FRAMES_IN_FLIGHT> uniformBuffersMemory_;
+		RenderMeshPushConstants pushConstants_{};
+		MeshBuffers meshBufs_{};
+
+		Entity mainCamera_;
 
 		void CreateDescriptorPool();
 		void CreateDescriptorSetLayout();
 		void CreateDescriptorSets();
-
 		void CreatePipeline();
-		void CreateVertexBuffer();
-		void CreateIndexBuffer();
+
+		void DestroyVertexBuffer(VertexBufHandle handle);
+		void DestroyIndexBuffer(IndexBufHandle handle);
+		VertexBufHandle CreateVertexBuffer(const std::vector<Vertex>& vertices);
+		IndexBufHandle CreateIndexBuffer(const std::vector<uint32_t>& indices);
+
 		void CreateUniformBuffers();
 	};
 }

@@ -26,8 +26,8 @@ namespace Quadbit {
 		}
 
 		template<typename T>
-		T* const GetComponent() {
-			return manager_->GetComponent<T>(*this);
+		T* const GetComponentPtr() {
+			return manager_->GetComponentPtr<T>(*this);
 		}
 
 		template<typename T>

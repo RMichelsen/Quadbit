@@ -5,18 +5,21 @@
 #include "Pipelines/ImGuiPipeline.h"
 #include "Memory/QbVkAllocator.h"
 #include "../Entities/EntityManager.h"
+#include "../Entities/InternalTypes.h"
 
 namespace Quadbit {
 	class QbVkRenderer {
 	public:
-		bool canRender_ = false;
-
 		QbVkRenderer(HINSTANCE hInstance, HWND hwnd, std::shared_ptr<Quadbit::EntityManager> registry);
 		~QbVkRenderer();
 
+		RenderMesh CreateMesh(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices, float scale, glm::vec3 position, glm::quat rotation);
+		void DestroyMesh(const RenderMesh& mesh);
 		void DrawFrame();
 
 	private:
+		bool canRender_ = false;
+
 		HINSTANCE localHandle_ = NULL;
 		HWND windowHandle_ = NULL;
 

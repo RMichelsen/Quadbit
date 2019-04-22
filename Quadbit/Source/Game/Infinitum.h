@@ -17,4 +17,5 @@ private:
 	std::shared_ptr<Quadbit::EntityManager> entityManager_;
 	std::unique_ptr<Quadbit::QbVkRenderer> renderer_;
 
+
 };

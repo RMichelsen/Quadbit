@@ -22,11 +22,6 @@ constexpr const char* VALIDATION_LAYERS[VALIDATION_LAYER_COUNT]{
 "VK_LAYER_LUNARG_standard_validation",
 "VK_LAYER_LUNARG_monitor",
 };
-#else
-constexpr int VALIDATION_LAYER_COUNT = 1;
-constexpr const char* VALIDATION_LAYERS[VALIDATION_LAYER_COUNT]{
-	"VK_LAYER_LUNARG_monitor"
-};
 #endif
 
 // Add debug messenger callback extension for validation layer if in debug mode
@@ -50,7 +45,8 @@ constexpr const char* DEVICE_EXT_NAMES[DEVICE_EXT_COUNT]{
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
 
-constexpr const int MAX_FRAMES_IN_FLIGHT = 2;
+constexpr int MAX_FRAMES_IN_FLIGHT = 2;
+constexpr int MAX_MESH_COUNT = 8192;
 
 constexpr const char* VulkanErrorToString(VkResult vkResult) {
 	switch(vkResult) {
@@ -85,6 +81,9 @@ constexpr const char* VulkanErrorToString(VkResult vkResult) {
 }
 
 namespace Quadbit {
+	using VertexBufHandle = uint16_t;
+	using IndexBufHandle = uint16_t;
+
 	enum QbVkMemoryUsage {
 		QBVK_MEMORY_USAGE_UNKNOWN,
 		QBVK_MEMORY_USAGE_CPU_ONLY,

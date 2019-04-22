@@ -3,7 +3,6 @@
 #include "Engine/Application/InputHandler.h"
 #include "Engine/Application/Time.h"
 #include "Engine/Application/Window.h"
-#include "Engine/Rendering/Camera.h"
 #include "Game/Infinitum.h"
 
 int __stdcall WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nCmdShow) {
@@ -19,7 +18,6 @@ int __stdcall WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		// Simulate and update the gamestate
 		game->Simulate(Quadbit::Time::deltaTime);
 
-		Quadbit::Camera::UpdateCamera(Quadbit::Time::deltaTime);
 		// Render the frame
 		game->DrawFrame();
 	}

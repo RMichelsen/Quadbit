@@ -45,27 +45,6 @@ namespace Quadbit {
 		}
 	}
 
-	void ImGuiPipeline::NewFrame() {
-		ImGuiIO& io = ImGui::GetIO();
-		io.DeltaTime = Time::deltaTime;
-
-		io.MousePos = ImVec2(static_cast<float>(InputHandler::clientMousePos.x), static_cast<float>(InputHandler::clientMousePos.y));
-		io.MouseDown[0] = InputHandler::mouseButtonStatus.left;
-		io.MouseDown[1] = InputHandler::mouseButtonStatus.right;
-
-		ImGui::NewFrame();
-
-		context_->allocator->ImGuiDrawState();
-
-		// Get injected ImGui commands from the global state
-		for(const auto& injector : ImGuiState::injectors) {
-			injector();
-		}
-
-		// Render to generate draw buffers
-		ImGui::Render();
-	}
-
 	void ImGuiPipeline::UpdateBuffers(uint32_t resourceIndex) {
 		ImDrawData* imDrawData = ImGui::GetDrawData();
 
@@ -414,5 +393,55 @@ namespace Quadbit {
 
 		vkDestroyShaderModule(context_->device, vertShaderModule, nullptr);
 		vkDestroyShaderModule(context_->device, fragShaderModule, nullptr);
+	}
+
+	void ImGuiPipeline::DrawStats() {
+		static auto tStart = std::chrono::time_point_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now());
+		auto tEnd = std::chrono::high_resolution_clock::now();
+
+		if(static_cast<std::chrono::duration<float, std::ratio<1>>>(tEnd - tStart).count() > 1) {
+			currentFrametime_ = std::accumulate(frametimeCache_.begin(), frametimeCache_.end(), 0.0f) / frametimeCache_.size() * 1000.0f;
+			currentFPS_ = frametimeCache_.size();
+			tStart = std::chrono::high_resolution_clock::now();
+			frametimeCache_.clear();
+		}
+
+		const float margin = 10.0f;
+		ImGuiIO& io = ImGui::GetIO();
+
+		ImVec2 window_pos = ImVec2(margin, margin);
+		ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always);
+		ImGui::SetNextWindowBgAlpha(0.5f);
+		ImGui::Begin("Stats", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+			ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav);
+
+		ImGui::Text("Frametime: %.2f ms", currentFrametime_);
+		ImGui::Separator();
+		ImGui::Text("FPS: %i", currentFPS_);
+
+		ImGui::End();
+	}
+
+	void ImGuiPipeline::NewFrame() {
+		ImGuiIO& io = ImGui::GetIO();
+		io.DeltaTime = Time::deltaTime;
+		frametimeCache_.push_back(Time::deltaTime);
+
+		io.MousePos = ImVec2(static_cast<float>(InputHandler::clientMousePos.x), static_cast<float>(InputHandler::clientMousePos.y));
+		io.MouseDown[0] = InputHandler::mouseButtonStatus.left;
+		io.MouseDown[1] = InputHandler::mouseButtonStatus.right;
+
+		ImGui::NewFrame();
+
+		DrawStats();
+		context_->allocator->ImGuiDrawState();
+
+		// Get injected ImGui commands from the global state
+		for(const auto& injector : ImGuiState::injectors) {
+			injector();
+		}
+
+		// Render to generate draw buffers
+		ImGui::Render();
 	}
 }

@@ -1,32 +1,38 @@
 #include <PCH.h>
 #include "Infinitum.h"
 
+#include "../Engine/Application/Time.h"
 #include "../Engine/Entities/InternalTypes.h"
 
-struct Position {
-	float x;
-	float y;
-	float z;
-};
-
-struct Rotation {
-	glm::vec3 rot;
-};
-
 void Infinitum::Init() {
-	entityManager_->RegisterComponent<Position>();
-	entityManager_->RegisterComponent<Rotation>();
+	//entityManager_->RegisterComponent<Quadbit::RenderMesh>();
 
-	for(auto i = 0; i < 1000000; i++) {
-		auto entity = entityManager_->Create();
-		entity.AddComponent<Position>();
+
+	for(auto i = 0; i < 20; i++) {
+		for(auto j = 0; j < 20; j++) {
+			for(auto k = 0; k < 20; k++) {
+				auto entity = entityManager_->Create();
+				entity.AddComponent<Quadbit::RenderMesh>(
+					renderer_->CreateMesh(
+						Quadbit::cubeVertices, Quadbit::cubeIndices, 1.0f, 
+						glm::vec3(static_cast<float>(i * 4), static_cast<float>(j * 4), static_cast<float>(k * 4)), 
+						glm::quat())
+					);
+			}
+		}
 	}
+
+	//for(auto i = 0; i < 1000; i++) {
+	//	auto entity = entityManager_->Create();
+	//	entity.AddComponent<Quadbit::Mesh>({ 0, 0, glm::mat4() });
+	//	entity.Destroy();
+	//}
 }
 
 void Infinitum::Simulate(float deltaTime) {
-	entityManager_->ParForEach<Position>([](auto & pos) {
-		pos.x += std::sqrt(std::sin(1.0f) * std::cos(1.0f));
-	});
+	//entityManager_->ForEach<Quadbit::Mesh>([](Quadbit::Mesh& mesh) {
+	//	mesh.indexHandle++;
+	//});
 }
 
 void Infinitum::DrawFrame() {

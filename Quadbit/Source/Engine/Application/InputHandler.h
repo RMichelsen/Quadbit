@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Logging.h"
+
 namespace Quadbit::InputHandler {
 	struct MouseButtonStatus {
 		bool left;
@@ -116,12 +118,13 @@ namespace Quadbit::InputHandler {
 		case WM_INPUT: {
 			uint32_t inputSize = 0;
 			GetRawInputData((HRAWINPUT)lParam, RID_INPUT, nullptr, &inputSize, sizeof(RAWINPUTHEADER));
-			static std::vector<std::byte> rawInput(inputSize);
-			if(GetRawInputData((HRAWINPUT)lParam, RID_INPUT, &rawInput[0], &inputSize, sizeof(RAWINPUTHEADER)) != inputSize) {
-				return 1;
+			LPBYTE rawInput = new BYTE[inputSize];
+			if(GetRawInputData((HRAWINPUT)lParam, RID_INPUT, rawInput, &inputSize, sizeof(RAWINPUTHEADER)) != inputSize) {
+				QB_LOG_ERROR("GetRawInputData didn't return correct size!\n");
 			}
 			else {
-				ProcessInput((RAWINPUT*)& rawInput[0], hwnd);
+				ProcessInput((RAWINPUT*)rawInput, hwnd);
+				delete[] rawInput;
 			}
 			break;
 		}

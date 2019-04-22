@@ -422,7 +422,6 @@
     <ClInclude Include="Source\Engine\Rendering\Pipelines\ImGuiPipeline.h" />
     <ClInclude Include="Source\Engine\Rendering\Pipelines\MeshPipeline.h" />
     <ClInclude Include="Source\Engine\Rendering\QbVkRenderer.h" />
-    <ClInclude Include="Source\Engine\Rendering\Camera.h" />
     <ClInclude Include="Source\Game\Infinitum.h" />
     <ClInclude Include="Source\PCH\PCH.h" />
   </ItemGroup>
@@ -594,7 +593,6 @@
     <ClCompile Include="Source\Engine\Rendering\Pipelines\ImGuiPipeline.cpp" />
     <ClCompile Include="Source\Engine\Rendering\Pipelines\MeshPipeline.cpp" />
     <ClCompile Include="Source\Engine\Rendering\QbVkRenderer.cpp" />
-    <ClCompile Include="Source\Engine\Rendering\Camera.cpp" />
     <ClCompile Include="Source\Game\Infinitum.cpp" />
     <ClCompile Include="Source\Main.cpp" />
     <ClCompile Include="Source\PCH\PCH.cpp">

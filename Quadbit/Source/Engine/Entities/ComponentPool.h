@@ -24,11 +24,7 @@ namespace Quadbit {
 
 		void Insert(EntityID id) {
 			assert(id.index < sparse_.size());
-
-			if(sparse_[id.index] != 0xFFFF'FFFF) {
-				QB_LOG_WARN("Failed to add component: \"%s\" is already part of Entity: %i\n", typeid(T).name(), id.index);
-				return;
-			}
+			assert(sparse_[id.index] == 0xFFFF'FFFF && "Failed to add component: Component is already part of entity");
 
 			sparse_[id.index] = static_cast<uint32_t>(dense_.size());
 			dense_.push_back(T());
@@ -37,11 +33,7 @@ namespace Quadbit {
 
 		void Insert(EntityID id, T&& t) {
 			assert(id.index < sparse_.size());
-
-			if(sparse_[id.index] != 0xFFFF'FFFF) {
-				QB_LOG_WARN("Failed to add component: \"%s\" is already part of Entity: %i\n", typeid(T).name(), id.index);
-				return;
-			}
+			assert(sparse_[id.index] == 0xFFFF'FFFF && "Failed to add component: Component is already part of entity");
 
 			sparse_[id.index] = static_cast<uint32_t>(dense_.size());
 			dense_.push_back(t);
@@ -50,11 +42,7 @@ namespace Quadbit {
 
 		void Remove(EntityID id) {
 			assert(id.index < sparse_.size());
-
-			if(sparse_[id.index] == 0xFFFF'FFFF) {
-				QB_LOG_WARN("Failed to remove component: \"%s\" is not part of Entity: %i\n", typeid(T).name(), id.index);
-				return;
-			}
+			assert(sparse_[id.index] != 0xFFFF'FFFF && "Failed to remove component: Component is not part of the entity");
 
 			// Removal works by swap and pop
 			uint32_t lastIndex = FindEntityID(static_cast<uint32_t>(dense_.size()) - 1);
@@ -69,7 +57,6 @@ namespace Quadbit {
 
 		void RemoveIfExists(EntityID id) override {
 			assert(id.index < sparse_.size());
-
 			if(sparse_[id.index] == 0xFFFF'FFFF) return;
 
 			// Removal works by swap and pop
@@ -90,11 +77,8 @@ namespace Quadbit {
 
 		T* const GetComponentPtr(EntityID id) {
 			assert(id.index < sparse_.size());
+			assert(sparse_[id.index] != 0xFFFF'FFFF && "Failed to get component: Component is not part of the entity");
 
-			if(sparse_[id.index] == 0xFFFF'FFFF) {
-				QB_LOG_WARN("Failed to get component: no component of type \"%s\" was found in Entity: %i\n", typeid(T).name(), id.index);
-				return nullptr;
-			}
 			return &dense_[sparse_[id.index]];
 		}
 

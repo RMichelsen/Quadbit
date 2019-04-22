@@ -783,9 +783,6 @@
     <ClInclude Include="Source\Engine\Rendering\Pipelines\MeshPipeline.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Engine\Rendering\Camera.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Engine\Rendering\QbVkRenderer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -1257,9 +1254,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Source\Engine\Rendering\Pipelines\MeshPipeline.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Engine\Rendering\Camera.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Source\Engine\Rendering\QbVkRenderer.cpp">
