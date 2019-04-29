@@ -1,8 +1,8 @@
 #include <PCH.h>
 #include "Window.h"
 
-#include "../Application/Time.h"
-#include "../Application/InputHandler.h"
+#include "../Core/Time.h"
+#include "../Core/InputHandler.h"
 
 namespace Quadbit {
 	Window::Window(HINSTANCE hInstance, int nCmdShow, WNDPROC windowProc) {
@@ -29,6 +29,7 @@ namespace Quadbit {
 
 	bool Window::ProcessMessages() {
 		Time::UpdateTimer();
+		InputHandler::Update();
 		MSG msg;
 		while(PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
 			TranslateMessage(&msg);

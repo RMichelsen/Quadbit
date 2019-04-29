@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Common/QbVkCommon.h"
+#include "../Common/QbVkDefines.h"
 #include "QbVkPool.h"
 
 namespace Quadbit {

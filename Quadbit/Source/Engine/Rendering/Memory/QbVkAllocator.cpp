@@ -85,7 +85,7 @@ namespace Quadbit {
 	}
 
 	void QbVkAllocator::ImGuiDrawState() {
-		ImGui::SetNextWindowSize(ImVec2(500, 400), ImGuiCond_FirstUseEver);
+		ImGui::SetNextWindowSize(ImVec2(500, 200), ImGuiCond_FirstUseEver);
 		ImGui::Begin("Quadbit Vulkan Allocator", nullptr);
 
 		char memoryTypeTitle[16];
@@ -99,6 +99,7 @@ namespace Quadbit {
 				}
 			}
 		}
+
 		ImGui::End();
 	}
 
@@ -134,8 +135,8 @@ namespace Quadbit {
 			requiredMemoryProperties |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 			break;
 		case QBVK_MEMORY_USAGE_GPU_TO_CPU:
-			requiredMemoryProperties |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 			optimalMemoryProperties |= VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
+			requiredMemoryProperties |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 			break;
 		default:
 			QB_LOG_WARN("QbVkAllocator: Couldn't find appropriate memory type.\n");

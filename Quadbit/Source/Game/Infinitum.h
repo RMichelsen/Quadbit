@@ -1,12 +1,14 @@
 #pragma once
 
 #include "../Engine/Rendering/QbVkRenderer.h"
+#include "../Engine/Entities/EntityManager.h"
+#include "../Engine/Physics/PhysicsWorld.h"
+
 
 class Infinitum {
 public:
 	Infinitum(HINSTANCE hInstance, HWND hwnd) {
-		entityManager_ = std::make_shared<Quadbit::EntityManager>();
-		renderer_ = std::make_unique<Quadbit::QbVkRenderer>(hInstance, hwnd, entityManager_);
+		renderer_ = std::make_unique<Quadbit::QbVkRenderer>(hInstance, hwnd);
 	}
 
 	void Init();
@@ -14,8 +16,10 @@ public:
 	void DrawFrame();
 
 private:
-	std::shared_ptr<Quadbit::EntityManager> entityManager_;
 	std::unique_ptr<Quadbit::QbVkRenderer> renderer_;
+	FastNoiseSIMD* fastnoise_;
+	Quadbit::PhysicsWorld* physicsWorld_;
 
-
+	Quadbit::Entity camera_;
+	Quadbit::Entity player_;
 };

@@ -2,6 +2,23 @@
 #include "EntityManager.h"
 
 namespace Quadbit {
+	Entity::Entity() : manager_(EntityManager::GetOrCreate()), id_(0, 1) {}
+
+
+	void Entity::Destroy() {
+		manager_->Destroy(*this);
+	}
+
+	bool Entity::IsValid() {
+		if(manager_ == nullptr) return false;
+		return id_.version == manager_->GetEntityVersion(id_);
+	}
+
+	EntityManager* EntityManager::GetOrCreate() {
+		static EntityManager* instance = new EntityManager();
+		return instance;
+	}
+
 	Entity EntityManager::Create() {
 		// If the freelist is empty, just add a new entity with version 1
 		if(entityFreeList_.empty()) {

@@ -1,7 +1,7 @@
 #include <PCH.h>
 
-#include "Engine/Application/InputHandler.h"
-#include "Engine/Application/Time.h"
+#include "Engine/Core/InputHandler.h"
+#include "Engine/Core/Time.h"
 #include "Engine/Application/Window.h"
 #include "Game/Infinitum.h"
 

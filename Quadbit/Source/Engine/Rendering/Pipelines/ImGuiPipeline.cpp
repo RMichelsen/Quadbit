@@ -2,9 +2,10 @@
 #include "ImGuiPipeline.h"
 
 #include "../Common/QbVkUtils.h"
-#include "../../Application/InputHandler.h"
-#include "../../Application/Time.h"
+#include "../../Core/InputHandler.h"
+#include "../../Core/Time.h"
 #include "../../Global/ImGuiState.h"
+#include "../../Entities/EntityManager.h"
 
 namespace Quadbit {
 	ImGuiPipeline::ImGuiPipeline(std::shared_ptr<QbVkContext> context) : context_(context) {
@@ -342,7 +343,8 @@ namespace Quadbit {
 		// This part specifies the multisampling stage for ImGui
 		VkPipelineMultisampleStateCreateInfo multisampleInfo =
 			VkUtils::Init::PipelineMultisampleStateCreateInfo();
-		multisampleInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+		multisampleInfo.sampleShadingEnable = VK_FALSE;
+		multisampleInfo.rasterizationSamples = context_->multisamplingResources.msaaSamples;
 
 		// This part specifies the blending for ImGui
 		VkPipelineColorBlendAttachmentState colorBlendAttachment =
@@ -434,6 +436,7 @@ namespace Quadbit {
 		ImGui::NewFrame();
 
 		DrawStats();
+		EntityManager::GetOrCreate()->systemDispatch_->ImGuiDrawSystemStats();
 		context_->allocator->ImGuiDrawState();
 
 		// Get injected ImGui commands from the global state

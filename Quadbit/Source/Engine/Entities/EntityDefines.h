@@ -2,10 +2,24 @@
 
 #include <stdint.h>
 
-
 namespace Quadbit {
-	constexpr size_t MAX_COMPONENTS = 128 ;
+	constexpr size_t MAX_SYSTEMS = 256;
+	constexpr size_t MAX_COMPONENTS = 128;
 	constexpr size_t INIT_MAX_ENTITIES = 5'000'000;
+
+	class SystemID {
+	public:
+		template<typename>
+		static std::size_t GetUnique() noexcept {
+			static const std::size_t val = GetID();
+			return val;
+		}
+	private:
+		static std::size_t GetID() noexcept {
+			static std::size_t val = 0;
+			return val++;
+		}
+	};
 
 	class ComponentID {
 	public:

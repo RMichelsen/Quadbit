@@ -4,7 +4,7 @@
 #include <vulkan/vulkan.h>
 #include <vector>
 
-#include "QbVkCommon.h"
+#include "QbVkDefines.h"
 #include "../Memory/QbVkAllocator.h"
 
 namespace Quadbit::VkUtils {
@@ -59,7 +59,7 @@ namespace Quadbit::VkUtils {
 			return imageViewCreateInfo;
 		}
 
-		inline VkImageCreateInfo ImageCreateInfo(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage) {
+		inline VkImageCreateInfo ImageCreateInfo(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkSampleCountFlagBits numSamples = VK_SAMPLE_COUNT_1_BIT) {
 			VkImageCreateInfo imageCreateInfo{};
 			imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 			imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -72,7 +72,7 @@ namespace Quadbit::VkUtils {
 			imageCreateInfo.tiling = tiling;
 			imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 			imageCreateInfo.usage = usage;
-			imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+			imageCreateInfo.samples = numSamples;
 			imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 			return imageCreateInfo;
 		}
@@ -402,6 +402,20 @@ namespace Quadbit::VkUtils {
 		return true;
 	}
 
+	inline VkSampleCountFlagBits GetMaxSampleCount(const VkPhysicalDeviceProperties& deviceProperties) {
+		VkSampleCountFlags commonCount = std::min(deviceProperties.limits.framebufferColorSampleCounts,
+			deviceProperties.limits.framebufferDepthSampleCounts);
+
+		// Pick the maximum usable sample count (the minimum of colour and depth max sample counts)
+		if(commonCount & VK_SAMPLE_COUNT_64_BIT) return VK_SAMPLE_COUNT_64_BIT;
+		if(commonCount & VK_SAMPLE_COUNT_32_BIT) return VK_SAMPLE_COUNT_32_BIT;
+		if(commonCount & VK_SAMPLE_COUNT_16_BIT) return VK_SAMPLE_COUNT_16_BIT;
+		if(commonCount & VK_SAMPLE_COUNT_8_BIT) return VK_SAMPLE_COUNT_8_BIT;
+		if(commonCount & VK_SAMPLE_COUNT_4_BIT) return VK_SAMPLE_COUNT_4_BIT;
+		if(commonCount & VK_SAMPLE_COUNT_2_BIT) return VK_SAMPLE_COUNT_2_BIT;
+		return VK_SAMPLE_COUNT_1_BIT;
+	}
+
 	inline bool FindSuitableGPU(std::shared_ptr<QbVkContext> context, const std::vector<VkPhysicalDevice>& physicalDevices) {
 		size_t physicalDeviceCount = physicalDevices.size();
 		GPU gpu{};
@@ -413,6 +427,7 @@ namespace Quadbit::VkUtils {
 
 			QB_LOG_INFO("Found Appropriate Discrete GPU: %s\n", gpu.deviceProps.deviceName);
 			context->gpu = std::make_unique<GPU>(gpu);
+			context->multisamplingResources.msaaSamples = GetMaxSampleCount(context->gpu->deviceProps);
 			return true;
 		}
 
@@ -423,6 +438,7 @@ namespace Quadbit::VkUtils {
 
 			QB_LOG_INFO("Found Appropriate Integrated GPU: %s\n", gpu.deviceProps.deviceName);
 			context->gpu = std::make_unique<GPU>(gpu);
+			context->multisamplingResources.msaaSamples = GetMaxSampleCount(context->gpu->deviceProps);
 			return true;
 		}
 
@@ -686,7 +702,7 @@ namespace Quadbit::VkUtils {
 		framebufferInfo.width = context->swapchain.extent.width;
 		framebufferInfo.height = context->swapchain.extent.height;
 		framebufferInfo.layers = 1;
-		std::array<VkImageView, 2> attachments = { imageView, context->depthResources.imageView };
+		std::array<VkImageView, 3> attachments = { context->multisamplingResources.msaaImageView, context->depthResources.imageView, imageView };
 		framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
 		framebufferInfo.pAttachments = attachments.data();
 

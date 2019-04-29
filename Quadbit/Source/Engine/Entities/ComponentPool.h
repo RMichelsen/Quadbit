@@ -1,14 +1,13 @@
 #pragma once
 #include <vector>
 
-#include "../Entities/EntitiesCommon.h"
+#include "../Entities/EntityDefines.h"
 
 namespace Quadbit {
 
 	class ComponentPool {
 	public:
 		virtual void RemoveIfExists(EntityID id) = 0;
-		virtual bool HasComponent(EntityID id) = 0;
 	};
 
 	template<typename T>
@@ -70,7 +69,7 @@ namespace Quadbit {
 			entityFromComponentIndices_.pop_back();
 		}
 
-		bool HasComponent(EntityID id) override {
+		bool HasComponent(EntityID id) {
 			assert(id.index < sparse_.size());
 			return sparse_[id.index] != 0xFFFF'FFFF;
 		}

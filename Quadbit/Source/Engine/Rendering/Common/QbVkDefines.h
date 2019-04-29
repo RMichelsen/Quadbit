@@ -46,7 +46,6 @@ constexpr const char* DEVICE_EXT_NAMES[DEVICE_EXT_COUNT]{
 };
 
 constexpr int MAX_FRAMES_IN_FLIGHT = 2;
-constexpr int MAX_MESH_COUNT = 8192;
 
 constexpr const char* VulkanErrorToString(VkResult vkResult) {
 	switch(vkResult) {
@@ -148,6 +147,12 @@ namespace Quadbit {
 		std::vector<VkImageView> imageViews;
 	};
 
+	struct MSAAResources {
+		VkSampleCountFlagBits msaaSamples;
+		QbVkImage msaaImage;
+		VkImageView msaaImageView;
+	};
+
 	struct DepthResources {
 		QbVkImage depthImage{};
 		VkImageView imageView = VK_NULL_HANDLE;
@@ -170,6 +175,7 @@ namespace Quadbit {
 		VkQueue graphicsQueue = VK_NULL_HANDLE;
 		VkQueue presentQueue = VK_NULL_HANDLE;
 
+		MSAAResources multisamplingResources;
 		DepthResources depthResources{};
 		Swapchain swapchain{};
 

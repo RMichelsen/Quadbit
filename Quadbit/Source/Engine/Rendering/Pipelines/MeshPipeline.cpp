@@ -1,28 +1,31 @@
 #include <PCH.h>
 #include "MeshPipeline.h"
 
-#include "../../Application/Time.h"
-#include "../../Application/InputHandler.h"
+#include "../../Core/Time.h"
+#include "../../Core/InputHandler.h"
+
 #include "../Common/QbVkUtils.h"
-#include "../../Entities/InternalTypes.h"
+
+#include "../../Entities/ComponentSystem.h"
+#include "../../Entities/SystemDispatch.h"
+
+#include "../Systems/NoClipCameraSystem.h"
 
 namespace Quadbit {
-	MeshPipeline::MeshPipeline(std::shared_ptr<QbVkContext> context, std::shared_ptr<EntityManager> entityManager) {
+	MeshPipeline::MeshPipeline(std::shared_ptr<QbVkContext> context) {
 		this->context_ = context;
-		this->entityManager_ = entityManager;
+		this->entityManager_ = EntityManager::GetOrCreate();
 
 		// Register the mesh component to be used by the ECS
-		entityManager->RegisterComponent<RenderMesh>();
-		entityManager->RegisterComponent<RenderCamera>();
-		entityManager->RegisterComponent<CameraUpdateAspectRatioTag>();
-		mainCamera_ = entityManager->Create();
-		mainCamera_.AddComponent<RenderCamera>(RenderCamera(-30.0f, 270.0f, glm::vec3(0.0f, 4.0f, 6.0f), 
-			static_cast<float>(context_->swapchain.extent.width) / static_cast<float>(context_->swapchain.extent.height), 1000.0f));
+		entityManager_->RegisterComponents<RenderMeshComponent, TransformComponent, RenderCamera, CameraUpdateAspectRatioTag>();
 
-		CreateUniformBuffers();
-		CreateDescriptorPool();
-		CreateDescriptorSetLayout();
-		CreateDescriptorSets();
+		fallbackCamera_ = entityManager_->Create();
+		fallbackCamera_.AddComponent<RenderCamera>(Quadbit::RenderCamera(305.0f, -50.0f, glm::vec3(-24.0f, 122.0f, 93.0f), 16.0f / 9.0f, 10000.0f));
+
+		//CreateUniformBuffers();
+		//CreateDescriptorPool();
+		//CreateDescriptorSetLayout();
+		//CreateDescriptorSets();
 
 		CreatePipeline();
 	}
@@ -52,7 +55,8 @@ namespace Quadbit {
 		vkDestroyPipelineLayout(context_->device, pipelineLayout_, nullptr);
 		vkDestroyPipeline(context_->device, pipeline_, nullptr);
 
-		mainCamera_.AddComponent<CameraUpdateAspectRatioTag>();
+		fallbackCamera_.AddComponent<CameraUpdateAspectRatioTag>();
+		if(userCamera_.IsValid()) userCamera_.AddComponent<CameraUpdateAspectRatioTag>();
 
 		// Create new pipeline
 		CreatePipeline();
@@ -60,153 +64,98 @@ namespace Quadbit {
 
 	void MeshPipeline::DrawFrame(uint32_t resourceIndex, VkCommandBuffer commandbuffer) {
 		entityManager_->ForEach<RenderCamera, CameraUpdateAspectRatioTag>([&](Entity entity, auto& camera, auto& tag) noexcept {
-			camera.perspective = glm::perspective(glm::radians(45.0f), static_cast<float>(context_->swapchain.extent.width) / static_cast<float>(context_->swapchain.extent.height), 0.1f, 1000.0f);
+			camera.perspective =
+				glm::perspective(glm::radians(45.0f), static_cast<float>(context_->swapchain.extent.width) / static_cast<float>(context_->swapchain.extent.height), 0.1f, camera.viewDistance);
 			camera.perspective[1][1] *= -1;
 		});
 
-		entityManager_->ForEach<RenderCamera>([](Entity entity, auto& camera) noexcept {
-			if(InputHandler::rightMouseDragging && !camera.dragActive) {
-				camera.dragActive = true;
-				ShowCursor(false);
-			}
-			else if(!InputHandler::rightMouseDragging && camera.dragActive) {
-				camera.dragActive = false;
-				// Set the cursor back to the cached position
-				SetCursorPos(InputHandler::rightDragCachedPos.x, InputHandler::rightDragCachedPos.y);
-				ShowCursor(true);
-			}
+		//UpdateUniformBuffers(resourceIndex);
 
-			if(InputHandler::rightMouseDragging || InputHandler::keycodes[0x41] || InputHandler::keycodes[0x44] ||
-				InputHandler::keycodes[0x53] || InputHandler::keycodes[0x57]) {
+		if(!userCamera_.IsValid()) {
+			entityManager_->systemDispatch_->RunSystem<NoClipCameraSystem>(Time::deltaTime);
+		}
 
-				const float cameraSpeed = 0.05f;
-
-				// 'W'
-				if(InputHandler::keycodes[0x57]) {
-					camera.pos += camera.front * cameraSpeed;
-				}
-				// 'S'
-				if(InputHandler::keycodes[0x53]) {
-					camera.pos -= camera.front * cameraSpeed;
-				}
-				// 'D'
-				if(InputHandler::keycodes[0x44]) {
-					camera.pos += glm::normalize(glm::cross(camera.front, glm::vec3(0.0f, 1.0f, 0.0f))) * cameraSpeed;
-				}
-				// 'A'
-				if(InputHandler::keycodes[0x41]) {
-					camera.pos -= glm::normalize(glm::cross(camera.front, glm::vec3(0.0f, 1.0f, 0.0f))) * cameraSpeed;
-				}
-
-				if(InputHandler::rightMouseDragging) {
-					const float dragSpeed = 0.05f;
-					auto deltaMove = InputHandler::ProcessDeltaMovement();
-
-					if(deltaMove[0] != 0) {
-						camera.yaw += static_cast<float>(deltaMove[0]) * dragSpeed;
-					}
-					if(deltaMove[1] != 0) {
-						camera.pitch -= static_cast<float>(deltaMove[1]) * dragSpeed;
-						// Put constraints on pitch.
-						// 1.5533rad is approx 89deg
-						if(camera.pitch > 89.0f) {
-							camera.pitch = 89.0f;
-						}
-						if(camera.pitch < -89.0f) {
-							camera.pitch = -89.0f;
-						}
-					}
-				}
-				// Update view matrix
-				camera.front.x = cos(glm::radians(camera.yaw)) * cos(glm::radians(camera.pitch));
-				camera.front.y = sin(glm::radians(camera.pitch));
-				camera.front.z = sin(glm::radians(camera.yaw)) * cos(glm::radians(camera.pitch));
-				camera.front = glm::normalize(camera.front);
-				camera.view = glm::lookAt(camera.pos, camera.pos + camera.front, camera.up);
-			}
-		});
-
-		UpdateUniformBuffers(resourceIndex);
-
-		entityManager_->ForEach<RenderMesh>([&](Entity entity, auto& mesh) noexcept {
-			mesh.dynamicData.model = glm::rotate(mesh.dynamicData.model, glm::radians(180.0f) * Time::deltaTime, glm::vec3(0.3f, 0.7f, 0.0f));
-
+		Quadbit::RenderCamera* camera;
+		userCamera_.IsValid() ? camera = userCamera_.GetComponentPtr<RenderCamera>() : camera = fallbackCamera_.GetComponentPtr<RenderCamera>();
+		entityManager_->ForEach<RenderMeshComponent, TransformComponent>([&](Entity entity, RenderMeshComponent& mesh, TransformComponent& transform) noexcept {
 			vkCmdBindPipeline(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
+
+			mesh.dynamicData.MVP = camera->perspective * camera->view * transform.model;
 			vkCmdPushConstants(commandbuffer, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RenderMeshPushConstants), &mesh.dynamicData);
 
 			VkDeviceSize offsets[]{ 0 };
 			vkCmdBindVertexBuffers(commandbuffer, 0, 1, &meshBufs_.vertexBuffers_[mesh.vertexHandle].buf, offsets);
 			vkCmdBindIndexBuffer(commandbuffer, meshBufs_.indexBuffers_[mesh.indexHandle].buf, 0, VK_INDEX_TYPE_UINT32);
 
-			vkCmdBindDescriptorSets(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 0, 1, &descriptorSets_[resourceIndex], 0, nullptr);
+			//vkCmdBindDescriptorSets(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 0, 1, &descriptorSets_[resourceIndex], 0, nullptr);
 			vkCmdDrawIndexed(commandbuffer, mesh.indexCount, 1, 0, 0, 0);
 		});
 	}
 
-	void MeshPipeline::UpdateUniformBuffers(uint32_t resourceIndex) {
-		RenderCamera* camera = mainCamera_.GetComponentPtr<RenderCamera>();
-		UniformBufferObject* ubo = reinterpret_cast<UniformBufferObject*>(uniformBuffers_[resourceIndex].alloc.data);
-		ubo->proj = camera->perspective;
-		ubo->view = camera->view;
-	}
+	//void MeshPipeline::UpdateUniformBuffers(uint32_t resourceIndex) {
+	//	RenderCamera* camera = mainCamera_.GetComponentPtr<RenderCamera>();
+	//	UniformBufferObject* ubo = reinterpret_cast<UniformBufferObject*>(uniformBuffers_[resourceIndex].alloc.data);
+	//	ubo->proj = camera->perspective;
+	//	ubo->view = camera->view;
+	//}
 
-	void MeshPipeline::CreateDescriptorPool() {
-		VkDescriptorPoolSize poolSize{};
-		poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		poolSize.descriptorCount = MAX_FRAMES_IN_FLIGHT;
+	//void MeshPipeline::CreateDescriptorPool() {
+	//	VkDescriptorPoolSize poolSize{};
+	//	poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	//	poolSize.descriptorCount = MAX_FRAMES_IN_FLIGHT;
 
-		VkDescriptorPoolCreateInfo poolInfo{};
-		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		poolInfo.poolSizeCount = 1;
-		poolInfo.pPoolSizes = &poolSize;
-		poolInfo.maxSets = MAX_FRAMES_IN_FLIGHT;
+	//	VkDescriptorPoolCreateInfo poolInfo{};
+	//	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	//	poolInfo.poolSizeCount = 1;
+	//	poolInfo.pPoolSizes = &poolSize;
+	//	poolInfo.maxSets = MAX_FRAMES_IN_FLIGHT;
 
-		VK_CHECK(vkCreateDescriptorPool(context_->device, &poolInfo, nullptr, &descriptorPool_));
-	}
+	//	VK_CHECK(vkCreateDescriptorPool(context_->device, &poolInfo, nullptr, &descriptorPool_));
+	//}
 
-	void MeshPipeline::CreateDescriptorSetLayout() {
-		VkDescriptorSetLayoutBinding uboLayoutBinding{};
-		uboLayoutBinding.binding = 0;
-		uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		uboLayoutBinding.descriptorCount = 1;
-		uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-		uboLayoutBinding.pImmutableSamplers = nullptr;
+	//void MeshPipeline::CreateDescriptorSetLayout() {
+	//	VkDescriptorSetLayoutBinding uboLayoutBinding{};
+	//	uboLayoutBinding.binding = 0;
+	//	uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	//	uboLayoutBinding.descriptorCount = 1;
+	//	uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	//	uboLayoutBinding.pImmutableSamplers = nullptr;
 
-		VkDescriptorSetLayoutCreateInfo layoutInfo = VkUtils::Init::DescriptorSetLayoutCreateInfo();
-		layoutInfo.bindingCount = 1;
-		layoutInfo.pBindings = &uboLayoutBinding;
+	//	VkDescriptorSetLayoutCreateInfo layoutInfo = VkUtils::Init::DescriptorSetLayoutCreateInfo();
+	//	layoutInfo.bindingCount = 1;
+	//	layoutInfo.pBindings = &uboLayoutBinding;
 
-		VK_CHECK(vkCreateDescriptorSetLayout(context_->device, &layoutInfo, nullptr, &descriptorSetLayout_));
-	}
+	//	VK_CHECK(vkCreateDescriptorSetLayout(context_->device, &layoutInfo, nullptr, &descriptorSetLayout_));
+	//}
 
-	void MeshPipeline::CreateDescriptorSets() {
-		std::vector<VkDescriptorSetLayout> layouts(context_->swapchain.images.size(), descriptorSetLayout_);
-		VkDescriptorSetAllocateInfo descSetallocInfo = VkUtils::Init::DescriptorSetAllocateInfo();
-		descSetallocInfo.descriptorPool = descriptorPool_;
-		descSetallocInfo.descriptorSetCount = MAX_FRAMES_IN_FLIGHT;
-		descSetallocInfo.pSetLayouts = layouts.data();
+	//void MeshPipeline::CreateDescriptorSets() {
+	//	std::vector<VkDescriptorSetLayout> layouts(context_->swapchain.images.size(), descriptorSetLayout_);
+	//	VkDescriptorSetAllocateInfo descSetallocInfo = VkUtils::Init::DescriptorSetAllocateInfo();
+	//	descSetallocInfo.descriptorPool = descriptorPool_;
+	//	descSetallocInfo.descriptorSetCount = MAX_FRAMES_IN_FLIGHT;
+	//	descSetallocInfo.pSetLayouts = layouts.data();
 
-		VK_CHECK(vkAllocateDescriptorSets(context_->device, &descSetallocInfo, descriptorSets_.data()));
+	//	VK_CHECK(vkAllocateDescriptorSets(context_->device, &descSetallocInfo, descriptorSets_.data()));
 
-		for(auto i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-			VkDescriptorBufferInfo bufferInfo{};
-			bufferInfo.buffer = uniformBuffers_[i].buf;
-			bufferInfo.offset = 0;
-			bufferInfo.range = sizeof(UniformBufferObject);
+	//	for(auto i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+	//		VkDescriptorBufferInfo bufferInfo{};
+	//		bufferInfo.buffer = uniformBuffers_[i].buf;
+	//		bufferInfo.offset = 0;
+	//		bufferInfo.range = sizeof(UniformBufferObject);
 
-			VkWriteDescriptorSet writeDesc = VkUtils::Init::WriteDescriptorSet();
-			writeDesc.dstSet = descriptorSets_[i];
-			writeDesc.dstBinding = 0;
-			writeDesc.dstArrayElement = 0;
-			writeDesc.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-			writeDesc.descriptorCount = 1;
-			writeDesc.pBufferInfo = &bufferInfo;
-			writeDesc.pImageInfo = nullptr;
-			writeDesc.pTexelBufferView = nullptr;
+	//		VkWriteDescriptorSet writeDesc = VkUtils::Init::WriteDescriptorSet();
+	//		writeDesc.dstSet = descriptorSets_[i];
+	//		writeDesc.dstBinding = 0;
+	//		writeDesc.dstArrayElement = 0;
+	//		writeDesc.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	//		writeDesc.descriptorCount = 1;
+	//		writeDesc.pBufferInfo = &bufferInfo;
+	//		writeDesc.pImageInfo = nullptr;
+	//		writeDesc.pTexelBufferView = nullptr;
 
-			vkUpdateDescriptorSets(context_->device, 1, &writeDesc, 0, nullptr);
-		}
-	}
+	//		vkUpdateDescriptorSets(context_->device, 1, &writeDesc, 0, nullptr);
+	//	}
+	//}
 
 	void MeshPipeline::CreatePipeline() {
 		// We start off by reading the shader bytecode from disk and creating the modules subsequently
@@ -233,8 +182,8 @@ namespace Quadbit {
 		shaderStageInfo[1].pName = "main";
 
 		// This part specifies the format of the vertex data passed to the vertex shader
-		auto bindingDescription = Vertex::GetBindingDescription();
-		auto attributeDescriptions = Vertex::GetAttributeDescriptions();
+		auto bindingDescription = MeshVertex::GetBindingDescription();
+		auto attributeDescriptions = MeshVertex::GetAttributeDescriptions();
 		VkPipelineVertexInputStateCreateInfo vertexInputInfo =
 			VkUtils::Init::PipelineVertexInputStateCreateInfo();
 		vertexInputInfo.vertexBindingDescriptionCount = 1;
@@ -303,8 +252,8 @@ namespace Quadbit {
 			VkUtils::Init::PipelineMultisampleStateCreateInfo();
 		// For now everything is default or disabled
 		multisampleInfo.sampleShadingEnable = VK_FALSE;
-		multisampleInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 		multisampleInfo.minSampleShading = 1.0f;
+		multisampleInfo.rasterizationSamples = context_->multisamplingResources.msaaSamples;
 		multisampleInfo.pSampleMask = nullptr;
 		multisampleInfo.alphaToCoverageEnable = VK_FALSE;
 		multisampleInfo.alphaToOneEnable = VK_FALSE;
@@ -345,8 +294,8 @@ namespace Quadbit {
 		// This part specifies the pipeline layout, its mainly used to specify the layout of uniform values used in shaders
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo = VkUtils::Init::PipelineLayoutCreateInfo();
 		// ENABLE UBO
-		pipelineLayoutInfo.setLayoutCount = 1;
-		pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout_;
+		//pipelineLayoutInfo.setLayoutCount = 1;
+		//pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout_;
 		// ENABLE PUSHCONSTANTS
 		VkPushConstantRange pushConstantRange{};
 		pushConstantRange.offset = 0;
@@ -397,10 +346,10 @@ namespace Quadbit {
 		meshBufs_.indexBufferFreeList_.push_front(handle);
 	}
 
-	VertexBufHandle MeshPipeline::CreateVertexBuffer(const std::vector<Vertex>& vertices) {
+	VertexBufHandle MeshPipeline::CreateVertexBuffer(const std::vector<MeshVertex>& vertices) {
 		VertexBufHandle handle = meshBufs_.GetNextVertexHandle();
 
-		VkDeviceSize bufferSize = static_cast<uint32_t>(vertices.size()) * sizeof(Vertex);
+		VkDeviceSize bufferSize = static_cast<uint32_t>(vertices.size()) * sizeof(MeshVertex);
 
 		QbVkBuffer stagingBuffer;
 		context_->allocator->CreateStagingBuffer(stagingBuffer, bufferSize, vertices.data());
@@ -433,12 +382,12 @@ namespace Quadbit {
 		return handle;
 	}
 
-	void MeshPipeline::CreateUniformBuffers() {
-		VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+	//void MeshPipeline::CreateUniformBuffers() {
+	//	VkDeviceSize bufferSize = sizeof(UniformBufferObject);
 
-		VkBufferCreateInfo bufferInfo = VkUtils::Init::BufferCreateInfo(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-		for(auto i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-			context_->allocator->CreateBuffer(uniformBuffers_[i], bufferInfo, QBVK_MEMORY_USAGE_CPU_TO_GPU);
-		}
-	}
+	//	VkBufferCreateInfo bufferInfo = VkUtils::Init::BufferCreateInfo(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+	//	for(auto i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+	//		context_->allocator->CreateBuffer(uniformBuffers_[i], bufferInfo, QBVK_MEMORY_USAGE_CPU_TO_GPU);
+	//	}
+	//}
 }

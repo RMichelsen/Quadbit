@@ -2,13 +2,13 @@
 #include "QbVkRenderer.h"
 
 #include "Common/QbVkUtils.h"
-#include "../Application/InputHandler.h"
+#include "../Core/InputHandler.h"
 
 namespace Quadbit {
-	QbVkRenderer::QbVkRenderer(HINSTANCE hInstance, HWND hwnd, std::shared_ptr<Quadbit::EntityManager> entityManager) : 
+	QbVkRenderer::QbVkRenderer(HINSTANCE hInstance, HWND hwnd) : 
 		localHandle_(hInstance), 
-		windowHandle_(hwnd), 
-		entityManager_(entityManager) {
+		windowHandle_(hwnd),
+		entityManager_(EntityManager::GetOrCreate()) {
 		// REMEMBER: Order matters as some functions depend on member variables being initialized.
 		CreateInstance();
 #ifdef QBDEBUG
@@ -26,11 +26,12 @@ namespace Quadbit {
 
 		// Swapchain and dependent resources
 		CreateSwapChain();
+		CreateMultisamplingResources();
 		CreateDepthResources();
 		CreateMainRenderPass();
 
 		// Mesh Pipeline
-		meshPipeline_ = std::make_unique<MeshPipeline>(context_, entityManager_);
+		meshPipeline_ = std::make_unique<MeshPipeline>(context_);
 
 		// ImGui Pipeline (Debug build only)
 		imGuiPipeline_ = std::make_unique<ImGuiPipeline>(context_);
@@ -57,9 +58,13 @@ namespace Quadbit {
 			vkDestroyFence(context_->device, renderingResource.fence, nullptr);
 		}
 
-		// Cleanup swap chain and depth resources
-		vkDestroyImageView(context_->device, context_->depthResources.imageView, nullptr);
+		// Cleanup msaa and depth resources
+		context_->allocator->DestroyImage(context_->multisamplingResources.msaaImage);
+		vkDestroyImageView(context_->device, context_->multisamplingResources.msaaImageView, nullptr);
 		context_->allocator->DestroyImage(context_->depthResources.depthImage);
+		vkDestroyImageView(context_->device, context_->depthResources.imageView, nullptr);
+
+		// Destroy swapchain
 		vkDestroySwapchainKHR(context_->device, context_->swapchain.swapchain, nullptr);
 
 		// Destroy command pool
@@ -82,27 +87,27 @@ namespace Quadbit {
 		vkDestroyInstance(instance_, nullptr);
 	}
 
-	RenderMesh QbVkRenderer::CreateMesh(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices, 
-		float scale, glm::vec3 position, glm::quat rotation) {
-		glm::mat4 T(1.0f);
-		glm::mat4 S(1.0f);
+	float QbVkRenderer::GetAspectRatio() {
+		return static_cast<float>(context_->swapchain.extent.width) / static_cast<float>(context_->swapchain.extent.height);
+	}
 
-		T = glm::translate(T, position);
-		auto R = glm::toMat4(rotation);
-		S = glm::scale(S, glm::vec3(scale, scale, scale));
+	void QbVkRenderer::RegisterCamera(Entity entity) {
+		if(!entity.HasComponent<RenderCamera>()) {
+			QB_LOG_ERROR("Cannot register camera: Entity must have the Quadbit::RenderCamera component\n");
+			return;
+		}
+		meshPipeline_->userCamera_ = entity;
+	}
 
-		return RenderMesh{
+	RenderMeshComponent QbVkRenderer::CreateMesh(const std::vector<MeshVertex>& vertices, const std::vector<uint32_t>& indices) {
+		return RenderMeshComponent{
 			meshPipeline_->CreateVertexBuffer(vertices),
 			meshPipeline_->CreateIndexBuffer(indices),
-			static_cast<uint32_t>(indices.size()),
-			scale,
-			position,
-			rotation,
-			{ T * R * S }
+			static_cast<uint32_t>(indices.size())
 		};
 	}
 
-	void QbVkRenderer::DestroyMesh(const RenderMesh& mesh) {
+	void QbVkRenderer::DestroyMesh(const RenderMeshComponent& mesh) {
 		meshPipeline_->DestroyVertexBuffer(mesh.vertexHandle);
 		meshPipeline_->DestroyIndexBuffer(mesh.indexHandle);
 	}
@@ -277,6 +282,7 @@ namespace Quadbit {
 		VkPhysicalDeviceFeatures deviceFeatures{};
 		deviceFeatures.imageCubeArray = VK_TRUE;
 		deviceFeatures.fillModeNonSolid = VK_TRUE;
+		//deviceFeatures.sampleRateShading = VK_TRUE;
 
 		// Now we will fill out the actual information for device creation
 		VkDeviceCreateInfo deviceInfo = VkUtils::Init::DeviceCreateInfo();
@@ -338,11 +344,29 @@ namespace Quadbit {
 			VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
 	}
 
+	void QbVkRenderer::CreateMultisamplingResources() {
+		VkFormat colourFormat = context_->swapchain.imageFormat;
+
+		VkImageCreateInfo imageInfo = VkUtils::Init::ImageCreateInfo(context_->swapchain.extent.width, context_->swapchain.extent.height, colourFormat,
+			VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, context_->multisamplingResources.msaaSamples);
+
+		context_->allocator->CreateImage(context_->multisamplingResources.msaaImage, imageInfo, QBVK_MEMORY_USAGE_GPU_ONLY);
+		context_->multisamplingResources.msaaImageView = VkUtils::CreateImageView(context_, context_->multisamplingResources.msaaImage.img, colourFormat, VK_IMAGE_ASPECT_COLOR_BIT);
+
+		// Transition image layout with a temporary command buffer
+		VkCommandBuffer transitionBuffer = VkUtils::InitSingleTimeCommandBuffer(context_);
+		VkUtils::TransitionImageLayout(context_, transitionBuffer, context_->multisamplingResources.msaaImage.img, 
+			VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 
+			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+		VkUtils::FlushCommandBuffer(context_, transitionBuffer);
+
+	}
+
 	void QbVkRenderer::CreateDepthResources() {
 		VkFormat depthFormat = VkUtils::FindDepthFormat(context_);
 
 		VkImageCreateInfo imageInfo = VkUtils::Init::ImageCreateInfo(context_->swapchain.extent.width, context_->swapchain.extent.height, depthFormat,
-			VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+			VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, context_->multisamplingResources.msaaSamples);;
 
 		context_->allocator->CreateImage(context_->depthResources.depthImage, imageInfo, QBVK_MEMORY_USAGE_GPU_ONLY);
 		context_->depthResources.imageView = VkUtils::CreateImageView(context_, context_->depthResources.depthImage.img, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
@@ -457,12 +481,17 @@ namespace Quadbit {
 		// Wait for the device to be idle
 		vkDeviceWaitIdle(context_->device);
 
+		// Destroy msaa resources
+		context_->allocator->DestroyImage(context_->multisamplingResources.msaaImage);
+		vkDestroyImageView(context_->device, context_->multisamplingResources.msaaImageView, nullptr);
+
 		// Destroy depth resources
 		context_->allocator->DestroyImage(context_->depthResources.depthImage);
 		vkDestroyImageView(context_->device, context_->depthResources.imageView, nullptr);
 
 		// Recreate swapchain and dependent resources
 		CreateSwapChain();
+		CreateMultisamplingResources();
 		CreateDepthResources();
 
 		// Mesh Pipeline
@@ -480,36 +509,36 @@ namespace Quadbit {
 		// The render pass manages framebuffers and their contents
 
 		// This part includes the colour attachment
-		VkAttachmentDescription colorAttachment{};
-		colorAttachment.format = context_->swapchain.imageFormat;
-		colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+		VkAttachmentDescription colourAttachment{};
+		colourAttachment.format = context_->swapchain.imageFormat;
+		colourAttachment.samples = context_->multisamplingResources.msaaSamples;
 
 		// Contents are cleared to a constant at the start of the render pass (color and depth data)
-		colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		colourAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		// Rendered contents will be stored in memory and can be read later on (color and depth data)
-		colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		colourAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 
 		// As we aren't doing any stencil testing we don't care for now
-		colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-		colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		colourAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		colourAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 
 		// We don't care which layout the contents of the image has at start
-		colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		colourAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
 		// We do however need the final layout to be ready for present using the swapchain
-		colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+		colourAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
 		// Now we need an attachment reference
-		VkAttachmentReference colorAttachmentRef{};
+		VkAttachmentReference colourAttachmentRef{};
 		// Since we only have one attachment description, its index is 0
-		colorAttachmentRef.attachment = 0;
-		colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		colourAttachmentRef.attachment = 0;
+		colourAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		// NOTICE: the index of the attachment is directly referenced in the shader --> layout(location = 0) out vec4 outColor
 
 		// This part includes the depth attachment (similar values as above so refer there for explanations)
 		VkAttachmentDescription depthAttachment{};
 		depthAttachment.format = VkUtils::FindDepthFormat(context_);
-		depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+		depthAttachment.samples = context_->multisamplingResources.msaaSamples;
 		depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -521,12 +550,28 @@ namespace Quadbit {
 		depthAttachmentRef.attachment = 1;
 		depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
+		// We need an attachment to resolve the multisampled image
+		VkAttachmentDescription colourAttachmentResolve{};
+		colourAttachmentResolve.format = context_->swapchain.imageFormat;
+		colourAttachmentResolve.samples = VK_SAMPLE_COUNT_1_BIT;
+		colourAttachmentResolve.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		colourAttachmentResolve.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		colourAttachmentResolve.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		colourAttachmentResolve.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		colourAttachmentResolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		colourAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+		VkAttachmentReference colourAttachmentResolveRef{};
+		colourAttachmentResolveRef.attachment = 2;
+		colourAttachmentResolveRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
 		// We can now create the render subpass
 		VkSubpassDescription subpassDesc{};
 		subpassDesc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 		subpassDesc.colorAttachmentCount = 1;
-		subpassDesc.pColorAttachments = &colorAttachmentRef;
+		subpassDesc.pColorAttachments = &colourAttachmentRef;
 		subpassDesc.pDepthStencilAttachment = &depthAttachmentRef;
+		subpassDesc.pResolveAttachments = &colourAttachmentResolveRef;
 
 		// We need to add a subpass dependency here to make the render pass 
 		// wait for the VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT stage
@@ -545,7 +590,8 @@ namespace Quadbit {
 		dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
 		// Now we can create the actual renderpass
-		std::array<VkAttachmentDescription, 2> attachments = { colorAttachment, depthAttachment };
+		std::array<VkAttachmentDescription, 3> attachments = 
+		{ colourAttachment, depthAttachment, colourAttachmentResolve };
 		VkRenderPassCreateInfo renderPassInfo = VkUtils::Init::RenderPassCreateInfo();
 		renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
 		renderPassInfo.pAttachments = attachments.data();

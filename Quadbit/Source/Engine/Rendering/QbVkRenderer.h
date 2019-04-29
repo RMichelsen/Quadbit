@@ -1,20 +1,21 @@
 #pragma once
 
-#include "Common/QbVkCommon.h"
+#include "Common/QbVkDefines.h"
 #include "Pipelines/MeshPipeline.h"
 #include "Pipelines/ImGuiPipeline.h"
 #include "Memory/QbVkAllocator.h"
 #include "../Entities/EntityManager.h"
-#include "../Entities/InternalTypes.h"
 
 namespace Quadbit {
 	class QbVkRenderer {
 	public:
-		QbVkRenderer(HINSTANCE hInstance, HWND hwnd, std::shared_ptr<Quadbit::EntityManager> registry);
+		QbVkRenderer(HINSTANCE hInstance, HWND hwnd);
 		~QbVkRenderer();
 
-		RenderMesh CreateMesh(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices, float scale, glm::vec3 position, glm::quat rotation);
-		void DestroyMesh(const RenderMesh& mesh);
+		float GetAspectRatio();
+		void RegisterCamera(Entity entity);
+		RenderMeshComponent CreateMesh(const std::vector<MeshVertex>& vertices, const std::vector<uint32_t>& indices);
+		void DestroyMesh(const RenderMeshComponent& mesh);
 		void DrawFrame();
 
 	private:
@@ -23,7 +24,7 @@ namespace Quadbit {
 		HINSTANCE localHandle_ = NULL;
 		HWND windowHandle_ = NULL;
 
-		std::shared_ptr<Quadbit::EntityManager> entityManager_;
+		EntityManager* entityManager_;
 
 		VkInstance instance_ = VK_NULL_HANDLE;
 		std::shared_ptr<QbVkContext> context_ = std::make_shared<QbVkContext>();
@@ -45,6 +46,7 @@ namespace Quadbit {
 		void CreateSyncObjects();
 		void AllocateCommandBuffers();
 
+		void CreateMultisamplingResources();
 		void CreateDepthResources();
 		void CreateSwapChain();
 		void RecreateSwapchain();

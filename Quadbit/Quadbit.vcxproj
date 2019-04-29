@@ -82,12 +82,12 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>$(SolutionDir)Bin\$(Configuration)\$(Platform)\</OutDir>
     <IntDir>$(SolutionDir)Bin\$(Configuration)\$(Platform)-int\</IntDir>
-    <IncludePath>$(ProjectDir)\Extern;$(ProjectDir)\Source\PCH;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
+    <IncludePath>C:\Bullet\src;$(ProjectDir)Extern;$(ProjectDir)Source\PCH;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(SolutionDir)Bin\$(Configuration)\$(Platform)\</OutDir>
     <IntDir>$(SolutionDir)Bin\$(Configuration)\$(Platform)-int\</IntDir>
-    <IncludePath>$(ProjectDir)\Extern;$(ProjectDir)\Source\PCH;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
+    <IncludePath>C:\Bullet\src;$(ProjectDir)Extern;$(ProjectDir)Source\PCH;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -112,11 +112,12 @@
       <PreprocessorDefinitions>QBDEBUG;_CRT_SECURE_NO_WARNINGS;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>PCH.h</PrecompiledHeaderFile>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <AdditionalDependencies>vulkan-1.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:\VulkanSDK\1.1.101.0\Lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>vulkan-1.lib;BulletDynamics.lib;BulletCollision.lib;LinearMath.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Bullet\lib\Release;C:\VulkanSDK\1.1.101.0\Lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -145,19 +146,22 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalIncludeDirectories>$(ProjectDir)\Source\PCH;C:\VulkanSDK\1.1.101.0\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CRT_SECURE_NO_WARNINGS;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>PCH.h</PrecompiledHeaderFile>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalLibraryDirectories>C:\VulkanSDK\1.1.101.0\Lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>vulkan-1.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Bullet\lib\Release;C:\VulkanSDK\1.1.101.0\Lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>vulkan-1.lib;BulletDynamics.lib;BulletCollision.lib;LinearMath.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="Extern\FastNoiseSIMD\FastNoiseSIMD.h" />
+    <ClInclude Include="Extern\FastNoiseSIMD\FastNoiseSIMD_internal.h" />
     <ClInclude Include="Extern\glm\common.hpp" />
     <ClInclude Include="Extern\glm\detail\compute_common.hpp" />
     <ClInclude Include="Extern\glm\detail\compute_vector_relational.hpp" />
@@ -405,24 +409,36 @@
     <ClInclude Include="Extern\ImGui\imstb_rectpack.h" />
     <ClInclude Include="Extern\ImGui\imstb_textedit.h" />
     <ClInclude Include="Extern\ImGui\imstb_truetype.h" />
-    <ClInclude Include="Source\Engine\Application\Logging.h" />
+    <ClInclude Include="Source\Engine\Core\Logging.h" />
     <ClInclude Include="Source\Engine\Application\Window.h" />
     <ClInclude Include="Source\Engine\Entities\ComponentPool.h" />
-    <ClInclude Include="Source\Engine\Entities\EntitiesCommon.h" />
-    <ClInclude Include="Source\Engine\Entities\Entity.h" />
+    <ClInclude Include="Source\Engine\Entities\EntityDefines.h" />
     <ClInclude Include="Source\Engine\Entities\EntityManager.h" />
-    <ClInclude Include="Source\Engine\Entities\InternalTypes.h" />
+    <ClInclude Include="Source\Engine\Entities\EventTag.h" />
+    <ClInclude Include="Source\Engine\Core\Sfinae.h" />
+    <ClInclude Include="Source\Engine\Entities\ComponentSystem.h" />
+    <ClInclude Include="Source\Engine\Entities\SystemDispatch.h" />
     <ClInclude Include="Source\Engine\Global\ImGuiState.h" />
-    <ClInclude Include="Source\Engine\Application\InputHandler.h" />
-    <ClInclude Include="Source\Engine\Application\Time.h" />
-    <ClInclude Include="Source\Engine\Rendering\Common\QbVkCommon.h" />
+    <ClInclude Include="Source\Engine\Core\InputHandler.h" />
+    <ClInclude Include="Source\Engine\Core\Time.h" />
+    <ClInclude Include="Source\Engine\Physics\PhysicsComponents.h" />
+    <ClInclude Include="Source\Engine\Physics\PhysicsWorld.h" />
+    <ClInclude Include="Source\Engine\Rendering\Common\QbVkDefines.h" />
     <ClInclude Include="Source\Engine\Rendering\Common\QbVkUtils.h" />
     <ClInclude Include="Source\Engine\Rendering\Memory\QbVkAllocator.h" />
     <ClInclude Include="Source\Engine\Rendering\Memory\QbVkPool.h" />
     <ClInclude Include="Source\Engine\Rendering\Pipelines\ImGuiPipeline.h" />
     <ClInclude Include="Source\Engine\Rendering\Pipelines\MeshPipeline.h" />
     <ClInclude Include="Source\Engine\Rendering\QbVkRenderer.h" />
+    <ClInclude Include="Source\Engine\Rendering\RenderTypes.h" />
+    <ClInclude Include="Source\Engine\Rendering\Systems\NoClipCameraSystem.h" />
+    <ClInclude Include="Source\Game\Data\Defines.h" />
+    <ClInclude Include="Source\Game\Data\Components.h" />
     <ClInclude Include="Source\Game\Infinitum.h" />
+    <ClInclude Include="Source\Game\Systems\MeshGenerationSystem.h" />
+    <ClInclude Include="Source\Game\Systems\PlayerMovementSystem.h" />
+    <ClInclude Include="Source\Game\Systems\ThirdPersonCameraSystem.h" />
+    <ClInclude Include="Source\Game\Systems\VoxelGenerationSystem.h" />
     <ClInclude Include="Source\PCH\PCH.h" />
   </ItemGroup>
   <ItemGroup>
@@ -565,6 +581,46 @@
     <None Include="Resources\Shaders\mesh_vert.glsl" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Extern\FastNoiseSIMD\FastNoiseSIMD.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="Extern\FastNoiseSIMD\FastNoiseSIMD_avx2.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|x64'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+      <WholeProgramOptimization Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</WholeProgramOptimization>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+    </ClCompile>
+    <ClCompile Include="Extern\FastNoiseSIMD\FastNoiseSIMD_avx512.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|x64'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+      <WholeProgramOptimization Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</WholeProgramOptimization>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+    </ClCompile>
+    <ClCompile Include="Extern\FastNoiseSIMD\FastNoiseSIMD_internal.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="Extern\FastNoiseSIMD\FastNoiseSIMD_neon.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="Extern\FastNoiseSIMD\FastNoiseSIMD_sse2.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotSet</EnableEnhancedInstructionSet>
+      <WholeProgramOptimization Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</WholeProgramOptimization>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotSet</EnableEnhancedInstructionSet>
+    </ClCompile>
+    <ClCompile Include="Extern\FastNoiseSIMD\FastNoiseSIMD_sse41.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotSet</EnableEnhancedInstructionSet>
+      <WholeProgramOptimization Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</WholeProgramOptimization>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotSet</EnableEnhancedInstructionSet>
+    </ClCompile>
     <ClCompile Include="Extern\glm\detail\glm.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
@@ -586,8 +642,8 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Source\Engine\Application\Window.cpp" />
-    <ClCompile Include="Source\Engine\Entities\Entity.cpp" />
     <ClCompile Include="Source\Engine\Entities\EntityManager.cpp" />
+    <ClCompile Include="Source\Engine\Physics\PhysicsWorld.cpp" />
     <ClCompile Include="Source\Engine\Rendering\Memory\QbVkAllocator.cpp" />
     <ClCompile Include="Source\Engine\Rendering\Memory\QbVkPool.cpp" />
     <ClCompile Include="Source\Engine\Rendering\Pipelines\ImGuiPipeline.cpp" />

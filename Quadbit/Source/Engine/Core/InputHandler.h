@@ -32,7 +32,6 @@ namespace Quadbit::InputHandler {
 	// Keycodes for keyboard handling
 	inline std::array<bool, 0xFF> keycodes{};
 
-
 	inline bool Initialize() {
 		return RegisterRawInputDevices(&rawinputdevices[0], 2, sizeof(RAWINPUTDEVICE));
 	}
@@ -80,7 +79,7 @@ namespace Quadbit::InputHandler {
 			if(mouseButtonStatus.left && !leftMouseDragging) leftClickFrameDuration++;
 			if(mouseButtonStatus.right && !rightMouseDragging) rightClickFrameDuration++;
 
-			// If any mousebutton has been held for 5 seconds, we're "dragging"
+			// If any mousebutton has been held for 5 frames, we're "dragging"
 			// Once the drag starts we cache the current mouse position if the camera or 
 			// anything else wants to use it later. 
 			if(rightClickFrameDuration > 5 && !rightMouseDragging) {
@@ -102,12 +101,10 @@ namespace Quadbit::InputHandler {
 		}
 	}
 
-	// Return the delta mouse movement, and reset for subsequent use
-	inline std::array<int32_t, 2> ProcessDeltaMovement() {
-		auto temp = deltaMouseMovement;
+	// Update each frame to reset per-frame resources
+	inline void Update() {
 		deltaMouseMovement[0] = 0;
 		deltaMouseMovement[1] = 0;
-		return temp;
 	}
 
 	inline LRESULT WindowCallback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
