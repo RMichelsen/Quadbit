@@ -8,6 +8,8 @@
 #include "../../Engine/Entities/EntityManager.h"
 #include "../../Engine/Entities/ComponentSystem.h"
 #include "../../Engine/Rendering/RenderTypes.h"
+#include "../../Engine/Physics/PhysicsComponents.h"
+#include "../../Engine/Physics/PxCompat.h"
 
 #include "../Data/Components.h"
 
@@ -16,27 +18,35 @@ using namespace Quadbit;
 struct PlayerMovementSystem : ComponentSystem {
 	void Update(float dt) {
 		auto entityManager = EntityManager::GetOrCreate();
-		entityManager->ForEach<TransformComponent, PlayerTag>([&](Entity& entity, TransformComponent& transform, auto& tag) {
+		entityManager->ForEach<RenderTransformComponent, CharacterControllerComponent, PlayerTag>
+			([&](Entity& entity, RenderTransformComponent& transform, CharacterControllerComponent& character, auto& tag) {
 
-			const float movementSpeed = 50.0f;
+			const float movementSpeed = 50.0f * dt;
+
+			PxVec3 displacement(0.0f, -9.81f * 5.0f * dt, 0.0f);
 
 			// 'W'
 			if(InputHandler::keycodes[0x57]) {
-				transform.UpdatePosition(transform.rotation * glm::vec3(movementSpeed * dt, 0.0f, 0.0f));
+				displacement += GlmVec3ToPx(transform.rotation * glm::vec3(movementSpeed, 0.0f, 0.0f));
+				//character.controller->move(GlmVec3ToPx(transform.rotation * glm::vec3(movementSpeed, 0.0f, 0.0f)), 0.01f, dt, nullptr);
 			}
 			// 'S'
 			if(InputHandler::keycodes[0x53]) {
-				transform.UpdatePosition(transform.rotation * glm::vec3(-movementSpeed * dt, 0.0f, 0.0f));
+				displacement += GlmVec3ToPx(transform.rotation * glm::vec3(-movementSpeed, 0.0f, 0.0f));
+				//character.controller->move(GlmVec3ToPx(transform.rotation * glm::vec3(-movementSpeed, 0.0f, 0.0f)), 0.01f, dt, nullptr);
 			}
 			// 'A'
 			if(InputHandler::keycodes[0x41]) {
-				transform.UpdatePosition(transform.rotation * glm::vec3(0.0f, 0.0f, movementSpeed * dt));
+				displacement += GlmVec3ToPx(transform.rotation * glm::vec3(0.0f, 0.0f, movementSpeed));
+				//character.controller->move(GlmVec3ToPx(transform.rotation * glm::vec3(0.0f, 0.0f, movementSpeed)), 0.01f, dt, nullptr);
 			}
 			// 'D'
 			if(InputHandler::keycodes[0x44]) {
-				transform.UpdatePosition(transform.rotation * glm::vec3(0.0f, 0.0f, -movementSpeed * dt));
+				displacement += GlmVec3ToPx(transform.rotation * glm::vec3(0.0f, 0.0f, -movementSpeed));
+				//character.controller->move(GlmVec3ToPx(transform.rotation * glm::vec3(0.0f, 0.0f, -movementSpeed)), 0.01f, dt, nullptr);
 			}
 
+			character.controller->move(displacement, 0.0001f, dt, PxControllerFilters());
 
 			if(InputHandler::rightMouseDragging) {
 				const float dragSpeed = 5.0f * dt;

@@ -31,12 +31,15 @@ namespace Quadbit::InputHandler {
 
 	// Keycodes for keyboard handling
 	inline std::array<bool, 0xFF> keycodes{};
+	inline std::array<bool, 0xFF> keypressed{};
 
 	inline bool Initialize() {
 		return RegisterRawInputDevices(&rawinputdevices[0], 2, sizeof(RAWINPUTDEVICE));
 	}
 
 	inline void ProcessInput(RAWINPUT* rawinput, HWND hwnd) {
+		keypressed.fill(false);
+
 		// Handle keyboard input
 		if(rawinput->header.dwType == RIM_TYPEKEYBOARD) {
 			// If key down.
@@ -45,6 +48,7 @@ namespace Quadbit::InputHandler {
 			}
 			// If key up.
 			else if(rawinput->data.keyboard.Flags == RI_KEY_BREAK) {
+				if(keycodes[rawinput->data.keyboard.VKey]) keypressed[rawinput->data.keyboard.VKey] = true;
 				keycodes[rawinput->data.keyboard.VKey] = false;
 			}
 		}
@@ -99,6 +103,14 @@ namespace Quadbit::InputHandler {
 				if(deltaMouseMovement[1] == 0) deltaMouseMovement[1] = rawinput->data.mouse.lLastY;
 			}
 		}
+	}
+
+	inline bool KeyPressed(const uint16_t vKey) {
+		if(keypressed[vKey]) {
+			keypressed[vKey] = false;
+			return true;
+		}
+		return false;
 	}
 
 	// Update each frame to reset per-frame resources

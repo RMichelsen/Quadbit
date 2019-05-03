@@ -28,7 +28,7 @@ namespace Quadbit {
 		}
 
 		template<typename S, typename... Args>
-		void RunSystem(float deltaTime, Args... args) {
+		void RunSystem(float deltaTime = 0.0f, Args... args) {
 			size_t systemID = SystemID::GetUnique<S>();
 			if(systems_[systemID] == nullptr) {
 				RegisterSystem<S>();

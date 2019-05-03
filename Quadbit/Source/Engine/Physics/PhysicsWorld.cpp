@@ -1,6 +1,10 @@
 #include <PCH.h>
 #include "PhysicsWorld.h"
 
+#include "PhysicsComponents.h"
+#include "Systems/PositionUpdateSystem.h"
+#include "../Entities/EntityManager.h"
+
 namespace Quadbit {
 
 	PhysicsWorld* PhysicsWorld::GetOrCreate() {
@@ -8,37 +12,69 @@ namespace Quadbit {
 		return instance;
 	}
 
+	void PhysicsWorld::StepSimulation(float dt) {
+		scene_->simulate(dt);
+		scene_->fetchResults(true);
+
+		// Update positions of entities in world
+		EntityManager::GetOrCreate()->systemDispatch_->RunSystem<PositionUpdateSystem>();
+	}
+
+	PxController* PhysicsWorld::CreateController(PxCapsuleControllerDesc desc) {
+		return controllerManager_->createController(desc);
+	}
+
 	PhysicsWorld::PhysicsWorld() {
-		// Collision configuration contains default memory and collision setup, TODO: Customize?
-		collisionConfiguration_ = new btDefaultCollisionConfiguration();
+		foundation_ = PxCreateFoundation(PX_PHYSICS_VERSION, defaultAllocator_, defaultErrorCallback_);
 
-		dispatcher_ = new btCollisionDispatcher(collisionConfiguration_);
+		// Connect to the PhysX Visual Debugger
+		visualDebugger_ = PxCreatePvd(*foundation_);
+		PxPvdTransport* transport = PxDefaultPvdSocketTransportCreate("localhost", 5425, 100);
+		visualDebugger_->connect(*transport, PxPvdInstrumentationFlag::eALL);
 
-		overlappingPairCache_ = new btDbvtBroadphase();
+		// Create the main physics object
+		physics_ = PxCreatePhysics(PX_PHYSICS_VERSION, *foundation_, PxTolerancesScale(), true, visualDebugger_);
+		if(!physics_) QB_LOG_ERROR("PxCreatePhysics failed!\n");
 
-		solver_ = new btSequentialImpulseConstraintSolver();
+		// Create the cooker
+		PxTolerancesScale scale;
+		PxCookingParams params(scale);
+		params.meshPreprocessParams |= PxMeshPreprocessingFlag::eDISABLE_CLEAN_MESH;
+		params.meshPreprocessParams |= PxMeshPreprocessingFlag::eDISABLE_ACTIVE_EDGES_PRECOMPUTE;
+		cooking_ = PxCreateCooking(PX_PHYSICS_VERSION, *foundation_, params);
+		if(!cooking_) QB_LOG_ERROR("PxCreateCooking failed!\n");
 
-		dynamicsWorld_ = new btDiscreteDynamicsWorld(dispatcher_, overlappingPairCache_, solver_, collisionConfiguration_);
+		// Create main scene
+		PxSceneDesc sceneDesc(physics_->getTolerancesScale());
+		sceneDesc.gravity = PxVec3(0.0f, -9.81f, 0.0f);
+		dispatcher_ = PxDefaultCpuDispatcherCreate(8);
+		sceneDesc.cpuDispatcher = dispatcher_;
+		sceneDesc.filterShader = PxDefaultSimulationFilterShader;
+		scene_ = physics_->createScene(sceneDesc);
 
-		dynamicsWorld_->setGravity(btVector3(0, -10, 0));
+		PxPvdSceneClient* pvdClient = scene_->getScenePvdClient();
+		if(pvdClient) {
+			pvdClient->setScenePvdFlag(PxPvdSceneFlag::eTRANSMIT_CONSTRAINTS, true);
+			pvdClient->setScenePvdFlag(PxPvdSceneFlag::eTRANSMIT_CONTACTS, true);
+			pvdClient->setScenePvdFlag(PxPvdSceneFlag::eTRANSMIT_SCENEQUERIES, true);
+		}
+
+		controllerManager_ = PxCreateControllerManager(*scene_);
+
+		EntityManager::GetOrCreate()->RegisterComponents<StaticBodyComponent, CharacterControllerComponent>();
 	}
 
 	PhysicsWorld::~PhysicsWorld() {
-		// Remove rigidbodies in reverse order of creation
+		controllerManager_->release();
+		scene_->release();
+		physics_->release();
 
-		auto collisionObjects = dynamicsWorld_->getCollisionObjectArray();
-		for(auto i = dynamicsWorld_->getNumCollisionObjects() - 1; i >= 0; i--) {
-			btCollisionObject* object = collisionObjects[i];
-			btRigidBody* body = btRigidBody::upcast(object);
-			if(body && body->getMotionState()) delete body->getMotionState();
-			dynamicsWorld_->removeCollisionObject(object);
-			delete object;
+		if(visualDebugger_ != nullptr) {
+			PxPvdTransport* transport = visualDebugger_->getTransport();
+			visualDebugger_->release();
+			visualDebugger_ = nullptr;
 		}
 
-		delete dynamicsWorld_;
-		delete solver_;
-		delete overlappingPairCache_;
-		delete dispatcher_;
-		delete collisionConfiguration_;
+		foundation_->release();
 	}
 }

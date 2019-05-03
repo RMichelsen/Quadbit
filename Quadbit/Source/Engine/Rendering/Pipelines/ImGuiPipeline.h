@@ -21,8 +21,6 @@ namespace Quadbit {
 
 		std::shared_ptr<QbVkContext> context_ = nullptr;
 
-		//VkDeviceMemory fontImageMemory_ = VK_NULL_HANDLE;
-		//VkImage fontImage_ = VK_NULL_HANDLE;
 		QbVkImage fontImage_{};
 		VkImageView fontImageView_ = VK_NULL_HANDLE;
 

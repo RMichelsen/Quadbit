@@ -147,6 +147,18 @@ namespace Quadbit {
 		std::vector<VkImageView> imageViews;
 	};
 
+	struct ShadowmapResources {
+		QbVkImage shadowDepthImage;
+		VkImageView imageView = VK_NULL_HANDLE;
+
+		uint32_t width;
+		uint32_t height;
+		VkFramebuffer framebuffer;
+		VkRenderPass shadowmapRenderpass;
+		VkSampler depthSampler;
+		VkDescriptorImageInfo descriptor;
+	};
+
 	struct MSAAResources {
 		VkSampleCountFlagBits msaaSamples;
 		QbVkImage msaaImage;
@@ -175,6 +187,7 @@ namespace Quadbit {
 		VkQueue graphicsQueue = VK_NULL_HANDLE;
 		VkQueue presentQueue = VK_NULL_HANDLE;
 
+		ShadowmapResources shadowmapResources;
 		MSAAResources multisamplingResources;
 		DepthResources depthResources{};
 		Swapchain swapchain{};

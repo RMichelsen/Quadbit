@@ -30,6 +30,10 @@ namespace Quadbit {
 		CreateDepthResources();
 		CreateMainRenderPass();
 
+		CreateOffscreenRenderResources();
+		CreateOffscreenRenderPass();
+		CreateOffscreenFramebuffer();
+
 		// Mesh Pipeline
 		meshPipeline_ = std::make_unique<MeshPipeline>(context_);
 
@@ -58,7 +62,9 @@ namespace Quadbit {
 			vkDestroyFence(context_->device, renderingResource.fence, nullptr);
 		}
 
-		// Cleanup msaa and depth resources
+		// Cleanup shadow, mesh and depth resources
+		context_->allocator->DestroyImage(context_->shadowmapResources.shadowDepthImage);
+		vkDestroyImageView(context_->device, context_->shadowmapResources.imageView, nullptr);
 		context_->allocator->DestroyImage(context_->multisamplingResources.msaaImage);
 		vkDestroyImageView(context_->device, context_->multisamplingResources.msaaImageView, nullptr);
 		context_->allocator->DestroyImage(context_->depthResources.depthImage);
@@ -603,9 +609,128 @@ namespace Quadbit {
 		VK_CHECK(vkCreateRenderPass(context_->device, &renderPassInfo, nullptr, &context_->mainRenderPass));
 	}
 
+	void QbVkRenderer::CreateOffscreenRenderResources() {
+		context_->shadowmapResources.width = 2048;
+		context_->shadowmapResources.height = 2048;
+
+		auto depthFormat = VkUtils::FindDepthFormat(context_);
+
+		VkImageCreateInfo imageInfo = VkUtils::Init::ImageCreateInfo(context_->shadowmapResources.width, context_->shadowmapResources.height,
+			depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+		imageInfo.extent.depth = 1;
+		imageInfo.mipLevels = 1;
+		imageInfo.arrayLayers = 1;
+		context_->allocator->CreateImage(context_->shadowmapResources.shadowDepthImage, imageInfo, QBVK_MEMORY_USAGE_GPU_ONLY);
+
+		context_->shadowmapResources.imageView = VkUtils::CreateImageView(context_, context_->shadowmapResources.shadowDepthImage.img, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
+
+		// Create sampler to sample from the depth attachment
+		// Used in the fragment shader for shadowed rendering
+		VkSamplerCreateInfo samplerInfo = VkUtils::Init::SamplerCreateInfo();
+		samplerInfo.magFilter = VK_FILTER_LINEAR;
+		samplerInfo.minFilter = VK_FILTER_LINEAR;
+		samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+		samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		samplerInfo.mipLodBias = 0.0f;
+		samplerInfo.maxAnisotropy = 1.0f;
+		samplerInfo.minLod = 0.0f;
+		samplerInfo.maxLod = 1.0f;
+		samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+		VK_CHECK(vkCreateSampler(context_->device, &samplerInfo, nullptr, &context_->shadowmapResources.depthSampler));
+	}
+
+	void QbVkRenderer::CreateOffscreenRenderPass() {
+		VkAttachmentDescription shadowmapDesc;
+		shadowmapDesc.format = VkUtils::FindDepthFormat(context_);
+		shadowmapDesc.samples = VK_SAMPLE_COUNT_1_BIT;
+		shadowmapDesc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		shadowmapDesc.storeOp = VK_ATTACHMENT_STORE_OP_STORE; // We need store since we read from the depth image
+		shadowmapDesc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		shadowmapDesc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		shadowmapDesc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		shadowmapDesc.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL; // Attachment will transition to shader read at the end of renderpass
+
+		VkAttachmentReference depthReference{};
+		depthReference.attachment = 0;
+		depthReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+		VkSubpassDescription subpass{};
+		subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+		subpass.colorAttachmentCount = 0;
+		subpass.pDepthStencilAttachment = &depthReference;
+
+		std::array<VkSubpassDependency, 2> dependencies;
+		dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+		dependencies[0].dstSubpass = 0;
+		dependencies[0].srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		dependencies[0].dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+		dependencies[0].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		dependencies[0].dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+		dependencies[1].srcSubpass = 0;
+		dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+		dependencies[1].srcStageMask = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+		dependencies[1].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		dependencies[1].srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		dependencies[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+		VkRenderPassCreateInfo renderPassInfo = VkUtils::Init::RenderPassCreateInfo();
+		renderPassInfo.attachmentCount = 1;
+		renderPassInfo.pAttachments = &shadowmapDesc;
+		renderPassInfo.subpassCount = 1;
+		renderPassInfo.pSubpasses = &subpass;
+		renderPassInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
+		renderPassInfo.pDependencies = dependencies.data();
+
+		VK_CHECK(vkCreateRenderPass(context_->device, &renderPassInfo, nullptr, &context_->shadowmapResources.shadowmapRenderpass));
+	}
+
+	void QbVkRenderer::CreateOffscreenFramebuffer() {
+		VkFramebufferCreateInfo framebufferInfo = VkUtils::Init::FramebufferCreateInfo();
+		framebufferInfo.renderPass = context_->shadowmapResources.shadowmapRenderpass;
+		framebufferInfo.attachmentCount = 1;
+		framebufferInfo.pAttachments = &context_->shadowmapResources.imageView;
+		framebufferInfo.width = context_->shadowmapResources.width;
+		framebufferInfo.height = context_->shadowmapResources.height;
+		framebufferInfo.layers = 1;
+
+		VK_CHECK(vkCreateFramebuffer(context_->device, &framebufferInfo, nullptr, &context_->shadowmapResources.framebuffer));
+	}
+
 	void QbVkRenderer::PrepareFrame(uint32_t resourceIndex, VkCommandBuffer commandbuffer, VkFramebuffer& framebuffer, VkImageView imageView) {
 		// Let the allocator cleanup stuff before preparing the frame
 		context_->allocator->EmptyGarbage();
+
+		std::array<VkClearValue, 2> clearValues{};
+
+		// Write to shadow map
+		//clearValues[0].color = { 0.0f, 0.0f, 0.0f, 0.0f };
+		clearValues[1].depthStencil = { 1, 0 };
+
+		VkRenderPassBeginInfo shadowmapRenderpassInfo = VkUtils::Init::RenderPassBeginInfo();
+		shadowmapRenderpassInfo.renderPass = context_->shadowmapResources.shadowmapRenderpass;
+		shadowmapRenderpassInfo.renderArea.extent.width = context_->shadowmapResources.width;
+		shadowmapRenderpassInfo.renderArea.extent.height = context_->shadowmapResources.height;
+		shadowmapRenderpassInfo.clearValueCount = 1;
+		shadowmapRenderpassInfo.pClearValues = clearValues.data();
+		shadowmapRenderpassInfo.framebuffer = context_->shadowmapResources.framebuffer;
+
+		VkCommandBufferBeginInfo commandBufferInfo = VkUtils::Init::CommandBufferBeginInfo();
+		commandBufferInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+		VK_CHECK(vkBeginCommandBuffer(commandbuffer, &commandBufferInfo));
+
+		vkCmdBeginRenderPass(commandbuffer, &shadowmapRenderpassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+		// Depth bias is required to avoid shadowmapping artifacts
+		vkCmdSetDepthBias(commandbuffer, 1.25f, 0.0f, 1.75f);
+
+		meshPipeline_->DrawShadows(resourceIndex, commandbuffer);
+
+		vkCmdEndRenderPass(commandbuffer);
 
 		// Create the frame buffer
 		VkUtils::CreateFrameBuffer(context_, framebuffer, imageView);
@@ -616,19 +741,12 @@ namespace Quadbit {
 		renderPassInfo.renderArea.extent = context_->swapchain.extent;
 
 		// This specifies the clear values to use for the VK_ATTACHMENT_LOAD_OP_CLEAR operation (in the color and depth attachments)
-		std::array<VkClearValue, 2> clearValues{};
 		clearValues[0].color = { 0.2f, 0.2f, 0.2f, 1.0f };
-		clearValues[1].depthStencil = { 1.0f, 0 };
+		clearValues[1].depthStencil = { 1, 0 };
 		renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
 		renderPassInfo.pClearValues = clearValues.data();
-
-		// For now we'll record some drawing commands here
 		renderPassInfo.framebuffer = framebuffer;
 
-		VkCommandBufferBeginInfo commandBufferInfo = VkUtils::Init::CommandBufferBeginInfo();
-		commandBufferInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-		VK_CHECK(vkBeginCommandBuffer(commandbuffer, &commandBufferInfo));
 		vkCmdBeginRenderPass(commandbuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
 		meshPipeline_->DrawFrame(resourceIndex, commandbuffer);

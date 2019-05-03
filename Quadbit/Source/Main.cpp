@@ -3,6 +3,7 @@
 #include "Engine/Core/InputHandler.h"
 #include "Engine/Core/Time.h"
 #include "Engine/Application/Window.h"
+#include "Engine/Physics/PhysicsWorld.h"
 #include "Game/Infinitum.h"
 
 int __stdcall WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nCmdShow) {
@@ -12,6 +13,9 @@ int __stdcall WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	game->Init();
 
 	while(window->ProcessMessages()) {
+		// Simulate physics
+		Quadbit::PhysicsWorld::GetOrCreate()->StepSimulation(Quadbit::Time::deltaTime);
+
 		// If the windows is minimized, skip rendering
 		if(IsIconic(window->hwnd_)) continue;
 

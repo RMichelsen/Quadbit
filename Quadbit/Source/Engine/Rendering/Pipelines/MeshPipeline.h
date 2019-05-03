@@ -7,10 +7,14 @@
 namespace Quadbit {
 	constexpr int MAX_MESH_COUNT = 65536;
 
-	//struct alignas(16) UniformBufferObject {
-	//	glm::mat4 view;
-	//	glm::mat4 proj;
-	//};
+	struct alignas(16) MainUBO {
+		glm::mat4 depthMVP;
+		glm::vec3 lightPosition;
+	};
+
+	struct alignas(16) OffscreenUBO {
+		glm::mat4 depthMVP;
+	};
 
 	struct MeshBuffers {
 		VertexBufHandle vertexBufferIdx_;
@@ -57,8 +61,8 @@ namespace Quadbit {
 		~MeshPipeline();
 		void RebuildPipeline();
 
+		void DrawShadows(uint32_t resourceIndex, VkCommandBuffer commandbuffer);
 		void DrawFrame(uint32_t resourceIndex, VkCommandBuffer commandbuffer);
-		//void UpdateUniformBuffers(uint32_t currentImage);
 
 	private:
 		friend class QbVkRenderer;
@@ -69,10 +73,15 @@ namespace Quadbit {
 		VkDescriptorPool descriptorPool_ = VK_NULL_HANDLE;
 		VkDescriptorSetLayout descriptorSetLayout_ = VK_NULL_HANDLE;
 		std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> descriptorSets_{};
+		std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> offscreenDescriptorSets_{};
 
 		VkPipelineLayout pipelineLayout_ = VK_NULL_HANDLE;
 		VkPipeline pipeline_ = VK_NULL_HANDLE;
 
+		VkPipelineLayout offscreenPipelineLayout_ = VK_NULL_HANDLE;
+		VkPipeline offscreenPipeline_ = VK_NULL_HANDLE;
+
+		std::array<QbVkBuffer, MAX_FRAMES_IN_FLIGHT> offscreenUniformBuffers_;
 		std::array<QbVkBuffer, MAX_FRAMES_IN_FLIGHT> uniformBuffers_;
 
 		RenderMeshPushConstants pushConstants_{};
@@ -81,9 +90,9 @@ namespace Quadbit {
 		Entity fallbackCamera_ = NULL_ENTITY;
 		Entity userCamera_ = NULL_ENTITY;
 
-		//void CreateDescriptorPool();
-		//void CreateDescriptorSetLayout();
-		//void CreateDescriptorSets();
+		void CreateDescriptorPool();
+		void CreateDescriptorSetLayout();
+		void CreateDescriptorSets();
 		void CreatePipeline();
 
 		void DestroyVertexBuffer(VertexBufHandle handle);
@@ -91,6 +100,9 @@ namespace Quadbit {
 		VertexBufHandle CreateVertexBuffer(const std::vector<MeshVertex>& vertices);
 		IndexBufHandle CreateIndexBuffer(const std::vector<uint32_t>& indices);
 
-		//void CreateUniformBuffers();
+		void CreateUniformBuffers();
+
+		void UpdateUniformBuffers(uint32_t resourceIndex);
+		void UpdateOffscreenUniformBuffers(uint32_t resourceIndex);
 	};
 }

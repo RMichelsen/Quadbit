@@ -855,6 +855,12 @@
     <ClInclude Include="Source\Engine\Entities\EntityDefines.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Engine\Physics\Systems\PositionUpdateSystem.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Physics\PxCompat.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="Extern\glm\detail\func_common.inl">
@@ -1260,6 +1266,7 @@
     <None Include="Resources\Shaders\imgui_vert.glsl" />
     <None Include="Resources\Shaders\mesh_frag.glsl" />
     <None Include="Resources\Shaders\mesh_vert.glsl" />
+    <None Include="Resources\Shaders\shadowmap_vert.glsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Extern\glm\detail\glm.cpp">

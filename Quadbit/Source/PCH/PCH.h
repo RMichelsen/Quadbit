@@ -18,7 +18,7 @@
 #include <glm/gtx/quaternion.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include <btBulletDynamicsCommon.h>
+#include <PxPhysicsAPI.h>
 
 #include <ImGui/imgui.h>
 

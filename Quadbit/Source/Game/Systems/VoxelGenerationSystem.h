@@ -15,8 +15,8 @@ struct VoxelGenerationSystem : Quadbit::ComponentSystem {
 	void Update(float dt, FastNoiseSIMD* fastnoise) {
 		auto entityManager = Quadbit::EntityManager::GetOrCreate();
 
-		entityManager->ForEach<Quadbit::TransformComponent, VoxelBlockComponent, VoxelBlockUpdateTag>
-			([&](Quadbit::Entity entity, Quadbit::TransformComponent& transform, VoxelBlockComponent& block, auto& tag) {
+		entityManager->ForEach<Quadbit::RenderTransformComponent, VoxelBlockComponent, VoxelBlockUpdateTag>
+			([&](Quadbit::Entity entity, Quadbit::RenderTransformComponent& transform, VoxelBlockComponent& block, auto& tag) {
 			auto& voxels = block.voxels;
 
 			// This perlin set generates noise roughly in the region of -0.8f to 0.8f

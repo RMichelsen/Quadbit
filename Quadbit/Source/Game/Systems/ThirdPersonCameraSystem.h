@@ -14,8 +14,8 @@
 using namespace Quadbit;
 
 struct ThirdPersonCameraSystem : ComponentSystem {
-	void Update(float deltaTime, Entity objectToFollow) {
-		auto transform = objectToFollow.GetComponentPtr<TransformComponent>();
+	void Update(float dt, Entity objectToFollow) {
+		auto transform = objectToFollow.GetComponentPtr<RenderTransformComponent>();
 
 		EntityManager::GetOrCreate()->ForEach<RenderCamera>([&](Entity entity, RenderCamera& camera) {
 			if(InputHandler::rightMouseDragging && !camera.dragActive) {
@@ -29,10 +29,10 @@ struct ThirdPersonCameraSystem : ComponentSystem {
 				ShowCursor(true);
 			}
 
-			const float cameraSpeed = CAMERA_MOVE_SPEED * deltaTime;
+			const float cameraSpeed = CAMERA_MOVE_SPEED * dt;
 
 			if(InputHandler::rightMouseDragging) {
-				const float dragSpeed = CAMERA_DRAG_SPEED * deltaTime;
+				const float dragSpeed = CAMERA_DRAG_SPEED * dt;
 
 				if(InputHandler::deltaMouseMovement[1] != 0) {
 					camera.pitch += static_cast<float>(InputHandler::deltaMouseMovement[1]) * dragSpeed;
