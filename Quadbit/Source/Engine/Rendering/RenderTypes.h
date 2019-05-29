@@ -9,7 +9,6 @@
 namespace Quadbit {
 	struct MeshVertex {
 		glm::vec3 position;
-		glm::vec3 normal;
 		glm::vec3 colour;
 
 		static VkVertexInputBindingDescription GetBindingDescription() {
@@ -20,23 +19,18 @@ namespace Quadbit {
 			return bindingDescription;
 		}
 
-		static std::array<VkVertexInputAttributeDescription, 3> GetAttributeDescriptions() {
-			std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions{};
+		static std::array<VkVertexInputAttributeDescription, 2> GetAttributeDescriptions() {
+			std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions{};
 			// Attribute description for the position
 			attributeDescriptions[0].binding = 0;
 			attributeDescriptions[0].location = 0;
 			attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
 			attributeDescriptions[0].offset = offsetof(MeshVertex, position);
-			// Attribute description for the normal
+			// Attribute description for the colour
 			attributeDescriptions[1].binding = 0;
 			attributeDescriptions[1].location = 1;
 			attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-			attributeDescriptions[1].offset = offsetof(MeshVertex, normal);
-			// Attribute description for the colour
-			attributeDescriptions[2].binding = 0;
-			attributeDescriptions[2].location = 2;
-			attributeDescriptions[2].format = VK_FORMAT_R32G32B32_SFLOAT;
-			attributeDescriptions[2].offset = offsetof(MeshVertex, colour);
+			attributeDescriptions[1].offset = offsetof(MeshVertex, colour);
 			return attributeDescriptions;
 		}
 	};

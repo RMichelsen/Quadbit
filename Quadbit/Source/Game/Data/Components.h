@@ -41,10 +41,11 @@ enum FillType {
 struct Voxel {
 	FillType fillType;
 	VisibleFaces visibleFaces;
+	glm::float4 ambientOcclusion;
 };
 
-struct MeshGenerationUpdateTag : Quadbit::EventTagComponent {};
 struct VoxelBlockUpdateTag : Quadbit::EventTagComponent {};
+struct MeshGenerationUpdateTag : Quadbit::EventTagComponent {};
 
 struct VoxelBlockComponent {
 	// Could be stored in a std::array but might overflow stack size
@@ -59,15 +60,15 @@ struct VoxelBlockComponent {
 struct PlayerTag {};
 
 const std::vector<Quadbit::MeshVertex> cubeVertices = {
-{{-1.0f, -1.0f, 1.0f},	{0.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}},
-{{1.0f, -1.0f, 1.0f},	{0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}},
-{{1.0f, 1.0f, 1.0f},	{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}},
-{{-1.0f, 1.0f, 1.0f},	{0.0f, 0.0f, 0.0f}, {1.0f, 1.0f, 0.0f}},
+{{-1.0f, -1.0f, 1.0f},	{1.0f, 0.0f, 0.0f}},
+{{1.0f, -1.0f, 1.0f},	{0.0f, 1.0f, 0.0f}},
+{{1.0f, 1.0f, 1.0f},	{0.0f, 0.0f, 1.0f}},
+{{-1.0f, 1.0f, 1.0f},	{1.0f, 1.0f, 0.0f}},
 
-{{-1.0f, -1.0f, -1.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}},
-{{1.0f, -1.0f, -1.0f},	{0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}},
-{{1.0f, 1.0f, -1.0f},	{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}},
-{{-1.0f, 1.0f, -1.0f},	{0.0f, 0.0f, 0.0f}, {1.0f, 1.0f, 0.0f}}
+{{-1.0f, -1.0f, -1.0f}, {1.0f, 0.0f, 0.0f}},
+{{1.0f, -1.0f, -1.0f},	{0.0f, 1.0f, 0.0f}},
+{{1.0f, 1.0f, -1.0f},	{0.0f, 0.0f, 1.0f}},
+{{-1.0f, 1.0f, -1.0f},	{1.0f, 1.0f, 0.0f}}
 };
 
 const std::vector<uint32_t> cubeIndices = {

@@ -15,6 +15,8 @@ namespace Quadbit {
 		static PhysicsWorld* GetOrCreate();
 		void StepSimulation(float dt);
 		PxController* CreateController(PxCapsuleControllerDesc desc);
+		PxRigidStatic* CreateTriangleMesh(PxTransform physxTransform, const std::vector<PxVec3>& colliderVertices, const std::vector<uint32_t>& indices);
+		PxRigidStatic* CreateBoxCollider(PxTransform physxTransform);
 
 	private:
 		PxDefaultErrorCallback defaultErrorCallback_;
@@ -24,6 +26,8 @@ namespace Quadbit {
 		PxFoundation* foundation_;
 		PxCpuDispatcher* dispatcher_;
 		PxPvd* visualDebugger_;
+
+		PxMaterial* defaultMaterial_;
 
 		// Delete copy constructor and assignment operator
 		PhysicsWorld(const PhysicsWorld&) = delete;

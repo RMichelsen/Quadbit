@@ -24,6 +24,42 @@ namespace Quadbit {
 		return controllerManager_->createController(desc);
 	}
 
+	PxRigidStatic* PhysicsWorld::CreateTriangleMesh(PxTransform physxTransform, const std::vector<PxVec3>& colliderVertices, const std::vector<uint32_t>& indices) {
+		auto params = cooking_->getParams();
+
+		PxTriangleMeshDesc triangleMeshDesc;
+		triangleMeshDesc.points.count = static_cast<PxU32>(colliderVertices.size());
+		triangleMeshDesc.points.stride = sizeof(PxVec3);
+		triangleMeshDesc.points.data = colliderVertices.data();
+
+		triangleMeshDesc.triangles.count = static_cast<PxU32>(indices.size() / 3);
+		triangleMeshDesc.triangles.stride = 3 * sizeof(uint32_t);
+		triangleMeshDesc.triangles.data = indices.data();
+
+#ifdef QBDEBUG
+		bool res = cooking_->validateTriangleMesh(triangleMeshDesc);
+		PX_ASSERT(res);
+#endif
+
+		PxRigidStatic* mesh = physics_->createRigidStatic(physxTransform);
+		PxTriangleMesh* triangleMesh = cooking_->createTriangleMesh(triangleMeshDesc, physics_->getPhysicsInsertionCallback());
+		PxTriangleMeshGeometry geometry(triangleMesh);
+		PxShape* shape = physics_->createShape(geometry, *defaultMaterial_);
+		mesh->attachShape(*shape);
+		scene_->addActor(*mesh);
+		
+		return mesh;
+	}
+
+	PxRigidStatic* PhysicsWorld::CreateBoxCollider(PxTransform physxTransform) {
+		PxRigidStatic* boxMesh = physics_->createRigidStatic(physxTransform);
+		PxShape* shape = PxRigidActorExt::createExclusiveShape(*boxMesh, PxBoxGeometry(0.5f, 0.5f, 0.5f), *defaultMaterial_);
+		boxMesh->attachShape(*shape);
+		scene_->addActor(*boxMesh);
+
+		return boxMesh;
+	}
+
 	PhysicsWorld::PhysicsWorld() {
 		foundation_ = PxCreateFoundation(PX_PHYSICS_VERSION, defaultAllocator_, defaultErrorCallback_);
 
@@ -39,8 +75,15 @@ namespace Quadbit {
 		// Create the cooker
 		PxTolerancesScale scale;
 		PxCookingParams params(scale);
+
+		// Parameters to faciliate fast cooking at the expense of mesh quality
+		// TODO: Future idea might be to cook individual voxels as cube meshes around player
 		params.meshPreprocessParams |= PxMeshPreprocessingFlag::eDISABLE_CLEAN_MESH;
 		params.meshPreprocessParams |= PxMeshPreprocessingFlag::eDISABLE_ACTIVE_EDGES_PRECOMPUTE;
+		params.suppressTriangleMeshRemapTable = true;
+		params.midphaseDesc.setToDefault(PxMeshMidPhase::eBVH34);
+		params.midphaseDesc.mBVH34Desc.numPrimsPerLeaf = 15;
+
 		cooking_ = PxCreateCooking(PX_PHYSICS_VERSION, *foundation_, params);
 		if(!cooking_) QB_LOG_ERROR("PxCreateCooking failed!\n");
 
@@ -60,6 +103,8 @@ namespace Quadbit {
 		}
 
 		controllerManager_ = PxCreateControllerManager(*scene_);
+
+		defaultMaterial_ = physics_->createMaterial(0.0f, 0.0f, 0.0f);
 
 		EntityManager::GetOrCreate()->RegisterComponents<StaticBodyComponent, CharacterControllerComponent>();
 	}

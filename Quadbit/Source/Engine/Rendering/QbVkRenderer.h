@@ -52,10 +52,6 @@ namespace Quadbit {
 		void RecreateSwapchain();
 		void CreateMainRenderPass();
 
-		void CreateOffscreenRenderResources();
-		void CreateOffscreenRenderPass();
-		void CreateOffscreenFramebuffer();
-
 		void PrepareFrame(uint32_t resourceIndex, VkCommandBuffer commandbuffer, VkFramebuffer& framebuffer, VkImageView imageView);
 	};
 }

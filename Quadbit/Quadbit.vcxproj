@@ -590,7 +590,6 @@
     <None Include="Resources\Shaders\imgui_vert.glsl" />
     <None Include="Resources\Shaders\mesh_frag.glsl" />
     <None Include="Resources\Shaders\mesh_vert.glsl" />
-    <None Include="Resources\Shaders\shadowmap_vert.glsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Extern\FastNoiseSIMD\FastNoiseSIMD.cpp">
