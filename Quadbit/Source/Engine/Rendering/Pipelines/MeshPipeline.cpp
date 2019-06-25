@@ -20,7 +20,7 @@ namespace Quadbit {
 		entityManager_->RegisterComponents<RenderMeshComponent, RenderTransformComponent, RenderCamera, CameraUpdateAspectRatioTag>();
 
 		fallbackCamera_ = entityManager_->Create();
-		fallbackCamera_.AddComponent<RenderCamera>(Quadbit::RenderCamera(305.0f, -50.0f, glm::vec3(-24.0f, 122.0f, 93.0f), 16.0f / 9.0f, 10000.0f));
+		fallbackCamera_.AddComponent<RenderCamera>(Quadbit::RenderCamera(145.0f, -42.0f, glm::vec3(266.0f, 387.0f, 50.0f), 16.0f / 9.0f, 10000.0f));
 
 		//CreateUniformBuffers();
 		//CreateDescriptorPool();
@@ -52,7 +52,7 @@ namespace Quadbit {
 		vkDestroyPipeline(context_->device, pipeline_, nullptr);
 
 		fallbackCamera_.AddComponent<CameraUpdateAspectRatioTag>();
-		if(userCamera_.IsValid()) userCamera_.AddComponent<CameraUpdateAspectRatioTag>();
+		if(userCamera_ != NULL_ENTITY && userCamera_.IsValid()) userCamera_.AddComponent<CameraUpdateAspectRatioTag>();
 
 		// Create new pipeline
 		CreatePipeline();
@@ -65,14 +65,14 @@ namespace Quadbit {
 			camera.perspective[1][1] *= -1;
 		});
 
-		UpdateUniformBuffers(resourceIndex);
+		//UpdateUniformBuffers(resourceIndex);
 
-		if(!userCamera_.IsValid()) {
+		if(userCamera_ == NULL_ENTITY || !userCamera_.IsValid()) {
 			entityManager_->systemDispatch_->RunSystem<NoClipCameraSystem>(Time::deltaTime);
 		}
 
 		Quadbit::RenderCamera* camera;
-		userCamera_.IsValid() ? camera = userCamera_.GetComponentPtr<RenderCamera>() : camera = fallbackCamera_.GetComponentPtr<RenderCamera>();
+		(userCamera_ != NULL_ENTITY && userCamera_.IsValid()) ? camera = userCamera_.GetComponentPtr<RenderCamera>() : camera = fallbackCamera_.GetComponentPtr<RenderCamera>();
 
 		VkDeviceSize offsets[]{ 0 };
 		entityManager_->ForEach<RenderMeshComponent, RenderTransformComponent>([&](Entity entity, RenderMeshComponent& mesh, RenderTransformComponent& transform) noexcept {
@@ -370,7 +370,7 @@ namespace Quadbit {
 	}
 
 	void MeshPipeline::UpdateUniformBuffers(uint32_t resourceIndex) {
-		RenderCamera* camera = userCamera_.GetComponentPtr<RenderCamera>();
-		MainUBO* ubo = reinterpret_cast<MainUBO*>(uniformBuffers_[resourceIndex].alloc.data);
+		//RenderCamera* camera = userCamera_.GetComponentPtr<RenderCamera>();
+		//MainUBO* ubo = reinterpret_cast<MainUBO*>(uniformBuffers_[resourceIndex].alloc.data);
 	}
 }

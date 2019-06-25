@@ -18,8 +18,6 @@
 #include <glm/gtx/quaternion.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include <PxPhysicsAPI.h>
-
 #include <ImGui/imgui.h>
 
 #include <FastNoiseSIMD/FastNoiseSIMD.h>

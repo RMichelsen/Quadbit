@@ -82,12 +82,12 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>$(SolutionDir)Bin\$(Configuration)\$(Platform)\</OutDir>
     <IntDir>$(SolutionDir)Bin\$(Configuration)\$(Platform)-int\</IntDir>
-    <IncludePath>C:\PhysX\pxshared\include;C:\PhysX\physx\include;$(ProjectDir)Extern;$(ProjectDir)Source\PCH;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(SolutionDir)Bin\$(Configuration)\$(Platform)\</OutDir>
     <IntDir>$(SolutionDir)Bin\$(Configuration)\$(Platform)-int\</IntDir>
-    <IncludePath>C:\PhysX\pxshared\include;C:\PhysX\physx\include;$(ProjectDir)Extern;$(ProjectDir)Source\PCH;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -108,7 +108,7 @@
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)\Source\PCH;C:\VulkanSDK\1.1.101.0\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)Extern;$(ProjectDir)Source\PCH;C:\VulkanSDK\1.1.108.0\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>QBDEBUG;_CRT_SECURE_NO_WARNINGS;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>PCH.h</PrecompiledHeaderFile>
@@ -119,8 +119,8 @@
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <AdditionalDependencies>vulkan-1.lib;PhysX_64.lib;PhysXCommon_64.lib;PhysXFoundation_64.lib;PhysXCooking_64.lib;PhysXPvdSDK_static_64.lib;PhysXExtensions_static_64.lib;PhysXCharacterKinematic_static_64.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:\PhysX\physx\bin\win.x86_64.vc141.mt\debug;C:\VulkanSDK\1.1.101.0\Lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>vulkan-1.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\VulkanSDK\1.1.108.0\Lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <ProjectReference>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
@@ -151,7 +151,7 @@
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)\Source\PCH;C:\VulkanSDK\1.1.101.0\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)Extern;$(ProjectDir)Source\PCH;C:\VulkanSDK\1.1.108.0\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>NDEBUG;_CRT_SECURE_NO_WARNINGS;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>PCH.h</PrecompiledHeaderFile>
@@ -164,8 +164,8 @@
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalLibraryDirectories>C:\PhysX\physx\bin\win.x86_64.vc141.mt\checked;C:\VulkanSDK\1.1.101.0\Lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>vulkan-1.lib;PhysX_64.lib;PhysXCommon_64.lib;PhysXFoundation_64.lib;PhysXCooking_64.lib;PhysXPvdSDK_static_64.lib;PhysXExtensions_static_64.lib;PhysXCharacterKinematic_static_64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\VulkanSDK\1.1.108.0\Lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>vulkan-1.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -430,9 +430,6 @@
     <ClInclude Include="Source\Engine\Global\ImGuiState.h" />
     <ClInclude Include="Source\Engine\Core\InputHandler.h" />
     <ClInclude Include="Source\Engine\Core\Time.h" />
-    <ClInclude Include="Source\Engine\Physics\PhysicsComponents.h" />
-    <ClInclude Include="Source\Engine\Physics\PhysicsWorld.h" />
-    <ClInclude Include="Source\Engine\Physics\PxCompat.h" />
     <ClInclude Include="Source\Engine\Rendering\Common\QbVkDefines.h" />
     <ClInclude Include="Source\Engine\Rendering\Common\QbVkUtils.h" />
     <ClInclude Include="Source\Engine\Rendering\Memory\QbVkAllocator.h" />
@@ -441,15 +438,8 @@
     <ClInclude Include="Source\Engine\Rendering\Pipelines\MeshPipeline.h" />
     <ClInclude Include="Source\Engine\Rendering\QbVkRenderer.h" />
     <ClInclude Include="Source\Engine\Rendering\RenderTypes.h" />
-    <ClInclude Include="Source\Engine\Physics\Systems\PositionUpdateSystem.h" />
     <ClInclude Include="Source\Engine\Rendering\Systems\NoClipCameraSystem.h" />
-    <ClInclude Include="Source\Game\Data\Defines.h" />
-    <ClInclude Include="Source\Game\Data\Components.h" />
-    <ClInclude Include="Source\Game\Infinitum.h" />
-    <ClInclude Include="Source\Game\Systems\MeshGenerationSystem.h" />
-    <ClInclude Include="Source\Game\Systems\PlayerMovementSystem.h" />
-    <ClInclude Include="Source\Game\Systems\ThirdPersonCameraSystem.h" />
-    <ClInclude Include="Source\Game\Systems\VoxelGenerationSystem.h" />
+    <ClInclude Include="Source\Game\Water.h" />
     <ClInclude Include="Source\PCH\PCH.h" />
   </ItemGroup>
   <ItemGroup>
@@ -661,13 +651,12 @@
     </ClCompile>
     <ClCompile Include="Source\Engine\Application\Window.cpp" />
     <ClCompile Include="Source\Engine\Entities\EntityManager.cpp" />
-    <ClCompile Include="Source\Engine\Physics\PhysicsWorld.cpp" />
     <ClCompile Include="Source\Engine\Rendering\Memory\QbVkAllocator.cpp" />
     <ClCompile Include="Source\Engine\Rendering\Memory\QbVkPool.cpp" />
     <ClCompile Include="Source\Engine\Rendering\Pipelines\ImGuiPipeline.cpp" />
     <ClCompile Include="Source\Engine\Rendering\Pipelines\MeshPipeline.cpp" />
     <ClCompile Include="Source\Engine\Rendering\QbVkRenderer.cpp" />
-    <ClCompile Include="Source\Game\Infinitum.cpp" />
+    <ClCompile Include="Source\Game\Water.cpp" />
     <ClCompile Include="Source\Main.cpp" />
     <ClCompile Include="Source\PCH\PCH.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>

@@ -783,9 +783,6 @@
     <ClInclude Include="Source\Engine\Rendering\QbVkRenderer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Game\Infinitum.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Engine\Entities\EntityManager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -798,19 +795,10 @@
     <ClInclude Include="Source\Engine\Entities\ComponentSystem.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Game\Data\Components.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Engine\Rendering\RenderTypes.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Source\Engine\Entities\EventTag.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\Systems\VoxelGenerationSystem.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\Systems\MeshGenerationSystem.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Extern\FastNoiseSIMD\FastNoiseSIMD.h">
@@ -819,19 +807,7 @@
     <ClInclude Include="Extern\FastNoiseSIMD\FastNoiseSIMD_internal.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Game\Systems\ThirdPersonCameraSystem.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\Systems\PlayerMovementSystem.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Engine\Rendering\Systems\NoClipCameraSystem.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Engine\Physics\PhysicsComponents.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Engine\Physics\PhysicsWorld.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Source\Engine\Core\Sfinae.h">
@@ -849,16 +825,10 @@
     <ClInclude Include="Source\Engine\Rendering\Common\QbVkDefines.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Game\Data\Defines.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Engine\Entities\EntityDefines.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Engine\Physics\Systems\PositionUpdateSystem.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Engine\Physics\PxCompat.h">
+    <ClInclude Include="Source\Game\Water.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -1307,9 +1277,6 @@
     <ClCompile Include="Source\Engine\Rendering\QbVkRenderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Game\Infinitum.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Engine\Entities\EntityManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1334,7 +1301,7 @@
     <ClCompile Include="Extern\FastNoiseSIMD\FastNoiseSIMD_sse41.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Engine\Physics\PhysicsWorld.cpp">
+    <ClCompile Include="Source\Game\Water.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
