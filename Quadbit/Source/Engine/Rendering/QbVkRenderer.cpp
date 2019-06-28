@@ -35,6 +35,9 @@ namespace Quadbit {
 
 		// ImGui Pipeline (Debug build only)
 		imGuiPipeline_ = std::make_unique<ImGuiPipeline>(context_);
+
+		// Compute Pipeline
+		computePipeline_ = std::make_unique<ComputePipeline>(context_);
 	}
 
 	QbVkRenderer::~QbVkRenderer() {
@@ -76,6 +79,7 @@ namespace Quadbit {
 		// Destroy pipelines
 		meshPipeline_.reset();
 		imGuiPipeline_.reset();
+		computePipeline_.reset();
 
 		// Destroy allocator
 		context_->allocator.reset();
@@ -108,6 +112,18 @@ namespace Quadbit {
 			meshPipeline_->CreateIndexBuffer(indices),
 			static_cast<uint32_t>(indices.size())
 		};
+	}
+
+	QbVkComputeInstance QbVkRenderer::CreateComputeInstance(std::vector<std::tuple<VkDescriptorType, void*>> descriptors, const char* shader, const char* shaderFunc) {
+		return computePipeline_->CreateInstance(descriptors, shader, shaderFunc);
+	}
+
+	void QbVkRenderer::ComputeDispatch(QbVkComputeInstance& instance) {
+		computePipeline_->Dispatch(instance);
+	}
+
+	void QbVkRenderer::DestroyComputeInstance(QbVkComputeInstance& instance) {
+		computePipeline_->DestroyInstance(instance);
 	}
 
 	void QbVkRenderer::DestroyMesh(const RenderMeshComponent& mesh) {
@@ -183,8 +199,16 @@ namespace Quadbit {
 		resourceIndex = (resourceIndex + 1) % MAX_FRAMES_IN_FLIGHT;
 	}
 
-	// Debug messenger creation and callback function
+	std::shared_ptr<QbVkContext> QbVkRenderer::RequestRenderContext() {
+		return context_;
+	}
+
+	VkInstance QbVkRenderer::GetInstance() {
+		return instance_;
+	}
+
 #ifdef QBDEBUG
+	// Debug messenger creation and callback function
 	VKAPI_ATTR VkBool32 VKAPI_CALL DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
 		VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData) {
 
@@ -266,6 +290,9 @@ namespace Quadbit {
 		if(context_->gpu->graphicsFamilyIdx != context_->gpu->presentFamilyIdx) {
 			queueIndices.push_back(context_->gpu->presentFamilyIdx);
 		}
+		if (context_->gpu->graphicsFamilyIdx != context_->gpu->computeFamilyIdx && context_->gpu->presentFamilyIdx != context_->gpu->computeFamilyIdx) {
+			queueIndices.push_back(context_->gpu->computeFamilyIdx);
+		}
 
 		std::vector<VkDeviceQueueCreateInfo> deviceQueueInfo;
 
@@ -307,6 +334,7 @@ namespace Quadbit {
 		// Now get the queues from the logical device
 		vkGetDeviceQueue(context_->device, context_->gpu->graphicsFamilyIdx, 0, &context_->graphicsQueue);
 		vkGetDeviceQueue(context_->device, context_->gpu->presentFamilyIdx, 0, &context_->presentQueue);
+		vkGetDeviceQueue(context_->device, context_->gpu->computeFamilyIdx, 0, &context_->computeQueue);
 	}
 
 	void QbVkRenderer::CreateCommandPool() {
@@ -636,6 +664,8 @@ namespace Quadbit {
 		meshPipeline_->DrawFrame(resourceIndex, commandbuffer);
 
 		imGuiPipeline_->DrawFrame(resourceIndex, commandbuffer);
+
+		computePipeline_->RunJobs();
 
 		vkCmdEndRenderPass(commandbuffer);
 		VK_CHECK(vkEndCommandBuffer(commandbuffer));

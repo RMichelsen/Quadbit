@@ -1,0 +1,14 @@
+{
+  "commands": {
+    "compileshaders": {
+      "fileName": "cmd.exe",
+      "workingDirectory": ".",
+      "arguments": "/c Quadbit\\Resources\\Shaders\\compileshaders.bat"
+    },
+    "compileshaders 1897759766": {
+      "fileName": "cmd.exe",
+      "workingDirectory": ".",
+      "arguments": "/c Quadbit\\Resources\\Shaders\\compileshaders.bat"
+    }
+  }
+}

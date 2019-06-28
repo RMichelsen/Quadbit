@@ -35,8 +35,8 @@ namespace Quadbit {
 		if(pipeline_ != VK_NULL_HANDLE) vkDestroyPipeline(context_->device, pipeline_, nullptr);
 		if(pipelineLayout_ != VK_NULL_HANDLE) vkDestroyPipelineLayout(context_->device, pipelineLayout_, nullptr);
 
-		vkDestroyDescriptorPool(context_->device, descriptorPool_, nullptr);
-		vkDestroyDescriptorSetLayout(context_->device, descriptorSetLayout_, nullptr);
+		//vkDestroyDescriptorPool(context_->device, descriptorPool_, nullptr);
+		//vkDestroyDescriptorSetLayout(context_->device, descriptorSetLayout_, nullptr);
 
 		for(auto&& vertexBuffer : meshBufs_.vertexBuffers_) {
 			context_->allocator->DestroyBuffer(vertexBuffer);
@@ -91,9 +91,7 @@ namespace Quadbit {
 	}
 
 	void MeshPipeline::CreateDescriptorPool() {
-		VkDescriptorPoolSize poolSize{};
-		poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		poolSize.descriptorCount = MAX_FRAMES_IN_FLIGHT;
+		VkDescriptorPoolSize poolSize = VkUtils::Init::DescriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, MAX_FRAMES_IN_FLIGHT);
 
 		VkDescriptorPoolCreateInfo poolInfo{};
 		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -134,15 +132,15 @@ namespace Quadbit {
 			bufferInfo.offset = 0;
 			bufferInfo.range = sizeof(MainUBO);
 
-			VkWriteDescriptorSet writeDesc = VkUtils::Init::WriteDescriptorSet();
-			writeDesc.dstSet = descriptorSets_[i];
-			writeDesc.dstBinding = 0;
-			writeDesc.dstArrayElement = 0;
-			writeDesc.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-			writeDesc.descriptorCount = 1;
-			writeDesc.pBufferInfo = &bufferInfo;
-			writeDesc.pImageInfo = nullptr;
-			writeDesc.pTexelBufferView = nullptr;
+			VkWriteDescriptorSet writeDesc = VkUtils::Init::WriteDescriptorSet(descriptorSets_[i], VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &bufferInfo);
+			//writeDesc.dstSet = descriptorSets_[i];
+			//writeDesc.dstBinding = 0;
+			//writeDesc.dstArrayElement = 0;
+			//writeDesc.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			//writeDesc.descriptorCount = 1;
+			//writeDesc.pBufferInfo = &bufferInfo;
+			//writeDesc.pImageInfo = nullptr;
+			//writeDesc.pTexelBufferView = nullptr;
 
 			vkUpdateDescriptorSets(context_->device, 1, &writeDesc, 0, nullptr);
 		}
@@ -241,7 +239,6 @@ namespace Quadbit {
 		// This part specifies the multisampling stage
 		VkPipelineMultisampleStateCreateInfo multisampleInfo =
 			VkUtils::Init::PipelineMultisampleStateCreateInfo();
-		// For now everything is default or disabled
 		multisampleInfo.sampleShadingEnable = VK_FALSE;
 		multisampleInfo.minSampleShading = 1.0f;
 		multisampleInfo.rasterizationSamples = context_->multisamplingResources.msaaSamples;

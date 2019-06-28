@@ -831,6 +831,9 @@
     <ClInclude Include="Source\Game\Water.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Engine\Rendering\Pipelines\ComputePipeline.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="Extern\glm\detail\func_common.inl">
@@ -1236,6 +1239,7 @@
     <None Include="Resources\Shaders\imgui_vert.glsl" />
     <None Include="Resources\Shaders\mesh_frag.glsl" />
     <None Include="Resources\Shaders\mesh_vert.glsl" />
+    <None Include="Resources\Shaders\waveheights.comp.glsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Extern\glm\detail\glm.cpp">
@@ -1302,6 +1306,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Source\Game\Water.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Rendering\Pipelines\ComputePipeline.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

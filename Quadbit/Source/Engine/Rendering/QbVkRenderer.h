@@ -3,6 +3,7 @@
 #include "Common/QbVkDefines.h"
 #include "Pipelines/MeshPipeline.h"
 #include "Pipelines/ImGuiPipeline.h"
+#include "Pipelines/ComputePipeline.h"
 #include "Memory/QbVkAllocator.h"
 #include "../Entities/EntityManager.h"
 
@@ -15,8 +16,15 @@ namespace Quadbit {
 		float GetAspectRatio();
 		void RegisterCamera(Entity entity);
 		RenderMeshComponent CreateMesh(const std::vector<MeshVertex>& vertices, const std::vector<uint32_t>& indices);
+		QbVkComputeInstance CreateComputeInstance(std::vector<std::tuple<VkDescriptorType, void*>> descriptors, const char* shader, const char* shaderFunc);
+		void ComputeDispatch(QbVkComputeInstance& instance);
+		void DestroyComputeInstance(QbVkComputeInstance& instance);
 		void DestroyMesh(const RenderMeshComponent& mesh);
 		void DrawFrame();
+
+		// TODO: Questionable engine design, cleanup?
+		std::shared_ptr<QbVkContext> RequestRenderContext();
+		VkInstance GetInstance();
 
 	private:
 		bool canRender_ = false;
@@ -30,6 +38,7 @@ namespace Quadbit {
 		std::shared_ptr<QbVkContext> context_ = std::make_shared<QbVkContext>();
 		std::unique_ptr<MeshPipeline> meshPipeline_ = nullptr;
 		std::unique_ptr<ImGuiPipeline> imGuiPipeline_ = nullptr;
+		std::unique_ptr<ComputePipeline> computePipeline_ = nullptr;
 
 		// DEBUG BUILD ONLY
 #ifdef QBDEBUG

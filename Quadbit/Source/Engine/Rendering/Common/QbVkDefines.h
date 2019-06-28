@@ -30,7 +30,7 @@ constexpr int INSTANCE_EXT_COUNT = 3;
 constexpr const char* INSTANCE_EXT_NAMES[INSTANCE_EXT_COUNT]{
 	VK_KHR_SURFACE_EXTENSION_NAME,
 	VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
-	VK_EXT_DEBUG_UTILS_EXTENSION_NAME
+	VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
 };
 #else
 constexpr int INSTANCE_EXT_COUNT = 2;
@@ -138,6 +138,7 @@ namespace Quadbit {
 
 		int graphicsFamilyIdx = -1;
 		int presentFamilyIdx = -1;
+		int computeFamilyIdx = -1;
 	};
 
 	struct Swapchain {
@@ -176,6 +177,7 @@ namespace Quadbit {
 		VkSurfaceKHR surface = VK_NULL_HANDLE;
 		VkQueue graphicsQueue = VK_NULL_HANDLE;
 		VkQueue presentQueue = VK_NULL_HANDLE;
+		VkQueue computeQueue = VK_NULL_HANDLE;
 
 		MSAAResources multisamplingResources;
 		DepthResources depthResources{};

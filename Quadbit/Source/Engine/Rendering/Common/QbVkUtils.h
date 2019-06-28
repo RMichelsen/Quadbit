@@ -89,6 +89,12 @@ namespace Quadbit::VkUtils {
 			return graphicsPipelineCreateInfo;
 		}
 
+		inline VkComputePipelineCreateInfo ComputePipelineCreateInfo() {
+			VkComputePipelineCreateInfo computePipelineCreateInfo{};
+			computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+			return computePipelineCreateInfo;
+		}
+
 		inline VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo() {
 			VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
 			pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -273,6 +279,13 @@ namespace Quadbit::VkUtils {
 			return descSetLayoutBinding;
 		}
 
+		inline VkDescriptorPoolSize DescriptorPoolSize(VkDescriptorType descriptorType, uint32_t count) {
+			VkDescriptorPoolSize descriptorPoolSize{};
+			descriptorPoolSize.type = descriptorType;
+			descriptorPoolSize.descriptorCount = count;
+			return descriptorPoolSize;
+		}
+
 		inline VkDescriptorSetLayoutCreateInfo DescriptorSetLayoutCreateInfo() {
 			VkDescriptorSetLayoutCreateInfo descSetLayoutCreateInfo{};
 			descSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -285,9 +298,25 @@ namespace Quadbit::VkUtils {
 			return descAllocInfo;
 		}
 
-		inline VkWriteDescriptorSet WriteDescriptorSet() {
+		inline VkWriteDescriptorSet WriteDescriptorSet(VkDescriptorSet dstSet, VkDescriptorType descType, uint32_t dstBinding, VkDescriptorBufferInfo* bufferInfo, uint32_t descCount = 1) {
 			VkWriteDescriptorSet writeDescriptorSet{};
 			writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			writeDescriptorSet.dstSet = dstSet;
+			writeDescriptorSet.descriptorType = descType;
+			writeDescriptorSet.dstBinding = dstBinding;
+			writeDescriptorSet.pBufferInfo = bufferInfo;
+			writeDescriptorSet.descriptorCount = descCount;
+			return writeDescriptorSet;
+		}
+
+		inline VkWriteDescriptorSet WriteDescriptorSet(VkDescriptorSet dstSet, VkDescriptorType descType, uint32_t dstBinding, VkDescriptorImageInfo* imageInfo, uint32_t descCount = 1) {
+			VkWriteDescriptorSet writeDescriptorSet{};
+			writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			writeDescriptorSet.dstSet = dstSet;
+			writeDescriptorSet.descriptorType = descType;
+			writeDescriptorSet.dstBinding = dstBinding;
+			writeDescriptorSet.pImageInfo = imageInfo;
+			writeDescriptorSet.descriptorCount = descCount;
 			return writeDescriptorSet;
 		}
 
@@ -381,22 +410,41 @@ namespace Quadbit::VkUtils {
 
 			if(props.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
 				gpu.graphicsFamilyIdx = i;
-				break;
 			}
-		}
-		for(auto i = 0; i < gpu.queueProps.size(); i++) {
-			VkQueueFamilyProperties props = gpu.queueProps[i];
-
-			if(props.queueCount == 0) continue;
 
 			VkBool32 supportsPresent = VK_FALSE;
 			VK_CHECK(vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, context->surface, &supportsPresent));
-			if(supportsPresent) {
+			if (supportsPresent) {
 				gpu.presentFamilyIdx = i;
-				break;
+			}
+
+			if (props.queueFlags & VK_QUEUE_COMPUTE_BIT) {
+				gpu.computeFamilyIdx = i;
 			}
 		}
-		if(gpu.graphicsFamilyIdx < 0 || gpu.presentFamilyIdx < 0) return false;
+		//for(auto i = 0; i < gpu.queueProps.size(); i++) {
+		//	VkQueueFamilyProperties props = gpu.queueProps[i];
+
+		//	if(props.queueCount == 0) continue;
+
+		//	if(props.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+		//		gpu.graphicsFamilyIdx = i;
+		//		break;
+		//	}
+		//}
+		//for(auto i = 0; i < gpu.queueProps.size(); i++) {
+		//	VkQueueFamilyProperties props = gpu.queueProps[i];
+
+		//	if(props.queueCount == 0) continue;
+
+		//	VkBool32 supportsPresent = VK_FALSE;
+		//	VK_CHECK(vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, context->surface, &supportsPresent));
+		//	if(supportsPresent) {
+		//		gpu.presentFamilyIdx = i;
+		//		break;
+		//	}
+		//}
+		if(gpu.graphicsFamilyIdx < 0 || gpu.presentFamilyIdx < 0 || gpu.computeFamilyIdx < 0) return false;
 
 		gpu.physicalDevice = physicalDevice;
 		return true;
@@ -757,6 +805,9 @@ namespace Quadbit::VkUtils {
 			break;
 		}
 		switch(newLayout) {
+		case VK_IMAGE_LAYOUT_GENERAL:
+			memoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			break;
 		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
 			// image is a transfer destination
 			memoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;

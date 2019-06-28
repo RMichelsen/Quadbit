@@ -252,15 +252,15 @@ namespace Quadbit {
 		fontDescriptor.imageView = fontImageView_;
 
 		// Write
-		VkWriteDescriptorSet writeDesc = VkUtils::Init::WriteDescriptorSet();
-		writeDesc.dstSet = descriptorSet_;
-		writeDesc.dstBinding = 0;
-		writeDesc.dstArrayElement = 0;
-		writeDesc.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		writeDesc.descriptorCount = 1;
-		writeDesc.pBufferInfo = nullptr;
-		writeDesc.pImageInfo = &fontDescriptor;
-		writeDesc.pTexelBufferView = nullptr;
+		VkWriteDescriptorSet writeDesc = VkUtils::Init::WriteDescriptorSet(descriptorSet_, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 0, &fontDescriptor);
+		//writeDesc.dstSet = descriptorSet_;
+		//writeDesc.dstBinding = 0;
+		//writeDesc.dstArrayElement = 0;
+		//writeDesc.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		//writeDesc.descriptorCount = 1;
+		//writeDesc.pBufferInfo = nullptr;
+		//writeDesc.pImageInfo = &fontDescriptor;
+		//writeDesc.pTexelBufferView = nullptr;
 
 		// Update
 		vkUpdateDescriptorSets(context_->device, 1, &writeDesc, 0, nullptr);

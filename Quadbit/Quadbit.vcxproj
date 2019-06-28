@@ -434,6 +434,7 @@
     <ClInclude Include="Source\Engine\Rendering\Common\QbVkUtils.h" />
     <ClInclude Include="Source\Engine\Rendering\Memory\QbVkAllocator.h" />
     <ClInclude Include="Source\Engine\Rendering\Memory\QbVkPool.h" />
+    <ClInclude Include="Source\Engine\Rendering\Pipelines\ComputePipeline.h" />
     <ClInclude Include="Source\Engine\Rendering\Pipelines\ImGuiPipeline.h" />
     <ClInclude Include="Source\Engine\Rendering\Pipelines\MeshPipeline.h" />
     <ClInclude Include="Source\Engine\Rendering\QbVkRenderer.h" />
@@ -580,6 +581,7 @@
     <None Include="Resources\Shaders\imgui_vert.glsl" />
     <None Include="Resources\Shaders\mesh_frag.glsl" />
     <None Include="Resources\Shaders\mesh_vert.glsl" />
+    <None Include="Resources\Shaders\waveheights.comp.glsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Extern\FastNoiseSIMD\FastNoiseSIMD.cpp">
@@ -653,6 +655,7 @@
     <ClCompile Include="Source\Engine\Entities\EntityManager.cpp" />
     <ClCompile Include="Source\Engine\Rendering\Memory\QbVkAllocator.cpp" />
     <ClCompile Include="Source\Engine\Rendering\Memory\QbVkPool.cpp" />
+    <ClCompile Include="Source\Engine\Rendering\Pipelines\ComputePipeline.cpp" />
     <ClCompile Include="Source\Engine\Rendering\Pipelines\ImGuiPipeline.cpp" />
     <ClCompile Include="Source\Engine\Rendering\Pipelines\MeshPipeline.cpp" />
     <ClCompile Include="Source\Engine\Rendering\QbVkRenderer.cpp" />
