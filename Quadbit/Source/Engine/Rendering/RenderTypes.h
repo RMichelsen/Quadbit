@@ -1,5 +1,6 @@
 #pragma once
 #include "../Entities/EventTag.h"
+#include "Common/QbVkDefines.h"
 
 #include <stdint.h>
 #include <glm/mat4x4.hpp>
@@ -7,6 +8,16 @@
 #include <glm/gtc/quaternion.hpp>
 
 namespace Quadbit {
+	struct QbVkRenderMeshInstance {
+		VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
+		VkPipeline pipeline = VK_NULL_HANDLE;
+
+		std::array<QbVkBuffer, MAX_FRAMES_IN_FLIGHT> uniformBuffers;
+		VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
+		VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
+		std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> descriptorSets{};
+	};
+
 	struct MeshVertex {
 		glm::vec3 position;
 		glm::vec3 colour;
@@ -96,6 +107,7 @@ namespace Quadbit {
 		IndexBufHandle indexHandle;
 		uint32_t indexCount;
 		RenderMeshPushConstants dynamicData;
+		QbVkRenderMeshInstance* externalInstance = nullptr;
 	};
 
 	struct CameraUpdateAspectRatioTag : public EventTagComponent {};

@@ -106,16 +106,22 @@ namespace Quadbit {
 		meshPipeline_->userCamera_ = entity;
 	}
 
-	RenderMeshComponent QbVkRenderer::CreateMesh(const std::vector<MeshVertex>& vertices, const std::vector<uint32_t>& indices) {
+	RenderMeshComponent QbVkRenderer::CreateMesh(const std::vector<MeshVertex>& vertices, const std::vector<uint32_t>& indices, QbVkRenderMeshInstance* externalInstance) {
 		return RenderMeshComponent{
 			meshPipeline_->CreateVertexBuffer(vertices),
 			meshPipeline_->CreateIndexBuffer(indices),
-			static_cast<uint32_t>(indices.size())
+			static_cast<uint32_t>(indices.size()),
+			RenderMeshPushConstants{},
+			externalInstance
 		};
 	}
 
 	QbVkComputeInstance QbVkRenderer::CreateComputeInstance(std::vector<std::tuple<VkDescriptorType, void*>> descriptors, const char* shader, const char* shaderFunc) {
 		return computePipeline_->CreateInstance(descriptors, shader, shaderFunc);
+	}
+
+	QbVkRenderMeshInstance* QbVkRenderer::CreateRenderMeshInstance(std::vector<std::tuple<VkDescriptorType, void*>> descriptors, const char* vertexShader, const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry) {
+		return meshPipeline_->CreateInstance(descriptors, vertexShader, vertexEntry, fragmentShader, fragmentEntry);
 	}
 
 	void QbVkRenderer::ComputeDispatch(QbVkComputeInstance& instance) {
@@ -664,8 +670,6 @@ namespace Quadbit {
 		meshPipeline_->DrawFrame(resourceIndex, commandbuffer);
 
 		imGuiPipeline_->DrawFrame(resourceIndex, commandbuffer);
-
-		computePipeline_->RunJobs();
 
 		vkCmdEndRenderPass(commandbuffer);
 		VK_CHECK(vkEndCommandBuffer(commandbuffer));

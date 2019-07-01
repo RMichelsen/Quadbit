@@ -9,9 +9,9 @@ namespace Quadbit {
 
 		std::vector<VkDescriptorPoolSize> poolSizes{
 			VkUtils::Init::DescriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1),
-			VkUtils::Init::DescriptorPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1)
+			VkUtils::Init::DescriptorPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2),
+			VkUtils::Init::DescriptorPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 5),
 		};
-
 
 		// Create descriptor pool
 		VkDescriptorPoolCreateInfo descriptorPoolCreateInfo{};
@@ -38,14 +38,7 @@ namespace Quadbit {
 		vkDestroyFence(context_->device, computeFence_, nullptr);
 	}
 
-	void ComputePipeline::Dispatch(QbVkComputeInstance& instance) {
-		dispatchQueue_.push_back(instance);
-	}
-
-	void ComputePipeline::RunJobs() {
-		if (dispatchQueue_.empty()) return;
-		QbVkComputeInstance computeInstance = dispatchQueue_.front();
-
+	void ComputePipeline::Dispatch(QbVkComputeInstance& computeInstance) {
 		VkSubmitInfo computeSubmitInfo = VkSubmitInfo{};
 		computeSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 		computeSubmitInfo.commandBufferCount = 1;
@@ -53,10 +46,8 @@ namespace Quadbit {
 
 		VK_CHECK(vkQueueSubmit(context_->computeQueue, 1, &computeSubmitInfo, computeFence_));
 
-		vkWaitForFences(context_->device, 1, &computeFence_, VK_TRUE, UINT64_MAX);
-		vkResetFences(context_->device, 1, &computeFence_);
-
-		dispatchQueue_.pop_front();
+		VK_CHECK(vkWaitForFences(context_->device, 1, &computeFence_, VK_TRUE, std::numeric_limits<uint64_t>().max()));
+		VK_CHECK(vkResetFences(context_->device, 1, &computeFence_));
 	}
 
 	QbVkComputeInstance ComputePipeline::CreateInstance(std::vector<std::tuple<VkDescriptorType, void*>> descriptors, const char* shader, const char* shaderFunc) {
@@ -83,7 +74,7 @@ namespace Quadbit {
 
 		std::vector<VkWriteDescriptorSet> writeDescSets;
 		for (auto i = 0; i < descriptors.size(); i++) {
-			if (std::get<0>(descriptors[i]) == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER) {
+			if (std::get<0>(descriptors[i]) == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER || std::get<0>(descriptors[i]) == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) {
 				writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(computeInstance.descriptorSet, std::get<0>(descriptors[i]), i, static_cast<VkDescriptorBufferInfo*>(std::get<1>(descriptors[i]))));
 			}
 			else if (std::get<0>(descriptors[i]) == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE) {
@@ -117,6 +108,8 @@ namespace Quadbit {
 		// Create command buffer
 		VkCommandBufferAllocateInfo cmdBufferAllocateInfo = VkUtils::Init::CommandBufferAllocateInfo(commandPool_, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
 		VK_CHECK(vkAllocateCommandBuffers(context_->device, &cmdBufferAllocateInfo, &computeInstance.commandBuffer));
+
+		vkDestroyShaderModule(context_->device, computeShaderModule, nullptr);
 
 		return computeInstance;
 	}

@@ -7,32 +7,55 @@
 
 
 constexpr int WATER_RESOLUTION = 512;
+constexpr VkFormat IMAGE_FORMAT = VK_FORMAT_R32G32B32A32_SFLOAT;
 
-struct WaveheightUBO {
-	float time;
-	int N;
+struct alignas(16) PrecalcUBO {
 	glm::float2 W;
-	glm::float2 WN;
+	int N;
 	float A;
 	int L;
+};
+
+struct alignas(16) WaveheightUBO {
+	int N;
+	int L;
+	float RT;
+	float T;
+};
+
+struct PreCalculatedResources {
+	Quadbit::QbVkBuffer ubo;
+
+	Quadbit::QbVkImage h0Tilde;
+	Quadbit::QbVkImage h0TildeConj;
+
+	std::vector<glm::float4> precalcUniformRandoms;
+	Quadbit::QbVkBuffer uniformRandomsStorageBuffer;
+
+	std::vector<uint32_t> precalcBitRevIndices;
+	Quadbit::QbVkBuffer bitRevIndicesStorageBuffer;
 };
 
 struct WaveheightResources {
 	Quadbit::QbVkBuffer ubo;
 
-	Quadbit::QbVkImage h0s;
-	Quadbit::QbVkImage h0sConj;
+	Quadbit::QbVkImage h0TildeTx;
+	Quadbit::QbVkImage h0TildeTy;
+	Quadbit::QbVkImage h0TildeTz;
 };
 
 class Water {
 public:
+	inline static float step_;
+	inline static float repeat_;
+
 	Water(HINSTANCE hInstance, HWND hwnd) {
 		renderer_ = std::make_unique<Quadbit::QbVkRenderer>(hInstance, hwnd);
 	}
 
 	void Init();
 	void InitializeCompute();
-	void RecordComputeCommands(Quadbit::QbVkComputeInstance& computeInstance);
+	void RecordComputeCommands();
 	void Simulate(float deltaTime);
 	void DrawFrame();
 
@@ -44,5 +67,12 @@ private:
 	std::vector<Quadbit::MeshVertex> waterVertices_;
 	std::vector<uint32_t> waterIndices_;
 
+	PreCalculatedResources precalcResources_{};
 	WaveheightResources waveheightResources_{};
+	Quadbit::QbVkComputeInstance precalcInstance_;
+	Quadbit::QbVkComputeInstance waveheightInstance_;
+
+	void InitPrecalcComputeInstance();
+	void InitWaveheightComputeInstance();
+	void UpdateWaveheightUBO(float deltaTime);
 };

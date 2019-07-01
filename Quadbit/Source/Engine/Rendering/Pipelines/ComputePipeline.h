@@ -16,13 +16,13 @@ namespace Quadbit {
 		ComputePipeline(std::shared_ptr<QbVkContext> context);
 		~ComputePipeline();
 		void Dispatch(QbVkComputeInstance& instance);
-		void RunJobs();
 		QbVkComputeInstance CreateInstance(std::vector<std::tuple<VkDescriptorType, void*>> descriptors, const char* shader, const char* shaderFunc);
 		void DestroyInstance(QbVkComputeInstance& computeInstance);
 
 	private:
 		std::shared_ptr<QbVkContext> context_ = nullptr;
-		std::deque<QbVkComputeInstance> dispatchQueue_;
+
+		VkCommandBuffer commandBuffer_ = VK_NULL_HANDLE;
 
 		VkDescriptorPool descriptorPool_ = VK_NULL_HANDLE;
 		VkCommandPool commandPool_ = VK_NULL_HANDLE;

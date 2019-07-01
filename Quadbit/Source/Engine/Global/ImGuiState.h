@@ -3,7 +3,7 @@
 #include <vector>
 #include <functional>
 
-#define IMGUI_VAR(x) ImGuiState::pointers[ImGuiState::varCount - x]
+#define IMGUI_VAR(x) Quadbit::ImGuiState::pointers[Quadbit::ImGuiState::varCount - x]
 
 namespace Quadbit::ImGuiState {
 	inline uint32_t varCount = 0;
@@ -21,6 +21,10 @@ namespace Quadbit::ImGuiState {
 			pointers.push_back(x);
 			varCount++;
 		}
+		injectors.push_back(functor);
+	}
+
+	inline void Inject(std::function<void()> functor) {
 		injectors.push_back(functor);
 	}
 }

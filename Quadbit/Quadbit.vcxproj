@@ -581,7 +581,10 @@
     <None Include="Resources\Shaders\imgui_vert.glsl" />
     <None Include="Resources\Shaders\mesh_frag.glsl" />
     <None Include="Resources\Shaders\mesh_vert.glsl" />
-    <None Include="Resources\Shaders\waveheights.comp.glsl" />
+    <None Include="Resources\Shaders\precalc_comp.glsl" />
+    <None Include="Resources\Shaders\water_frag.glsl" />
+    <None Include="Resources\Shaders\water_vert.glsl" />
+    <None Include="Resources\Shaders\waveheight_comp.glsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Extern\FastNoiseSIMD\FastNoiseSIMD.cpp">

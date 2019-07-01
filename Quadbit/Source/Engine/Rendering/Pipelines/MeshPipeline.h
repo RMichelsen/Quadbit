@@ -7,9 +7,6 @@
 namespace Quadbit {
 	constexpr int MAX_MESH_COUNT = 65536;
 
-	struct alignas(16) MainUBO {
-	};
-
 	struct MeshBuffers {
 		VertexBufHandle vertexBufferIdx_;
 		IndexBufHandle indexBufferIdx_;
@@ -63,24 +60,16 @@ namespace Quadbit {
 		std::shared_ptr<QbVkContext> context_ = nullptr;
 		EntityManager* entityManager_ = nullptr;
 
-		VkDescriptorPool descriptorPool_ = VK_NULL_HANDLE;
-		VkDescriptorSetLayout descriptorSetLayout_ = VK_NULL_HANDLE;
-		std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> descriptorSets_{};
-
 		VkPipelineLayout pipelineLayout_ = VK_NULL_HANDLE;
 		VkPipeline pipeline_ = VK_NULL_HANDLE;
 
-		std::array<QbVkBuffer, MAX_FRAMES_IN_FLIGHT> uniformBuffers_;
-
-		RenderMeshPushConstants pushConstants_{};
 		MeshBuffers meshBufs_{};
+
+		std::vector<QbVkRenderMeshInstance> externalInstances_;
 
 		Entity fallbackCamera_ = NULL_ENTITY;
 		Entity userCamera_ = NULL_ENTITY;
 
-		void CreateDescriptorPool();
-		void CreateDescriptorSetLayout();
-		void CreateDescriptorSets();
 		void CreatePipeline();
 
 		void DestroyVertexBuffer(VertexBufHandle handle);
@@ -88,7 +77,8 @@ namespace Quadbit {
 		VertexBufHandle CreateVertexBuffer(const std::vector<MeshVertex>& vertices);
 		IndexBufHandle CreateIndexBuffer(const std::vector<uint32_t>& indices);
 
-		void CreateUniformBuffers();
-		void UpdateUniformBuffers(uint32_t resourceIndex);
+		QbVkRenderMeshInstance* CreateInstance(std::vector<std::tuple<VkDescriptorType, void*>> descriptors,
+			const char* vertexShader, const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry);
+		void CreateUniformBuffers(QbVkRenderMeshInstance& renderMeshInstance, VkDeviceSize size);
 	};
 }
