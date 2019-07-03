@@ -1,6 +1,6 @@
 #version 450
 
-layout(binding = 0, rgba8) readonly uniform image2D h0_tilde_ty;
+layout(binding = 0, rgba32f) readonly uniform image2D h0_tilde_ty;
 
 layout(location = 0) in vec3 inColour;
 layout(location = 1) in vec2 inImagePos;

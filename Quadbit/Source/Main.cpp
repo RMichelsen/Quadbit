@@ -10,7 +10,7 @@ int __stdcall WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	auto game = std::make_unique<Water>(hInstance, window->hwnd_);
 
 	game->Init();
-
+	
 	while(window->ProcessMessages()) {
 		// If the windows is minimized, skip rendering
 		if(IsIconic(window->hwnd_)) continue;

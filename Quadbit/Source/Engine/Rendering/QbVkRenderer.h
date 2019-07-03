@@ -16,8 +16,10 @@ namespace Quadbit {
 		float GetAspectRatio();
 		void RegisterCamera(Entity entity);
 		RenderMeshComponent CreateMesh(const std::vector<MeshVertex>& vertices, const std::vector<uint32_t>& indices, QbVkRenderMeshInstance* externalInstance = nullptr);
-		QbVkComputeInstance CreateComputeInstance(std::vector<std::tuple<VkDescriptorType, void*>> descriptors, const char* shader, const char* shaderFunc);
-		QbVkRenderMeshInstance* CreateRenderMeshInstance(std::vector<std::tuple<VkDescriptorType, void*>> descriptors, const char* vertexShader, const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry);
+		QbVkComputeInstance CreateComputeInstance(std::vector<std::tuple<VkDescriptorType, void*>> descriptors, const char* shader, const char* shaderFunc, const VkSpecializationInfo* specInfo = nullptr);
+		void UpdateComputeDescriptors(std::vector<std::tuple<VkDescriptorType, void*>> descriptors, QbVkComputeInstance& instance);
+		QbVkRenderMeshInstance* CreateRenderMeshInstance(std::vector<std::tuple<VkDescriptorType, void*, VkShaderStageFlagBits>> descriptors,
+			const char* vertexShader, const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry);
 		void ComputeDispatch(QbVkComputeInstance& instance);
 		void DestroyComputeInstance(QbVkComputeInstance& instance);
 		void DestroyMesh(const RenderMeshComponent& mesh);

@@ -16,7 +16,8 @@ namespace Quadbit {
 		ComputePipeline(std::shared_ptr<QbVkContext> context);
 		~ComputePipeline();
 		void Dispatch(QbVkComputeInstance& instance);
-		QbVkComputeInstance CreateInstance(std::vector<std::tuple<VkDescriptorType, void*>> descriptors, const char* shader, const char* shaderFunc);
+		QbVkComputeInstance CreateInstance(std::vector<std::tuple<VkDescriptorType, void*>> descriptors, const char* shader, const char* shaderFunc, const VkSpecializationInfo* specInfo = nullptr);
+		void UpdateDescriptors(std::vector<std::tuple<VkDescriptorType, void*>> descriptors, QbVkComputeInstance& instance);
 		void DestroyInstance(QbVkComputeInstance& computeInstance);
 
 	private:

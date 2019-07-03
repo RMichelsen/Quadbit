@@ -44,6 +44,18 @@ struct WaveheightResources {
 	Quadbit::QbVkImage h0TildeTz;
 };
 
+struct InverseFFTResources {
+	Quadbit::QbVkImage Dx;
+	Quadbit::QbVkImage Dy;
+	Quadbit::QbVkImage Dz;
+
+	std::array<int, 6> specData;
+};
+
+struct DisplacementResources {
+	Quadbit::QbVkImage displacement;
+};
+
 class Water {
 public:
 	inline static float step_;
@@ -69,10 +81,18 @@ private:
 
 	PreCalculatedResources precalcResources_{};
 	WaveheightResources waveheightResources_{};
+	InverseFFTResources horizontalIFFTResources_{};
+	InverseFFTResources verticalIFFTResources_{};
+	DisplacementResources displacementResources_{};
 	Quadbit::QbVkComputeInstance precalcInstance_;
 	Quadbit::QbVkComputeInstance waveheightInstance_;
+	Quadbit::QbVkComputeInstance horizontalIFFTInstance_;
+	Quadbit::QbVkComputeInstance verticalIFFTInstance_;
+	Quadbit::QbVkComputeInstance displacementInstance_;
 
 	void InitPrecalcComputeInstance();
 	void InitWaveheightComputeInstance();
+	void InitInverseFFTComputeInstances();
+	void InitDisplacementInstance();
 	void UpdateWaveheightUBO(float deltaTime);
 };

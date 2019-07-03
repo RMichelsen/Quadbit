@@ -116,11 +116,17 @@ namespace Quadbit {
 		};
 	}
 
-	QbVkComputeInstance QbVkRenderer::CreateComputeInstance(std::vector<std::tuple<VkDescriptorType, void*>> descriptors, const char* shader, const char* shaderFunc) {
-		return computePipeline_->CreateInstance(descriptors, shader, shaderFunc);
+	QbVkComputeInstance QbVkRenderer::CreateComputeInstance(std::vector<std::tuple<VkDescriptorType, void*>> descriptors, 
+		const char* shader, const char* shaderFunc, const VkSpecializationInfo* specInfo) {
+		return computePipeline_->CreateInstance(descriptors, shader, shaderFunc, specInfo);
 	}
 
-	QbVkRenderMeshInstance* QbVkRenderer::CreateRenderMeshInstance(std::vector<std::tuple<VkDescriptorType, void*>> descriptors, const char* vertexShader, const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry) {
+	void QbVkRenderer::UpdateComputeDescriptors(std::vector<std::tuple<VkDescriptorType, void*>> descriptors, QbVkComputeInstance& instance) {
+		computePipeline_->UpdateDescriptors(descriptors, instance);
+	}
+
+	QbVkRenderMeshInstance* QbVkRenderer::CreateRenderMeshInstance(std::vector<std::tuple<VkDescriptorType, void*, VkShaderStageFlagBits>> descriptors,
+		const char* vertexShader, const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry) {
 		return meshPipeline_->CreateInstance(descriptors, vertexShader, vertexEntry, fragmentShader, fragmentEntry);
 	}
 

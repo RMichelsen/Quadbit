@@ -1243,6 +1243,8 @@
     <None Include="Resources\Shaders\waveheight_comp.glsl" />
     <None Include="Resources\Shaders\water_frag.glsl" />
     <None Include="Resources\Shaders\water_vert.glsl" />
+    <None Include="Resources\Shaders\displacement_comp.glsl" />
+    <None Include="Resources\Shaders\ifft_comp.glsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Extern\glm\detail\glm.cpp">

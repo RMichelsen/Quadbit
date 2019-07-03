@@ -3,7 +3,7 @@
 #define M_PI 3.1415926535897932384626433832795
 #define M_G 9.81
 
-layout (local_size_x = 16, local_size_y = 16) in;
+layout (local_size_x = 32, local_size_y = 32) in;
 
 layout(binding = 0) uniform UBO {
 	vec2 W;
@@ -11,8 +11,8 @@ layout(binding = 0) uniform UBO {
 	float A;
 	int L;
 } ubo;
-layout(binding = 1, rgba8) writeonly uniform image2D h0tilde;
-layout(binding = 2, rgba8) writeonly uniform image2D h0tilde_conj;
+layout(binding = 1, rgba32f) writeonly uniform image2D h0tilde;
+layout(binding = 2, rgba32f) writeonly uniform image2D h0tilde_conj;
 layout(binding = 3) buffer UNIF_RAND_STORAGE_BUF {
 	vec4 data[];
 } unif_randoms;

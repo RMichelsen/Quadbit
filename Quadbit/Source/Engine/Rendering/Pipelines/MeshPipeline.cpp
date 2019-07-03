@@ -310,7 +310,7 @@ namespace Quadbit {
 		return handle;
 	}
 
-	QbVkRenderMeshInstance* MeshPipeline::CreateInstance(std::vector<std::tuple<VkDescriptorType, void*>> descriptors, 
+	QbVkRenderMeshInstance* MeshPipeline::CreateInstance(std::vector<std::tuple<VkDescriptorType, void*, VkShaderStageFlagBits>> descriptors, 
 		const char* vertexShader, const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry) {
 		QbVkRenderMeshInstance renderMeshInstance;
 
@@ -327,7 +327,7 @@ namespace Quadbit {
 
 		std::vector<VkDescriptorSetLayoutBinding> descSetLayoutBindings;
 		for (auto i = 0; i < descriptors.size(); i++) {
-			descSetLayoutBindings.push_back(VkUtils::Init::DescriptorSetLayoutBinding(i, std::get<0>(descriptors[i]), VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT));
+			descSetLayoutBindings.push_back(VkUtils::Init::DescriptorSetLayoutBinding(i, std::get<0>(descriptors[i]), std::get<2>(descriptors[i])));
 		}
 
 		VkDescriptorSetLayoutCreateInfo descSetLayoutCreateInfo = VkUtils::Init::DescriptorSetLayoutCreateInfo();
@@ -349,10 +349,10 @@ namespace Quadbit {
 			std::vector<VkWriteDescriptorSet> writeDescSets;
 			for (auto j = 0; j < descriptors.size(); j++) {
 				if (std::get<0>(descriptors[j]) == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER || std::get<0>(descriptors[j]) == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) {
-					writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(renderMeshInstance.descriptorSets[i], std::get<0>(descriptors[j]), j, static_cast<VkDescriptorBufferInfo*>(std::get<1>(descriptors[j]))));
+					writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(renderMeshInstance.descriptorSets[i], std::get<0>(descriptors[j]), j, reinterpret_cast<VkDescriptorBufferInfo*>(std::get<1>(descriptors[j]))));
 				}
 				else if (std::get<0>(descriptors[j]) == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE) {
-					writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(renderMeshInstance.descriptorSets[i], std::get<0>(descriptors[j]), j, static_cast<VkDescriptorImageInfo*>(std::get<1>(descriptors[j]))));
+					writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(renderMeshInstance.descriptorSets[i], std::get<0>(descriptors[j]), j, reinterpret_cast<VkDescriptorImageInfo*>(std::get<1>(descriptors[j]))));
 				}
 			}
 

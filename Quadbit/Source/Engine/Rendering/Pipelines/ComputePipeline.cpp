@@ -50,7 +50,8 @@ namespace Quadbit {
 		VK_CHECK(vkResetFences(context_->device, 1, &computeFence_));
 	}
 
-	QbVkComputeInstance ComputePipeline::CreateInstance(std::vector<std::tuple<VkDescriptorType, void*>> descriptors, const char* shader, const char* shaderFunc) {
+	QbVkComputeInstance ComputePipeline::CreateInstance(std::vector<std::tuple<VkDescriptorType, void*>> descriptors, 
+		const char* shader, const char* shaderFunc, const VkSpecializationInfo* specInfo) {
 		QbVkComputeInstance computeInstance;
 
 		// Create descriptor sets
@@ -90,6 +91,7 @@ namespace Quadbit {
 		VkPipelineShaderStageCreateInfo shaderStageInfo{};
 		shaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 		shaderStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+		shaderStageInfo.pSpecializationInfo = specInfo;
 		shaderStageInfo.module = computeShaderModule;
 		// Entrypoint of a given shader module
 		shaderStageInfo.pName = shaderFunc;
@@ -119,5 +121,18 @@ namespace Quadbit {
 		vkDestroyPipelineLayout(context_->device, computeInstance.pipelineLayout, nullptr);
 		vkDestroyPipeline(context_->device, computeInstance.pipeline, nullptr);
 		vkFreeCommandBuffers(context_->device, commandPool_, 1, &computeInstance.commandBuffer);
+	}
+
+	void ComputePipeline::UpdateDescriptors(std::vector<std::tuple<VkDescriptorType, void*>> descriptors, QbVkComputeInstance& instance) {
+		std::vector<VkWriteDescriptorSet> writeDescSets;
+		for (auto i = 0; i < descriptors.size(); i++) {
+			if (std::get<0>(descriptors[i]) == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER || std::get<0>(descriptors[i]) == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) {
+				writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(instance.descriptorSet, std::get<0>(descriptors[i]), i, static_cast<VkDescriptorBufferInfo*>(std::get<1>(descriptors[i]))));
+			}
+			else if (std::get<0>(descriptors[i]) == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE) {
+				writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(instance.descriptorSet, std::get<0>(descriptors[i]), i, static_cast<VkDescriptorImageInfo*>(std::get<1>(descriptors[i]))));
+			}
+		}
+		vkUpdateDescriptorSets(context_->device, static_cast<uint32_t>(writeDescSets.size()), writeDescSets.data(), 0, nullptr);
 	}
 }
