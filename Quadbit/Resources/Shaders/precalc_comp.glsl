@@ -1,4 +1,4 @@
-#version 450
+#version 460
 
 #define M_PI 3.1415926535897932384626433832795
 #define M_G 9.81
@@ -41,11 +41,11 @@ float phillips(vec2 k) {
 	vec2 k_unit = vec2(k.x / k_len, k.y / k_len);
 	vec2 w_unit = vec2(ubo.W.x / w_len, ubo.W.y / w_len);
 	float k_dot_w = dot(k_unit, w_unit);
-	float k_dot_w2 = k_dot_w * k_dot_w;
+	float k_dot_w6 = k_dot_w * k_dot_w * k_dot_w * k_dot_w * k_dot_w * k_dot_w;
 
 	float damping = 0.00001f;
 
-	return ubo.A * (exp(-1.0f / (k_len_squared * L * L)) / (k_len_squared * k_len_squared)) * k_dot_w2 * exp(-k_len_squared * damping);
+	return ubo.A * (exp(-1.0f / (k_len_squared * L * L)) / (k_len_squared * k_len_squared)) * k_dot_w6 * exp(-k_len_squared * damping);
 }
 
 vec4 gauss(vec4 unif_randoms) {

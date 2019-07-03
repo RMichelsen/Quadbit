@@ -8,29 +8,28 @@
 void Water::Init() {
 	InitializeCompute();
 
+
+	int resPlus1 = WATER_RESOLUTION + 1;
 	// Initialize vertices and indices for the water mesh
-	waterVertices_.resize((WATER_RESOLUTION + 1) * (WATER_RESOLUTION + 1));
-	waterIndices_.resize(WATER_RESOLUTION * WATER_RESOLUTION * 6);
+	waterVertices_.resize(resPlus1 * resPlus1 + 1);
+	waterIndices_.resize((resPlus1 - 1) * (resPlus1 - 1) * 6);
 	int vertexCount = 0;
 	int indexCount = 0;
-	for (int x = 0; x <= WATER_RESOLUTION; x++) {
-		for (int z = 0; z <= WATER_RESOLUTION; z++) {
+	for (int x = 0; x < resPlus1; x++) {
+		for (int z = 0; z < resPlus1; z++) {
 			waterVertices_[vertexCount] = { {x, 0, z}, {0.1f, 0.5f, 0.7f} };
-			if (x < WATER_RESOLUTION - 1 && z < WATER_RESOLUTION - 1) {
+			if (x < resPlus1 - 1 && z < resPlus1 - 1) {
 				waterIndices_[indexCount++] = vertexCount;
-				waterIndices_[indexCount++] = vertexCount + WATER_RESOLUTION;
-				waterIndices_[indexCount++] = vertexCount + WATER_RESOLUTION + 1;
+				waterIndices_[indexCount++] = vertexCount + resPlus1;
+				waterIndices_[indexCount++] = vertexCount + resPlus1 + 1;
 				waterIndices_[indexCount++] = vertexCount;
-				waterIndices_[indexCount++] = vertexCount + WATER_RESOLUTION + 1;
+				waterIndices_[indexCount++] = vertexCount + resPlus1 + 1;
 				waterIndices_[indexCount++] = vertexCount + 1;
 			}
 			vertexCount++;
 		}
 	}
 
-	// Setup entities
-	auto entityManager = Quadbit::EntityManager::GetOrCreate();
-	auto entity = entityManager->Create();
 
 	VkDescriptorImageInfo displacementImageDescInfo{};
 	displacementImageDescInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
@@ -38,13 +37,29 @@ void Water::Init() {
 		displacementResources_.displacement.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
 
 	Quadbit::QbVkRenderMeshInstance* rMeshInstance = renderer_->CreateRenderMeshInstance({
-			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &displacementImageDescInfo, VK_SHADER_STAGE_FRAGMENT_BIT)
-		}, 
+			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &displacementImageDescInfo, VK_SHADER_STAGE_VERTEX_BIT)
+	}, 
 		"Resources/Shaders/Compiled/water_vert.spv", "main", "Resources/Shaders/Compiled/water_frag.spv", "main"
 	);
 
+
+	// Setup entities
+	auto entityManager = Quadbit::EntityManager::GetOrCreate();
+	auto entity = entityManager->Create();
 	entity.AddComponent<Quadbit::RenderMeshComponent>(renderer_->CreateMesh(waterVertices_, waterIndices_, rMeshInstance));
 	entity.AddComponent<Quadbit::RenderTransformComponent>(Quadbit::RenderTransformComponent(1.0f, { 0.0f, 0.0f, 0.0f }, { 0, 0, 0, 1 }));
+
+	auto entity2 = entityManager->Create();
+	entity2.AddComponent<Quadbit::RenderMeshComponent>(renderer_->CreateMesh(waterVertices_, waterIndices_, rMeshInstance));
+	entity2.AddComponent<Quadbit::RenderTransformComponent>(Quadbit::RenderTransformComponent(1.0f, { 512.0f, 0.0f, 0.0f }, { 0, 0, 0, 1 }));
+
+	auto entity3 = entityManager->Create();
+	entity3.AddComponent<Quadbit::RenderMeshComponent>(renderer_->CreateMesh(waterVertices_, waterIndices_, rMeshInstance));
+	entity3.AddComponent<Quadbit::RenderTransformComponent>(Quadbit::RenderTransformComponent(1.0f, { 0.0f, 0.0f, 512.0f }, { 0, 0, 0, 1 }));
+
+	auto entity4 = entityManager->Create();
+	entity4.AddComponent<Quadbit::RenderMeshComponent>(renderer_->CreateMesh(waterVertices_, waterIndices_, rMeshInstance));
+	entity4.AddComponent<Quadbit::RenderTransformComponent>(Quadbit::RenderTransformComponent(1.0f, { 512.0f, 0.0f, 512.0f }, { 0, 0, 0, 1 }));
 
 	step_ = 1.0f;
 	repeat_ = 200.0f;
@@ -248,8 +263,8 @@ void Water::InitPrecalcComputeInstance() {
 
 	PrecalcUBO* ubo = reinterpret_cast<PrecalcUBO*>(precalcResources_.ubo.alloc.data);
 	ubo->N = WATER_RESOLUTION;
-	ubo->A = 20.0f;
-	ubo->L = 1000;
+	ubo->A = 70.0f;
+	ubo->L = 500;
 	ubo->W = glm::float2(16.0f, 16.0f);
 
 	// Create images
@@ -555,7 +570,7 @@ void Water::UpdateWaveheightUBO(float deltaTime) {
 
 	WaveheightUBO* ubo = reinterpret_cast<WaveheightUBO*>(waveheightResources_.ubo.alloc.data);
 	ubo->N = WATER_RESOLUTION;
-	ubo->L = 1000;
+	ubo->L = 500;
 	ubo->RT = repeat_;
 	ubo->T = t;
 

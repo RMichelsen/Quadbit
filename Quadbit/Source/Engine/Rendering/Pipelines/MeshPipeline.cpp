@@ -83,6 +83,20 @@ namespace Quadbit {
 				vkCmdDrawIndexed(commandbuffer, mesh.indexCount, 1, 0, 0, 0);
 			}
 			else {
+				// Dynamic update viewport and scissor for user-defined pipelines
+				VkViewport viewport{};
+				VkRect2D scissor{};
+				// In our case the viewport covers the entire window
+				viewport.width = static_cast<float>(context_->swapchain.extent.width);
+				viewport.height = static_cast<float>(context_->swapchain.extent.height);
+				viewport.minDepth = 0.0f;
+				viewport.maxDepth = 1.0f;
+				vkCmdSetViewport(commandbuffer, 0, 1, &viewport);
+				// And so does the scissor
+				scissor.offset = { 0, 0 };
+				scissor.extent = context_->swapchain.extent;
+				vkCmdSetScissor(commandbuffer, 0, 1, &scissor);
+
 				vkCmdBindPipeline(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh.externalInstance->pipeline);
 
 				mesh.dynamicData.model = transform.model;
@@ -399,27 +413,19 @@ namespace Quadbit {
 		// This setting makes it possible to break up lines and triangles when using _STRIP topology modes
 		inputAssemblyInfo.primitiveRestartEnable = VK_FALSE;
 
-		// This part creates the viewport and scissor and combines them in a struct holding the data for creation
-		VkViewport viewport{};
-		VkRect2D scissor{};
-		// In our case the viewport covers the entire window
-		viewport.x = 0.0f;
-		viewport.y = 0.0f;
-		viewport.width = static_cast<float>(context_->swapchain.extent.width);
-		viewport.height = static_cast<float>(context_->swapchain.extent.height);
-		viewport.minDepth = 0.0f;
-		viewport.maxDepth = 1.0f;
-
-		// And so does the scissor
-		scissor.offset = { 0, 0 };
-		scissor.extent = context_->swapchain.extent;
-
 		// Onto the create info struct as usual
 		VkPipelineViewportStateCreateInfo viewportInfo = VkUtils::Init::PipelineViewportStateCreateInfo();
 		viewportInfo.viewportCount = 1;
-		viewportInfo.pViewports = &viewport;
 		viewportInfo.scissorCount = 1;
-		viewportInfo.pScissors = &scissor;
+
+		// Dynamic states will be viewport and scissor for user-defined pipelines
+		std::array<VkDynamicState, 2> dynamicStates {
+			VK_DYNAMIC_STATE_VIEWPORT,
+			VK_DYNAMIC_STATE_SCISSOR
+		};
+		VkPipelineDynamicStateCreateInfo dynamicStateInfo = VkUtils::Init::PipelineDynamicStateCreateInfo();
+		dynamicStateInfo.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
+		dynamicStateInfo.pDynamicStates = dynamicStates.data();
 
 		// This part specifies the rasterization stage
 		VkPipelineRasterizationStateCreateInfo rasterizerInfo =
@@ -437,6 +443,7 @@ namespace Quadbit {
 		// VK_POLYGON_MODE_LINE: draws the polygon edges as lines
 		// VK_POLYGON_MODE_POINT: draws the polygon vertices as points
 		rasterizerInfo.polygonMode = VK_POLYGON_MODE_FILL;
+		//rasterizerInfo.polygonMode = VK_POLYGON_MODE_LINE;
 
 		// Thickness of lines (in terms of fragments)
 		rasterizerInfo.lineWidth = 1.0f;
@@ -509,7 +516,7 @@ namespace Quadbit {
 		pipelineInfo.pDepthStencilState = &depthStencilInfo;
 		pipelineInfo.pColorBlendState = &colorBlendInfo;
 		// IF USING DYNAMIC STATE REMEMBER TO CALL vkCmdSetViewport
-		pipelineInfo.pDynamicState = nullptr;
+		pipelineInfo.pDynamicState = &dynamicStateInfo;
 		pipelineInfo.layout = renderMeshInstance.pipelineLayout;
 		pipelineInfo.renderPass = context_->mainRenderPass;
 

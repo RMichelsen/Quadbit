@@ -1,6 +1,6 @@
-#version 450
+#version 460
 
-layout(binding = 0, rgba8) readonly uniform image2D h0_tilde_ty;
+layout(binding = 0, rgba32f) readonly uniform image2D displacement;
 
 layout(push_constant) uniform PushConstants {
 	mat4 model;
@@ -11,10 +11,27 @@ layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec3 inColour;
 
 layout(location = 0) out vec3 outColour;
-layout(location = 1) out vec2 outImagePos;
+layout(location = 1) out float height;
 
 void main() {
-    gl_Position = pc.MVP * vec4(inPosition, 1.0);
+	vec4 D = imageLoad(displacement, ivec2(inPosition.xz));
+
+	// Fix tiling
+	if(inPosition.x == 512) {
+		D = imageLoad(displacement, ivec2(0, inPosition.z)); 
+	}
+	if(inPosition.z == 512) {
+		D = imageLoad(displacement, ivec2(inPosition.x, 0)); 
+	}
+	if(inPosition.x == 512 && inPosition.z == 512) {
+		D = imageLoad(displacement, ivec2(0, 0));
+	}
+
+	// Choppy-ness factor
+	float lambda = -0.5f;
+	vec3 finalPos = vec3(inPosition.x + (D.x * lambda), inPosition.y + (D.y * 40.0f), inPosition.z + (D.z * lambda));
+
+    gl_Position = pc.MVP * (vec4(finalPos, 1.0));
 	outColour = inColour;
-	outImagePos = inPosition.xz;
+	height = D.y * 2.0f;
 }
