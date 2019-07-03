@@ -31,9 +31,6 @@ struct PreCalculatedResources {
 
 	std::vector<glm::float4> precalcUniformRandoms;
 	Quadbit::QbVkBuffer uniformRandomsStorageBuffer;
-
-	std::vector<uint32_t> precalcBitRevIndices;
-	Quadbit::QbVkBuffer bitRevIndicesStorageBuffer;
 };
 
 struct WaveheightResources {

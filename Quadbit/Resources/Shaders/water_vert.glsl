@@ -29,7 +29,7 @@ void main() {
 
 	// Choppy-ness factor
 	float lambda = -0.5f;
-	vec3 finalPos = vec3(inPosition.x + (D.x * lambda), inPosition.y + (D.y * 40.0f), inPosition.z + (D.z * lambda));
+	vec3 finalPos = vec3(inPosition.x + (D.x * lambda), inPosition.y + (D.y * 10.0f), inPosition.z + (D.z * lambda));
 
     gl_Position = pc.MVP * (vec4(finalPos, 1.0));
 	outColour = inColour;

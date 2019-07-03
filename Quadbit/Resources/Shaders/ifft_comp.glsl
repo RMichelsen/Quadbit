@@ -10,9 +10,6 @@ layout(constant_id = 3) const int LENGTH = 512;
 layout(constant_id = 4) const int PASS_COUNT = 9;
 layout(constant_id = 5) const int VERTICAL_PASS = 0;
 
-//layout(binding = 0) uniform UBO {
-//	uint VERTICAL_PASS;
-//} ubo;
 layout(binding = 0, rgba32f) readonly uniform image2D h0tilde_tx;
 layout(binding = 1, rgba32f) readonly uniform image2D h0tilde_ty;
 layout(binding = 2, rgba32f) readonly uniform image2D h0tilde_tz;
@@ -38,6 +35,7 @@ complex mul(complex z, float fac) {
 	return complex(z.re * fac, z.im * fac);
 }
 
+// SLM approach outlined in https://software.intel.com/en-us/articles/fast-fourier-transform-for-image-processing-in-directx-11
 shared complex pingpong_tx[2][LENGTH];
 shared complex pingpong_ty[2][LENGTH];
 shared complex pingpong_tz[2][LENGTH];
@@ -106,7 +104,7 @@ void butterfly_pass(int pass_index, uint local_index, int pingpong_index, out co
 //}
 
 void main() {
-	// Fetch position and pixel based on direction and load row or column into the shared ping pong array
+	// Fetch position and pixel based on direction and load row or column into the shared ping pong arrays
 	uint local_index = gl_GlobalInvocationID.x;
 	uvec2 pos = (VERTICAL_PASS == 0) ? gl_GlobalInvocationID.xy : gl_GlobalInvocationID.yx;
 
@@ -134,7 +132,7 @@ void main() {
 	groupMemoryBarrier();
 	barrier();
 
-	// Final pass writes directly to the output texture
+	// Final pass writes directly to the output textures
 	complex DxRes, DyRes, DzRes;
 	if(VERTICAL_PASS == 1) {
 		float sign_factor = (gl_GlobalInvocationID.x + gl_GlobalInvocationID.y) % 2 == 0 ? -1.0f : 1.0f;

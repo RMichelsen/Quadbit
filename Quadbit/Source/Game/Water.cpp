@@ -9,10 +9,10 @@ void Water::Init() {
 	InitializeCompute();
 
 
-	int resPlus1 = WATER_RESOLUTION + 1;
 	// Initialize vertices and indices for the water mesh
-	waterVertices_.resize(resPlus1 * resPlus1 + 1);
-	waterIndices_.resize((resPlus1 - 1) * (resPlus1 - 1) * 6);
+	int resPlus1 = WATER_RESOLUTION + 1;
+	waterVertices_.resize(static_cast<std::size_t>(resPlus1) * static_cast<std::size_t>(resPlus1) + 1);
+	waterIndices_.resize((static_cast<std::size_t>(resPlus1) - 1) * (static_cast<std::size_t>(resPlus1) - 1) * 6);
 	int vertexCount = 0;
 	int indexCount = 0;
 	for (int x = 0; x < resPlus1; x++) {
@@ -31,6 +31,7 @@ void Water::Init() {
 	}
 
 
+	// Our shader will be using the final displacement image calculated in the compute shaders to offset the vertex positions
 	VkDescriptorImageInfo displacementImageDescInfo{};
 	displacementImageDescInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 	displacementImageDescInfo.imageView = Quadbit::VkUtils::CreateImageView(renderer_->RequestRenderContext(), 
@@ -43,24 +44,15 @@ void Water::Init() {
 	);
 
 
-	// Setup entities
+	// Setup water plane entity
 	auto entityManager = Quadbit::EntityManager::GetOrCreate();
 	auto entity = entityManager->Create();
 	entity.AddComponent<Quadbit::RenderMeshComponent>(renderer_->CreateMesh(waterVertices_, waterIndices_, rMeshInstance));
 	entity.AddComponent<Quadbit::RenderTransformComponent>(Quadbit::RenderTransformComponent(1.0f, { 0.0f, 0.0f, 0.0f }, { 0, 0, 0, 1 }));
 
-	auto entity2 = entityManager->Create();
-	entity2.AddComponent<Quadbit::RenderMeshComponent>(renderer_->CreateMesh(waterVertices_, waterIndices_, rMeshInstance));
-	entity2.AddComponent<Quadbit::RenderTransformComponent>(Quadbit::RenderTransformComponent(1.0f, { 512.0f, 0.0f, 0.0f }, { 0, 0, 0, 1 }));
 
-	auto entity3 = entityManager->Create();
-	entity3.AddComponent<Quadbit::RenderMeshComponent>(renderer_->CreateMesh(waterVertices_, waterIndices_, rMeshInstance));
-	entity3.AddComponent<Quadbit::RenderTransformComponent>(Quadbit::RenderTransformComponent(1.0f, { 0.0f, 0.0f, 512.0f }, { 0, 0, 0, 1 }));
-
-	auto entity4 = entityManager->Create();
-	entity4.AddComponent<Quadbit::RenderMeshComponent>(renderer_->CreateMesh(waterVertices_, waterIndices_, rMeshInstance));
-	entity4.AddComponent<Quadbit::RenderTransformComponent>(Quadbit::RenderTransformComponent(1.0f, { 512.0f, 0.0f, 512.0f }, { 0, 0, 0, 1 }));
-
+	// Some ImGui debug stuff 
+	// (Can be extended to modify wind and amplitudes, but will need to recreate the initial precalcs every time that happens)
 	step_ = 1.0f;
 	repeat_ = 200.0f;
 	Quadbit::ImGuiState::Inject([]() {
@@ -74,7 +66,11 @@ void Water::Init() {
 
 void Water::InitializeCompute() {
 
-	// Initialize precalc and waveheight compute instances
+	// Initialize the necessary compute instances
+	// Precalc runs once.
+
+	// Then for each frame:
+	// Waveheight (Frequency Domain) --> Inverse Fast Fourier Transform -> Displacement Map (Spatial Domain)
 	InitPrecalcComputeInstance();
 	InitWaveheightComputeInstance();
 	InitInverseFFTComputeInstances();
@@ -84,6 +80,8 @@ void Water::InitializeCompute() {
 	renderer_->ComputeDispatch(precalcInstance_);
 }
 
+// This function records all the compute commands that will be run by each individual compute shader
+// The barriers are there to make sure images are only written/read from when they are available
 void Water::RecordComputeCommands() {
 	auto context = renderer_->RequestRenderContext();
 
@@ -240,12 +238,17 @@ void Water::RecordComputeCommands() {
 }
 
 void Water::Simulate(float deltaTime) {
+	// Update the deltatime 
 	UpdateWaveheightUBO(deltaTime);
+
+	// Compute waveheights
 	renderer_->ComputeDispatch(waveheightInstance_);
 
+	// IFFT, first a horizontal pass then a vertical pass
 	renderer_->ComputeDispatch(horizontalIFFTInstance_);
 	renderer_->ComputeDispatch(verticalIFFTInstance_);
 
+	// Finally assemble the displacement map to be used in the vertex shader each frame
 	renderer_->ComputeDispatch(displacementInstance_);
 }
 
@@ -261,10 +264,11 @@ void Water::InitPrecalcComputeInstance() {
 	VkBufferCreateInfo bufferCreateInfo = Quadbit::VkUtils::Init::BufferCreateInfo(sizeof(PrecalcUBO), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 	context->allocator->CreateBuffer(precalcResources_.ubo, bufferCreateInfo, Quadbit::QBVK_MEMORY_USAGE_CPU_TO_GPU);
 
+	// Set initial values for water
 	PrecalcUBO* ubo = reinterpret_cast<PrecalcUBO*>(precalcResources_.ubo.alloc.data);
 	ubo->N = WATER_RESOLUTION;
-	ubo->A = 70.0f;
-	ubo->L = 500;
+	ubo->A = 20.0f;
+	ubo->L = 1000;
 	ubo->W = glm::float2(16.0f, 16.0f);
 
 	// Create images
@@ -290,34 +294,13 @@ void Water::InitPrecalcComputeInstance() {
 		Quadbit::VkUtils::Init::BufferCreateInfo(uniformRandomsSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 	context->allocator->CreateBuffer(precalcResources_.uniformRandomsStorageBuffer, uniformRandomsStorageBufferCreateInfo, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
 
+	// Utilize a staging buffer to transfer the data onto the GPU
 	Quadbit::QbVkBuffer uniformRandomsStagingBuffer;
 	context->allocator->CreateStagingBuffer(uniformRandomsStagingBuffer, uniformRandomsSize, precalcResources_.precalcUniformRandoms.data());
 	Quadbit::VkUtils::CopyBuffer(context, uniformRandomsStagingBuffer.buf, precalcResources_.uniformRandomsStorageBuffer.buf, uniformRandomsSize);
 	context->allocator->DestroyBuffer(uniformRandomsStagingBuffer);
 
-
-	// Precalculate twiddle indices used in the IFFT
-	precalcResources_.precalcBitRevIndices.resize(WATER_RESOLUTION);
-	for (auto i = 0; i < WATER_RESOLUTION; i++) {
-		uint32_t x = i;
-		uint32_t res = 0;
-		for (auto j = 0; j < log(WATER_RESOLUTION) / log(2); j++) {
-			res = (res << 1) + (x & 1);
-			x >>= 1;
-		}
-		precalcResources_.precalcBitRevIndices[i] = res;
-	}
-	VkDeviceSize bitRevIndicesSize = WATER_RESOLUTION;
-	VkBufferCreateInfo bitRevIndicesStorageBufferCreateInfo =
-		Quadbit::VkUtils::Init::BufferCreateInfo(bitRevIndicesSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
-	context->allocator->CreateBuffer(precalcResources_.bitRevIndicesStorageBuffer, bitRevIndicesStorageBufferCreateInfo, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
-
-	Quadbit::QbVkBuffer bitRevIndicesStagingBuffer;
-	context->allocator->CreateStagingBuffer(bitRevIndicesStagingBuffer, bitRevIndicesSize, precalcResources_.precalcBitRevIndices.data());
-	Quadbit::VkUtils::CopyBuffer(context, bitRevIndicesStagingBuffer.buf, precalcResources_.bitRevIndicesStorageBuffer.buf, bitRevIndicesSize);
-	context->allocator->DestroyBuffer(bitRevIndicesStagingBuffer);
-
-
+	// Fill descriptors
 	VkDescriptorBufferInfo descBufferInfo{};
 	descBufferInfo.buffer = precalcResources_.ubo.buf;
 	descBufferInfo.range = sizeof(PrecalcUBO);
@@ -334,10 +317,6 @@ void Water::InitPrecalcComputeInstance() {
 	descUniformRandomsStorageBufferInfo.buffer = precalcResources_.uniformRandomsStorageBuffer.buf;
 	descUniformRandomsStorageBufferInfo.range = uniformRandomsSize;
 
-	VkDescriptorBufferInfo descBitRevIndicesStorageBufferInfo{};
-	descBitRevIndicesStorageBufferInfo.buffer = precalcResources_.bitRevIndicesStorageBuffer.buf;
-	descBitRevIndicesStorageBufferInfo.range = bitRevIndicesSize;
-
 	// Transition images from undefined layout and also copy the uniform randoms into the buffer on the GPU
 	VkCommandBuffer tempBuffer = Quadbit::VkUtils::InitSingleTimeCommandBuffer(context);
 
@@ -353,8 +332,7 @@ void Water::InitPrecalcComputeInstance() {
 			std::make_tuple(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, &descBufferInfo),
 			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &h0TildeDescImageInfo),
 			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &h0TildeConjDescImageInfo),
-			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, &descUniformRandomsStorageBufferInfo),
-			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, &descBitRevIndicesStorageBufferInfo),
+			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, &descUniformRandomsStorageBufferInfo)
 	};
 	precalcInstance_ = renderer_->CreateComputeInstance(computeDescriptors, "Resources/Shaders/Compiled/precalc_comp.spv", "main");
 }
@@ -366,6 +344,12 @@ void Water::InitWaveheightComputeInstance() {
 	// Allocate uniform buffer for the compute shader
 	VkBufferCreateInfo bufferCreateInfo = Quadbit::VkUtils::Init::BufferCreateInfo(sizeof(WaveheightUBO), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 	context->allocator->CreateBuffer(waveheightResources_.ubo, bufferCreateInfo, Quadbit::QBVK_MEMORY_USAGE_CPU_TO_GPU);
+
+	WaveheightUBO* ubo = reinterpret_cast<WaveheightUBO*>(waveheightResources_.ubo.alloc.data);
+	ubo->N = WATER_RESOLUTION;
+	ubo->L = 1000;
+	ubo->RT = repeat_;
+	ubo->T = 0.0f;
 
 	// Create images
 	VkImageCreateInfo imageCreateInfo = Quadbit::VkUtils::Init::ImageCreateInfo(WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT);
@@ -424,6 +408,8 @@ void Water::InitInverseFFTComputeInstances() {
 	// Get render context
 	auto context = renderer_->RequestRenderContext();
 
+	// Here we will utilize Vulkan specialization maps to dynamically change the size of the IFFT incase resolution changes.
+	// The vertical pass property is also set here. This way we avoid having to use a Uniform Buffer.
 	VkSpecializationMapEntry xLocalSize		{ 0, 0, sizeof(int) };
 	VkSpecializationMapEntry yLocalSize		{ 1, sizeof(int) * 1, sizeof(int) };
 	VkSpecializationMapEntry zLocalSize		{ 2, sizeof(int) * 2, sizeof(int) };
@@ -457,6 +443,7 @@ void Water::InitInverseFFTComputeInstances() {
 	context->allocator->CreateImage(horizontalIFFTResources_.Dz, imageCreateInfo, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
 	context->allocator->CreateImage(verticalIFFTResources_.Dz, imageCreateInfo, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
 
+	// Fill descriptors
 	VkDescriptorImageInfo h0TildeTxDescImageInfo{};
 	h0TildeTxDescImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 	h0TildeTxDescImageInfo.imageView = Quadbit::VkUtils::CreateImageView(context, waveheightResources_.h0TildeTx.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
@@ -489,7 +476,7 @@ void Water::InitInverseFFTComputeInstances() {
 	verticalDzDescImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 	verticalDzDescImageInfo.imageView = Quadbit::VkUtils::CreateImageView(context, verticalIFFTResources_.Dz.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
 
-	// Transition images from undefined layout and also copy the uniform randoms into the buffer on the GPU
+	// Transition images to VK_IMAGE_LAYOUT_GENERAL
 	VkCommandBuffer tempBuffer = Quadbit::VkUtils::InitSingleTimeCommandBuffer(context);
 	Quadbit::VkUtils::TransitionImageLayout(context, tempBuffer, horizontalIFFTResources_.Dx.img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
 		VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
@@ -505,6 +492,7 @@ void Water::InitInverseFFTComputeInstances() {
 		VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 	Quadbit::VkUtils::FlushCommandBuffer(context, tempBuffer);
 
+	// Setup the vertical/horizontal IFFT compute shaders
 	std::vector<std::tuple<VkDescriptorType, void*>> horizontalComputeDesc {
 		std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &h0TildeTxDescImageInfo),
 		std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &h0TildeTyDescImageInfo),
@@ -531,9 +519,11 @@ void Water::InitDisplacementInstance() {
 	// Get render context
 	auto context = renderer_->RequestRenderContext();
 
+	// Create the final displacement image
 	VkImageCreateInfo imageCreateInfo = Quadbit::VkUtils::Init::ImageCreateInfo(WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT);
 	context->allocator->CreateImage(displacementResources_.displacement, imageCreateInfo, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
 
+	// Fill descriptors
 	VkDescriptorImageInfo verticalDxDescImageInfo{};
 	verticalDxDescImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 	verticalDxDescImageInfo.imageView = Quadbit::VkUtils::CreateImageView(context, verticalIFFTResources_.Dx.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
@@ -554,7 +544,7 @@ void Water::InitDisplacementInstance() {
 		VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 	Quadbit::VkUtils::FlushCommandBuffer(context, tempBuffer);
 
-	// Setup FFT compute shader
+	// Setup the displacement compute shader
 	std::vector<std::tuple<VkDescriptorType, void*>> computeDescriptors {
 			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &verticalDxDescImageInfo),
 			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &verticalDyDescImageInfo),
@@ -569,8 +559,6 @@ void Water::UpdateWaveheightUBO(float deltaTime) {
 	static float t = 0.0f;
 
 	WaveheightUBO* ubo = reinterpret_cast<WaveheightUBO*>(waveheightResources_.ubo.alloc.data);
-	ubo->N = WATER_RESOLUTION;
-	ubo->L = 500;
 	ubo->RT = repeat_;
 	ubo->T = t;
 

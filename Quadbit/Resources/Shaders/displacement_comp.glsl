@@ -8,6 +8,7 @@ layout(binding = 2, rgba32f) uniform readonly image2D Dz;
 layout(binding = 3, rgba32f) uniform writeonly image2D displacement_map;
 
 void main() {
+	// Assemble the RGB displacement map from the individual displacement components
 	vec4 DxPixel = imageLoad(Dx, ivec2(gl_GlobalInvocationID.xy));
 	vec4 DyPixel = imageLoad(Dy, ivec2(gl_GlobalInvocationID.xy));
 	vec4 DzPixel = imageLoad(Dz, ivec2(gl_GlobalInvocationID.xy));

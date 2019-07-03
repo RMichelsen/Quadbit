@@ -16,9 +16,6 @@ layout(binding = 2, rgba32f) writeonly uniform image2D h0tilde_conj;
 layout(binding = 3) buffer UNIF_RAND_STORAGE_BUF {
 	vec4 data[];
 } unif_randoms;
-layout(binding = 4) buffer BITREV_INDICES_STORAGE_BUF {
-	uint data[];
-} bitrev_indices;
 
 struct complex {
 	float re;
