@@ -10,13 +10,12 @@ layout(constant_id = 3) const int LENGTH = 512;
 layout(constant_id = 4) const int PASS_COUNT = 9;
 layout(constant_id = 5) const int VERTICAL_PASS = 0;
 
-layout(binding = 0, rgba32f) readonly uniform image2D h0tilde_tx;
-layout(binding = 1, rgba32f) readonly uniform image2D h0tilde_ty;
-layout(binding = 2, rgba32f) readonly uniform image2D h0tilde_tz;
+layout(push_constant) uniform PushConstants {
+	int iteration;
+} pc;
 
-layout(binding = 3, rgba32f) writeonly uniform image2D Dx;
-layout(binding = 4, rgba32f) writeonly uniform image2D Dy;
-layout(binding = 5, rgba32f) writeonly uniform image2D Dz;
+layout(binding = 0, rgba32f) readonly uniform image2D input_images[5];
+layout(binding = 1, rgba32f) writeonly uniform image2D output_images[5];
 
 struct complex {
 	float re;
@@ -36,11 +35,8 @@ complex mul(complex z, float fac) {
 }
 
 // SLM approach outlined in https://software.intel.com/en-us/articles/fast-fourier-transform-for-image-processing-in-directx-11
-shared complex pingpong_tx[2][LENGTH];
-shared complex pingpong_ty[2][LENGTH];
-shared complex pingpong_tz[2][LENGTH];
+shared complex pingpong[2][LENGTH];
 void get_butterfly_values(int pass_index, uint pos, out uvec2 indices, out complex w) {
-	
 	const uint sec_width = 2 << pass_index;
 	const uint half_sec_width = sec_width / 2;
 
@@ -60,61 +56,25 @@ void get_butterfly_values(int pass_index, uint pos, out uvec2 indices, out compl
 	}
 }
 
-// Perform the butterfly calculation (0.5 added since its an inverse FFT, its possible to scale at the end by 1/N^2 instead)
-void butterfly_pass(int pass_index, uint local_index, int pingpong_index, out complex txRes, out complex tyRes, out complex tzRes) {
+// Perform the butterfly calculation ?? (multiply by 0.5 since its an inverse FFT, its possible to scale at the end by 1/N^2 instead) ??
+void butterfly_pass(int pass_index, uint local_index, int pingpong_index, out complex res) {
 	uvec2 indices;
 	complex w;
 	get_butterfly_values(pass_index, local_index, indices, w);
 
-	complex tx1 = pingpong_tx[pingpong_index][indices.x];
-	complex tx2 = pingpong_tx[pingpong_index][indices.y];
-	txRes = mul(add(tx1, mul(tx2, w)), 0.5f);
-
-	complex ty1 = pingpong_ty[pingpong_index][indices.x];
-	complex ty2 = pingpong_ty[pingpong_index][indices.y];
-	tyRes = mul(add(ty1, mul(ty2, w)), 0.5f);
-
-	complex tz1 = pingpong_tz[pingpong_index][indices.x];
-	complex tz2 = pingpong_tz[pingpong_index][indices.y];
-	tzRes = mul(add(tz1, mul(tz2, w)), 0.5f);
+	complex c0 = pingpong[pingpong_index][indices.x];
+	complex c1 = pingpong[pingpong_index][indices.y];
+	res = add(c0, mul(c1, w));
 }
-
-//void butterfly_pass_tx(int pingpong_index, uvec2 indices, complex w, out complex res) {
-//	complex c1 = pingpong_tx[pingpong_index][indices.x];
-//	complex c2 = pingpong_tx[pingpong_index][indices.y];
-//
-//	// Perform the butterfly calculation (0.5 added since its an inverse FFT, its possible to scale at the end by 1/N^2 instead)
-//	res = mul(add(c1, mul(c2, w)), 0.5f);
-//}
-//
-//void butterfly_pass_ty(int pingpong_index, uvec2 indices, complex w, out complex res) {
-//	complex c1 = pingpong_ty[pingpong_index][indices.x];
-//	complex c2 = pingpong_ty[pingpong_index][indices.y];
-//
-//	// Perform the butterfly calculation (0.5 added since its an inverse FFT, its possible to scale at the end by 1/N^2 instead)
-//	res = mul(add(c1, mul(c2, w)), 0.5f);
-//}
-//
-//void butterfly_pass_tz(int pingpong_index, uvec2 indices, complex w, out complex res) {
-//	complex c1 = pingpong_tz[pingpong_index][indices.x];
-//	complex c2 = pingpong_tz[pingpong_index][indices.y];
-//
-//	// Perform the butterfly calculation (0.5 added since its an inverse FFT, its possible to scale at the end by 1/N^2 instead)
-//	res = mul(add(c1, mul(c2, w)), 0.5f);
-//}
 
 void main() {
 	// Fetch position and pixel based on direction and load row or column into the shared ping pong arrays
 	uint local_index = gl_GlobalInvocationID.x;
 	uvec2 pos = (VERTICAL_PASS == 0) ? gl_GlobalInvocationID.xy : gl_GlobalInvocationID.yx;
 
-	vec2 tx_entry = imageLoad(h0tilde_tx, ivec2(pos)).rg;
-	vec2 ty_entry = imageLoad(h0tilde_ty, ivec2(pos)).rg;
-	vec2 tz_entry = imageLoad(h0tilde_tz, ivec2(pos)).rg;
+	vec2 entry = imageLoad(input_images[pc.iteration], ivec2(pos)).rg;
 
-	pingpong_tx[0][local_index] = complex(tx_entry.x, tx_entry.y);
-	pingpong_ty[0][local_index] = complex(ty_entry.x, ty_entry.y);
-	pingpong_tz[0][local_index] = complex(tz_entry.x, tz_entry.y);
+	pingpong[0][local_index] = complex(entry.x, entry.y);
 
 	ivec2 pingpong_indices = ivec2(0, 1);
 
@@ -122,8 +82,7 @@ void main() {
 		groupMemoryBarrier();
 		barrier();
 
-		butterfly_pass(i, local_index, pingpong_indices.x, pingpong_tx[pingpong_indices.y][local_index], pingpong_ty[pingpong_indices.y][local_index], 
-			pingpong_tz[pingpong_indices.y][local_index]);
+		butterfly_pass(i, local_index, pingpong_indices.x, pingpong[pingpong_indices.y][local_index]);
 
 		// Swap pingpong textures for next write
 		pingpong_indices.xy = pingpong_indices.yx;
@@ -133,18 +92,14 @@ void main() {
 	barrier();
 
 	// Final pass writes directly to the output textures
-	complex DxRes, DyRes, DzRes;
+	complex res;
 	if(VERTICAL_PASS == 1) {
 		float sign_factor = (gl_GlobalInvocationID.x + gl_GlobalInvocationID.y) % 2 == 0 ? -1.0f : 1.0f;
-		butterfly_pass(PASS_COUNT - 1, local_index, pingpong_indices.x, DxRes, DyRes, DzRes);
-		imageStore(Dx, ivec2(pos), vec4(DxRes.re * sign_factor, DxRes.re * sign_factor, DxRes.re * sign_factor, 0.0f));
-		imageStore(Dy, ivec2(pos), vec4(DyRes.re * sign_factor, DyRes.re * sign_factor, DyRes.re * sign_factor, 0.0f));
-		imageStore(Dz, ivec2(pos), vec4(DzRes.re * sign_factor, DzRes.re * sign_factor, DzRes.re * sign_factor, 0.0f));
+		butterfly_pass(PASS_COUNT - 1, local_index, pingpong_indices.x, res);
+		imageStore(output_images[pc.iteration], ivec2(pos), vec4(res.re * sign_factor, res.re * sign_factor, res.re * sign_factor, 0.0f));
 	}
 	else {
-		butterfly_pass(PASS_COUNT - 1, local_index, pingpong_indices.x, DxRes, DyRes, DzRes);
-		imageStore(Dx, ivec2(pos), vec4(DxRes.re, DxRes.im, 0.0f, 0.0f));
-		imageStore(Dy, ivec2(pos), vec4(DyRes.re, DyRes.im, 0.0f, 0.0f));
-		imageStore(Dz, ivec2(pos), vec4(DzRes.re, DzRes.im, 0.0f, 0.0f));
+		butterfly_pass(PASS_COUNT - 1, local_index, pingpong_indices.x, res);
+		imageStore(output_images[pc.iteration], ivec2(pos), vec4(res.re, res.im, 0.0f, 0.0f));
 	}
 }

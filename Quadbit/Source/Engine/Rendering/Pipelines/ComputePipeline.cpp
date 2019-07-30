@@ -49,15 +49,15 @@ namespace Quadbit {
 		VK_CHECK(vkWaitForFences(context_->device, 1, &computeFence_, VK_TRUE, std::numeric_limits<uint64_t>().max()));
 		VK_CHECK(vkResetFences(context_->device, 1, &computeFence_));
 	}
-
-	QbVkComputeInstance ComputePipeline::CreateInstance(std::vector<std::tuple<VkDescriptorType, void*>> descriptors, 
-		const char* shader, const char* shaderFunc, const VkSpecializationInfo* specInfo) {
+	
+	QbVkComputeInstance ComputePipeline::CreateInstance(std::vector<std::tuple<VkDescriptorType, std::vector<void*>>> descriptors,  const char* shader, 
+		const char* shaderFunc, const VkSpecializationInfo* specInfo, const uint32_t pushConstantRangeSize) {
 		QbVkComputeInstance computeInstance;
 
 		// Create descriptor sets
 		std::vector<VkDescriptorSetLayoutBinding> descSetLayoutBindings;
 		for (auto i = 0; i < descriptors.size(); i++) {
-			descSetLayoutBindings.push_back(VkUtils::Init::DescriptorSetLayoutBinding(i, std::get<0>(descriptors[i]), VK_SHADER_STAGE_COMPUTE_BIT));
+			descSetLayoutBindings.push_back(VkUtils::Init::DescriptorSetLayoutBinding(i, std::get<0>(descriptors[i]), VK_SHADER_STAGE_COMPUTE_BIT, static_cast<uint32_t>(std::get<1>(descriptors[i]).size())));
 		}
 
 		VkDescriptorSetLayoutCreateInfo descSetLayoutCreateInfo = VkUtils::Init::DescriptorSetLayoutCreateInfo();
@@ -70,16 +70,17 @@ namespace Quadbit {
 		descSetAllocInfo.descriptorPool = descriptorPool_;
 		descSetAllocInfo.pSetLayouts = &computeInstance.descriptorSetLayout;
 		descSetAllocInfo.descriptorSetCount = 1;
-
 		VK_CHECK(vkAllocateDescriptorSets(context_->device, &descSetAllocInfo, &computeInstance.descriptorSet));
 
 		std::vector<VkWriteDescriptorSet> writeDescSets;
 		for (auto i = 0; i < descriptors.size(); i++) {
 			if (std::get<0>(descriptors[i]) == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER || std::get<0>(descriptors[i]) == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) {
-				writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(computeInstance.descriptorSet, std::get<0>(descriptors[i]), i, static_cast<VkDescriptorBufferInfo*>(std::get<1>(descriptors[i]))));
+				writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(computeInstance.descriptorSet, std::get<0>(descriptors[i]), i, 
+					static_cast<VkDescriptorBufferInfo*>(std::get<1>(descriptors[i])[0]), static_cast<uint32_t>(std::get<1>(descriptors[i]).size())));
 			}
 			else if (std::get<0>(descriptors[i]) == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE) {
-				writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(computeInstance.descriptorSet, std::get<0>(descriptors[i]), i, static_cast<VkDescriptorImageInfo*>(std::get<1>(descriptors[i]))));
+				writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(computeInstance.descriptorSet, std::get<0>(descriptors[i]), i, 
+					static_cast<VkDescriptorImageInfo*>(std::get<1>(descriptors[i])[0]), static_cast<uint32_t>(std::get<1>(descriptors[i]).size())));
 			}
 		}
 
@@ -100,6 +101,13 @@ namespace Quadbit {
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = VkUtils::Init::PipelineLayoutCreateInfo();
 		pipelineLayoutCreateInfo.pSetLayouts = &computeInstance.descriptorSetLayout;
 		pipelineLayoutCreateInfo.setLayoutCount = 1;
+		VkPushConstantRange pushConstantRange{};
+		pushConstantRange.offset = 0;
+		pushConstantRange.size = pushConstantRangeSize;
+		pushConstantRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+		// Push constant ranges are only part of the main pipeline layout
+		pipelineLayoutCreateInfo.pushConstantRangeCount = pushConstantRangeSize > 0 ? 1 : 0;
+		pipelineLayoutCreateInfo.pPushConstantRanges = pushConstantRangeSize > 0 ? &pushConstantRange : nullptr;
 		VK_CHECK(vkCreatePipelineLayout(context_->device, &pipelineLayoutCreateInfo, nullptr, &computeInstance.pipelineLayout));
 
 		VkComputePipelineCreateInfo computePipelineCreateInfo = VkUtils::Init::ComputePipelineCreateInfo();

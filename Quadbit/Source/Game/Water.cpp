@@ -32,13 +32,37 @@ void Water::Init() {
 
 
 	// Our shader will be using the final displacement image calculated in the compute shaders to offset the vertex positions
-	VkDescriptorImageInfo displacementImageDescInfo{};
-	displacementImageDescInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-	displacementImageDescInfo.imageView = Quadbit::VkUtils::CreateImageView(renderer_->RequestRenderContext(), 
-		displacementResources_.displacement.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
+	VkDescriptorImageInfo displacementMapImageDescInfo{};
+	displacementMapImageDescInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+	displacementMapImageDescInfo.imageView = Quadbit::VkUtils::CreateImageView(renderer_->RequestRenderContext(),
+		displacementResources_.displacementMap.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
+
+	// Sampler to sample from the normal map image in the fragment shader
+	VkSamplerCreateInfo samplerInfo{};
+	samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	samplerInfo.magFilter = VK_FILTER_LINEAR;
+	samplerInfo.minFilter = VK_FILTER_LINEAR;
+	samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	samplerInfo.anisotropyEnable = VK_TRUE;
+	samplerInfo.maxAnisotropy = 16;
+	samplerInfo.unnormalizedCoordinates = VK_FALSE;
+	samplerInfo.compareEnable = VK_FALSE;
+	samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+	samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	VK_CHECK(vkCreateSampler(renderer_->RequestRenderContext()->device, &samplerInfo, nullptr, &displacementResources_.normalMapSampler));
+
+	// And the normal map image itself
+	VkDescriptorImageInfo normalMapTextureImageDescInfo{};
+	normalMapTextureImageDescInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+	normalMapTextureImageDescInfo.imageView = Quadbit::VkUtils::CreateImageView(renderer_->RequestRenderContext(),
+		displacementResources_.normalMap.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
+	normalMapTextureImageDescInfo.sampler = displacementResources_.normalMapSampler;
 
 	Quadbit::QbVkRenderMeshInstance* rMeshInstance = renderer_->CreateRenderMeshInstance({
-			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &displacementImageDescInfo, VK_SHADER_STAGE_VERTEX_BIT)
+			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &displacementMapImageDescInfo, VK_SHADER_STAGE_VERTEX_BIT),
+			std::make_tuple(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, &normalMapTextureImageDescInfo, VK_SHADER_STAGE_FRAGMENT_BIT)
 	}, 
 		"Resources/Shaders/Compiled/water_vert.spv", "main", "Resources/Shaders/Compiled/water_frag.spv", "main"
 	);
@@ -49,6 +73,18 @@ void Water::Init() {
 	auto entity = entityManager->Create();
 	entity.AddComponent<Quadbit::RenderMeshComponent>(renderer_->CreateMesh(waterVertices_, waterIndices_, rMeshInstance));
 	entity.AddComponent<Quadbit::RenderTransformComponent>(Quadbit::RenderTransformComponent(1.0f, { 0.0f, 0.0f, 0.0f }, { 0, 0, 0, 1 }));
+
+	entity = entityManager->Create();
+	entity.AddComponent<Quadbit::RenderMeshComponent>(renderer_->CreateMesh(waterVertices_, waterIndices_, rMeshInstance));
+	entity.AddComponent<Quadbit::RenderTransformComponent>(Quadbit::RenderTransformComponent(1.0f, { 1024.0f, 0.0f, 0.0f }, { 0, 0, 0, 1 }));
+
+	entity = entityManager->Create();
+	entity.AddComponent<Quadbit::RenderMeshComponent>(renderer_->CreateMesh(waterVertices_, waterIndices_, rMeshInstance));
+	entity.AddComponent<Quadbit::RenderTransformComponent>(Quadbit::RenderTransformComponent(1.0f, { 0.0f, 0.0f, 1024.0f }, { 0, 0, 0, 1 }));
+
+	entity = entityManager->Create();
+	entity.AddComponent<Quadbit::RenderMeshComponent>(renderer_->CreateMesh(waterVertices_, waterIndices_, rMeshInstance));
+	entity.AddComponent<Quadbit::RenderTransformComponent>(Quadbit::RenderTransformComponent(1.0f, { 1024.0f, 0.0f, 1024.0f }, { 0, 0, 0, 1 }));
 
 
 	// Some ImGui debug stuff 
@@ -126,10 +162,26 @@ void Water::RecordComputeCommands() {
 	h0TildeTzBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
 	h0TildeTzBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-	std::array<VkImageMemoryBarrier, 3> tBarriers { h0TildeTxBarrier, h0TildeTyBarrier, h0TildeTzBarrier };
+	VkImageMemoryBarrier h0TildeSlopeXBarrier = Quadbit::VkUtils::Init::ImageMemoryBarrier();
+	h0TildeSlopeXBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+	h0TildeSlopeXBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+	h0TildeSlopeXBarrier.image = waveheightResources_.h0TildeSlopeX.img;
+	h0TildeSlopeXBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+	h0TildeSlopeXBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+	h0TildeSlopeXBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+	VkImageMemoryBarrier h0TildeSlopeZBarrier = Quadbit::VkUtils::Init::ImageMemoryBarrier();
+	h0TildeSlopeZBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+	h0TildeSlopeZBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+	h0TildeSlopeZBarrier.image = waveheightResources_.h0TildeSlopeX.img;
+	h0TildeSlopeZBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+	h0TildeSlopeZBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+	h0TildeSlopeZBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+	std::array<VkImageMemoryBarrier, 5> tBarriers { h0TildeTxBarrier, h0TildeTyBarrier, h0TildeTzBarrier, h0TildeSlopeXBarrier, h0TildeSlopeZBarrier };
 
 	vkCmdPipelineBarrier(waveheightInstance_.commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-		0, 0, nullptr, 0, nullptr, 3, tBarriers.data());
+		0, 0, nullptr, 0, nullptr, static_cast<uint32_t>(tBarriers.size()), tBarriers.data());
 
 	VK_CHECK(vkEndCommandBuffer(waveheightInstance_.commandBuffer));
 
@@ -138,7 +190,12 @@ void Water::RecordComputeCommands() {
 	VK_CHECK(vkBeginCommandBuffer(horizontalIFFTInstance_.commandBuffer, &cmdBufInfo));
 	vkCmdBindPipeline(horizontalIFFTInstance_.commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, horizontalIFFTInstance_.pipeline);
 	vkCmdBindDescriptorSets(horizontalIFFTInstance_.commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, horizontalIFFTInstance_.pipelineLayout, 0, 1, &horizontalIFFTInstance_.descriptorSet, 0, 0);
-	vkCmdDispatch(horizontalIFFTInstance_.commandBuffer, 1, WATER_RESOLUTION, 1);
+
+	for (int i = 0; i < 5; i++) {
+		horizontalIFFTResources_.pushConstants.iteration = i;
+		vkCmdPushConstants(horizontalIFFTInstance_.commandBuffer, horizontalIFFTInstance_.pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(IFFTPushConstants), &horizontalIFFTResources_.pushConstants);
+		vkCmdDispatch(horizontalIFFTInstance_.commandBuffer, 1, WATER_RESOLUTION, 1);
+	}
 
 	VkImageMemoryBarrier hDxBarrier = Quadbit::VkUtils::Init::ImageMemoryBarrier();
 	hDxBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
@@ -164,10 +221,26 @@ void Water::RecordComputeCommands() {
 	hDzBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
 	hDzBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-	std::array<VkImageMemoryBarrier, 3> hBarriers { hDxBarrier, hDyBarrier, hDzBarrier };
+	VkImageMemoryBarrier hDSlopeXBarrier = Quadbit::VkUtils::Init::ImageMemoryBarrier();
+	hDSlopeXBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+	hDSlopeXBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+	hDSlopeXBarrier.image = horizontalIFFTResources_.DSlopeX.img;
+	hDSlopeXBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+	hDSlopeXBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+	hDSlopeXBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+	VkImageMemoryBarrier hDSlopeZBarrier = Quadbit::VkUtils::Init::ImageMemoryBarrier();
+	hDSlopeZBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+	hDSlopeZBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+	hDSlopeZBarrier.image = horizontalIFFTResources_.DSlopeZ.img;
+	hDSlopeZBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+	hDSlopeZBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+	hDSlopeZBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+	std::array<VkImageMemoryBarrier, 5> hBarriers { hDxBarrier, hDyBarrier, hDzBarrier, hDSlopeXBarrier, hDSlopeZBarrier };
 
 	vkCmdPipelineBarrier(horizontalIFFTInstance_.commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-		0, 0, nullptr, 0, nullptr, 3, hBarriers.data());
+		0, 0, nullptr, 0, nullptr, static_cast<uint32_t>(hBarriers.size()), hBarriers.data());
 
 	VK_CHECK(vkEndCommandBuffer(horizontalIFFTInstance_.commandBuffer));
 
@@ -175,7 +248,12 @@ void Water::RecordComputeCommands() {
 	VK_CHECK(vkBeginCommandBuffer(verticalIFFTInstance_.commandBuffer, &cmdBufInfo));
 	vkCmdBindPipeline(verticalIFFTInstance_.commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, verticalIFFTInstance_.pipeline);
 	vkCmdBindDescriptorSets(verticalIFFTInstance_.commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, verticalIFFTInstance_.pipelineLayout, 0, 1, &verticalIFFTInstance_.descriptorSet, 0, 0);
-	vkCmdDispatch(verticalIFFTInstance_.commandBuffer, 1, WATER_RESOLUTION, 1);
+
+	for (int i = 0; i < 5; i++) {
+		verticalIFFTResources_.pushConstants.iteration = i;
+		vkCmdPushConstants(verticalIFFTInstance_.commandBuffer, verticalIFFTInstance_.pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(IFFTPushConstants), &verticalIFFTResources_.pushConstants);
+		vkCmdDispatch(verticalIFFTInstance_.commandBuffer, 1, WATER_RESOLUTION, 1);
+	}
 
 	VkImageMemoryBarrier vDxBarrier = Quadbit::VkUtils::Init::ImageMemoryBarrier();
 	vDxBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
@@ -201,10 +279,26 @@ void Water::RecordComputeCommands() {
 	vDzBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
 	vDzBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-	std::array<VkImageMemoryBarrier, 3> vBarriers{ vDxBarrier, vDyBarrier, vDzBarrier };
+	VkImageMemoryBarrier vDSlopeXBarrier = Quadbit::VkUtils::Init::ImageMemoryBarrier();
+	vDSlopeXBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+	vDSlopeXBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+	vDSlopeXBarrier.image = verticalIFFTResources_.DSlopeX.img;
+	vDSlopeXBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+	vDSlopeXBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+	vDSlopeXBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+	VkImageMemoryBarrier vDSlopeZBarrier = Quadbit::VkUtils::Init::ImageMemoryBarrier();
+	vDSlopeZBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+	vDSlopeZBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+	vDSlopeZBarrier.image = verticalIFFTResources_.DSlopeZ.img;
+	vDSlopeZBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+	vDSlopeZBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+	vDSlopeZBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+	std::array<VkImageMemoryBarrier, 5> vBarriers{ vDxBarrier, vDyBarrier, vDzBarrier, vDSlopeXBarrier, vDSlopeZBarrier };
 
 	vkCmdPipelineBarrier(verticalIFFTInstance_.commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-		0, 0, nullptr, 0, nullptr, 3, vBarriers.data());
+		0, 0, nullptr, 0, nullptr, static_cast<uint32_t>(vBarriers.size()), vBarriers.data());
 
 	VK_CHECK(vkEndCommandBuffer(verticalIFFTInstance_.commandBuffer));
 
@@ -221,18 +315,26 @@ void Water::RecordComputeCommands() {
 	vDxBarrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
 
 	vkCmdPipelineBarrier(displacementInstance_.commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-		0, 0, nullptr, 0, nullptr, 3, vBarriers.data());
+		0, 0, nullptr, 0, nullptr, static_cast<uint32_t>(vBarriers.size()), vBarriers.data());
 
 	VkImageMemoryBarrier dispBarrier = Quadbit::VkUtils::Init::ImageMemoryBarrier();
 	dispBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
 	dispBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-	dispBarrier.image = displacementResources_.displacement.img;
+	dispBarrier.image = displacementResources_.displacementMap.img;
 	dispBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
 	dispBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
 	dispBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
+	VkImageMemoryBarrier normBarrier = Quadbit::VkUtils::Init::ImageMemoryBarrier();
+	normBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+	normBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+	normBarrier.image = displacementResources_.normalMap.img;
+	normBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+	normBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+	normBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
 	vkCmdPipelineBarrier(displacementInstance_.commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-		0, 0, nullptr, 0, nullptr, 1, &dispBarrier);
+		0, 0, nullptr, 0, nullptr, 1, &normBarrier);
 
 	VK_CHECK(vkEndCommandBuffer(displacementInstance_.commandBuffer));
 }
@@ -267,15 +369,14 @@ void Water::InitPrecalcComputeInstance() {
 	// Set initial values for water
 	PrecalcUBO* ubo = reinterpret_cast<PrecalcUBO*>(precalcResources_.ubo.alloc.data);
 	ubo->N = WATER_RESOLUTION;
-	ubo->A = 20.0f;
-	ubo->L = 1000;
-	ubo->W = glm::float2(16.0f, 16.0f);
+	ubo->A = 150.3e-9;
+	ubo->L = 1300;
+	ubo->W = glm::float2(16.0f, 24.0f);
 
 	// Create images
 	VkImageCreateInfo imageCreateInfo = Quadbit::VkUtils::Init::ImageCreateInfo(WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT);
 	context->allocator->CreateImage(precalcResources_.h0Tilde, imageCreateInfo, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
 	context->allocator->CreateImage(precalcResources_.h0TildeConj, imageCreateInfo, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
-
 
 	// Precalculate uniform randoms used for the generation of the initial frequency heightmaps
 	precalcResources_.precalcUniformRandoms.resize(WATER_RESOLUTION * WATER_RESOLUTION * 4);
@@ -328,11 +429,11 @@ void Water::InitPrecalcComputeInstance() {
 	Quadbit::VkUtils::FlushCommandBuffer(context, tempBuffer);
 
 	// Setup precalc compute shader
-	std::vector<std::tuple<VkDescriptorType, void*>> computeDescriptors {
-			std::make_tuple(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, &descBufferInfo),
-			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &h0TildeDescImageInfo),
-			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &h0TildeConjDescImageInfo),
-			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, &descUniformRandomsStorageBufferInfo)
+	std::vector<std::tuple<VkDescriptorType, std::vector<void*>>> computeDescriptors {
+			std::make_tuple(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, std::vector<void*> { &descBufferInfo }),
+			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, std::vector<void*> { &h0TildeDescImageInfo }),
+			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, std::vector<void*> { &h0TildeConjDescImageInfo }),
+			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, std::vector<void*> { &descUniformRandomsStorageBufferInfo })
 	};
 	precalcInstance_ = renderer_->CreateComputeInstance(computeDescriptors, "Resources/Shaders/Compiled/precalc_comp.spv", "main");
 }
@@ -347,7 +448,7 @@ void Water::InitWaveheightComputeInstance() {
 
 	WaveheightUBO* ubo = reinterpret_cast<WaveheightUBO*>(waveheightResources_.ubo.alloc.data);
 	ubo->N = WATER_RESOLUTION;
-	ubo->L = 1000;
+	ubo->L = 1300;
 	ubo->RT = repeat_;
 	ubo->T = 0.0f;
 
@@ -356,6 +457,15 @@ void Water::InitWaveheightComputeInstance() {
 	context->allocator->CreateImage(waveheightResources_.h0TildeTx, imageCreateInfo, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
 	context->allocator->CreateImage(waveheightResources_.h0TildeTy, imageCreateInfo, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
 	context->allocator->CreateImage(waveheightResources_.h0TildeTz, imageCreateInfo, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
+	context->allocator->CreateImage(waveheightResources_.h0TildeSlopeX, imageCreateInfo, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
+	context->allocator->CreateImage(waveheightResources_.h0TildeSlopeZ, imageCreateInfo, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
+
+	// Create imageviews
+	waveheightResources_.h0TildeTxImgInfo.imageView = Quadbit::VkUtils::CreateImageView(context, waveheightResources_.h0TildeTx.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
+	waveheightResources_.h0TildeTyImgInfo.imageView = Quadbit::VkUtils::CreateImageView(context, waveheightResources_.h0TildeTy.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
+	waveheightResources_.h0TildeTzImgInfo.imageView = Quadbit::VkUtils::CreateImageView(context, waveheightResources_.h0TildeTz.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
+	waveheightResources_.h0TildeSlopeXImgInfo.imageView = Quadbit::VkUtils::CreateImageView(context, waveheightResources_.h0TildeSlopeX.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
+	waveheightResources_.h0TildeSlopeZImgInfo.imageView = Quadbit::VkUtils::CreateImageView(context, waveheightResources_.h0TildeSlopeZ.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
 
 	// Fill descriptors
 	VkDescriptorBufferInfo descBufferInfo{};
@@ -370,16 +480,6 @@ void Water::InitWaveheightComputeInstance() {
 	h0TildeConjDescImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 	h0TildeConjDescImageInfo.imageView = Quadbit::VkUtils::CreateImageView(context, precalcResources_.h0TildeConj.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
 
-	VkDescriptorImageInfo h0TildeTxDescImageInfo{};
-	h0TildeTxDescImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-	h0TildeTxDescImageInfo.imageView = Quadbit::VkUtils::CreateImageView(context, waveheightResources_.h0TildeTx.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
-	VkDescriptorImageInfo h0TildeTyDescImageInfo{};
-	h0TildeTyDescImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-	h0TildeTyDescImageInfo.imageView = Quadbit::VkUtils::CreateImageView(context, waveheightResources_.h0TildeTy.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
-	VkDescriptorImageInfo h0TildeTzDescImageInfo{};
-	h0TildeTzDescImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-	h0TildeTzDescImageInfo.imageView = Quadbit::VkUtils::CreateImageView(context, waveheightResources_.h0TildeTz.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
-
 	// Transition images from undefined layout and also copy the uniform randoms into the buffer on the GPU
 	VkCommandBuffer tempBuffer = Quadbit::VkUtils::InitSingleTimeCommandBuffer(context);
 
@@ -389,17 +489,23 @@ void Water::InitWaveheightComputeInstance() {
 		VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 	Quadbit::VkUtils::TransitionImageLayout(context, tempBuffer, waveheightResources_.h0TildeTz.img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
 		VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+	Quadbit::VkUtils::TransitionImageLayout(context, tempBuffer, waveheightResources_.h0TildeSlopeX.img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
+		VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+	Quadbit::VkUtils::TransitionImageLayout(context, tempBuffer, waveheightResources_.h0TildeSlopeZ.img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
+		VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 
 	Quadbit::VkUtils::FlushCommandBuffer(context, tempBuffer);
 
 	// Setup waveheight shader
-	std::vector<std::tuple<VkDescriptorType, void*>> computeDescriptors{
-			std::make_tuple(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, &descBufferInfo),
-			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &h0TildeDescImageInfo),
-			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &h0TildeConjDescImageInfo),
-			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &h0TildeTxDescImageInfo),
-			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &h0TildeTyDescImageInfo),
-			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &h0TildeTzDescImageInfo)
+	std::vector<std::tuple<VkDescriptorType, std::vector<void*>>> computeDescriptors{
+			std::make_tuple(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, std::vector<void*> { &descBufferInfo }),
+			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,  std::vector<void*> { &h0TildeDescImageInfo }),
+			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,  std::vector<void*> { &h0TildeConjDescImageInfo }),
+			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,  std::vector<void*> { &waveheightResources_.h0TildeTxImgInfo }),
+			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,  std::vector<void*> { &waveheightResources_.h0TildeTyImgInfo }),
+			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,  std::vector<void*> { &waveheightResources_.h0TildeTzImgInfo }),
+			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,  std::vector<void*> { &waveheightResources_.h0TildeSlopeXImgInfo }),
+			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,  std::vector<void*> { &waveheightResources_.h0TildeSlopeZImgInfo })
 	};
 	waveheightInstance_ = renderer_->CreateComputeInstance(computeDescriptors, "Resources/Shaders/Compiled/waveheight_comp.spv", "main");
 }
@@ -442,39 +548,22 @@ void Water::InitInverseFFTComputeInstances() {
 	context->allocator->CreateImage(verticalIFFTResources_.Dy, imageCreateInfo, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
 	context->allocator->CreateImage(horizontalIFFTResources_.Dz, imageCreateInfo, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
 	context->allocator->CreateImage(verticalIFFTResources_.Dz, imageCreateInfo, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
+	context->allocator->CreateImage(horizontalIFFTResources_.DSlopeX, imageCreateInfo, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
+	context->allocator->CreateImage(verticalIFFTResources_.DSlopeX, imageCreateInfo, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
+	context->allocator->CreateImage(horizontalIFFTResources_.DSlopeZ, imageCreateInfo, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
+	context->allocator->CreateImage(verticalIFFTResources_.DSlopeZ, imageCreateInfo, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
 
-	// Fill descriptors
-	VkDescriptorImageInfo h0TildeTxDescImageInfo{};
-	h0TildeTxDescImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-	h0TildeTxDescImageInfo.imageView = Quadbit::VkUtils::CreateImageView(context, waveheightResources_.h0TildeTx.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
-
-	VkDescriptorImageInfo h0TildeTyDescImageInfo{};
-	h0TildeTyDescImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-	h0TildeTyDescImageInfo.imageView = Quadbit::VkUtils::CreateImageView(context, waveheightResources_.h0TildeTy.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
-
-	VkDescriptorImageInfo h0TildeTzDescImageInfo{};
-	h0TildeTzDescImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-	h0TildeTzDescImageInfo.imageView = Quadbit::VkUtils::CreateImageView(context, waveheightResources_.h0TildeTz.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
-
-	VkDescriptorImageInfo horizontalDxDescImageInfo{};
-	horizontalDxDescImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-	horizontalDxDescImageInfo.imageView = Quadbit::VkUtils::CreateImageView(context, horizontalIFFTResources_.Dx.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
-	VkDescriptorImageInfo horizontalDyDescImageInfo{};
-	horizontalDyDescImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-	horizontalDyDescImageInfo.imageView = Quadbit::VkUtils::CreateImageView(context, horizontalIFFTResources_.Dy.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
-	VkDescriptorImageInfo horizontalDzDescImageInfo{};
-	horizontalDzDescImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-	horizontalDzDescImageInfo.imageView = Quadbit::VkUtils::CreateImageView(context, horizontalIFFTResources_.Dz.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
-
-	VkDescriptorImageInfo verticalDxDescImageInfo{};
-	verticalDxDescImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-	verticalDxDescImageInfo.imageView = Quadbit::VkUtils::CreateImageView(context, verticalIFFTResources_.Dx.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
-	VkDescriptorImageInfo verticalDyDescImageInfo{};
-	verticalDyDescImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-	verticalDyDescImageInfo.imageView = Quadbit::VkUtils::CreateImageView(context, verticalIFFTResources_.Dy.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
-	VkDescriptorImageInfo verticalDzDescImageInfo{};
-	verticalDzDescImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-	verticalDzDescImageInfo.imageView = Quadbit::VkUtils::CreateImageView(context, verticalIFFTResources_.Dz.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
+	// Create image views
+	horizontalIFFTResources_.DxImgInfo.imageView = Quadbit::VkUtils::CreateImageView(context, horizontalIFFTResources_.Dx.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
+	horizontalIFFTResources_.DyImgInfo.imageView = Quadbit::VkUtils::CreateImageView(context, horizontalIFFTResources_.Dy.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
+	horizontalIFFTResources_.DzImgInfo.imageView = Quadbit::VkUtils::CreateImageView(context, horizontalIFFTResources_.Dz.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
+	horizontalIFFTResources_.DSlopeXImgInfo.imageView = Quadbit::VkUtils::CreateImageView(context, horizontalIFFTResources_.DSlopeX.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
+	horizontalIFFTResources_.DSlopeZImgInfo.imageView = Quadbit::VkUtils::CreateImageView(context, horizontalIFFTResources_.DSlopeZ.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
+	verticalIFFTResources_.DxImgInfo.imageView = Quadbit::VkUtils::CreateImageView(context, verticalIFFTResources_.Dx.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
+	verticalIFFTResources_.DyImgInfo.imageView = Quadbit::VkUtils::CreateImageView(context, verticalIFFTResources_.Dy.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
+	verticalIFFTResources_.DzImgInfo.imageView = Quadbit::VkUtils::CreateImageView(context, verticalIFFTResources_.Dz.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
+	verticalIFFTResources_.DSlopeXImgInfo.imageView = Quadbit::VkUtils::CreateImageView(context, verticalIFFTResources_.DSlopeX.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
+	verticalIFFTResources_.DSlopeZImgInfo.imageView = Quadbit::VkUtils::CreateImageView(context, verticalIFFTResources_.DSlopeZ.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
 
 	// Transition images to VK_IMAGE_LAYOUT_GENERAL
 	VkCommandBuffer tempBuffer = Quadbit::VkUtils::InitSingleTimeCommandBuffer(context);
@@ -484,44 +573,70 @@ void Water::InitInverseFFTComputeInstances() {
 		VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 	Quadbit::VkUtils::TransitionImageLayout(context, tempBuffer, horizontalIFFTResources_.Dz.img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
 		VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+	Quadbit::VkUtils::TransitionImageLayout(context, tempBuffer, horizontalIFFTResources_.DSlopeX.img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
+		VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+	Quadbit::VkUtils::TransitionImageLayout(context, tempBuffer, horizontalIFFTResources_.DSlopeZ.img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
+		VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 	Quadbit::VkUtils::TransitionImageLayout(context, tempBuffer, verticalIFFTResources_.Dx.img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
 		VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 	Quadbit::VkUtils::TransitionImageLayout(context, tempBuffer, verticalIFFTResources_.Dy.img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
 		VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 	Quadbit::VkUtils::TransitionImageLayout(context, tempBuffer, verticalIFFTResources_.Dz.img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
 		VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+	Quadbit::VkUtils::TransitionImageLayout(context, tempBuffer, verticalIFFTResources_.DSlopeX.img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
+		VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+	Quadbit::VkUtils::TransitionImageLayout(context, tempBuffer, verticalIFFTResources_.DSlopeZ.img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
+		VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 	Quadbit::VkUtils::FlushCommandBuffer(context, tempBuffer);
 
 	// Setup the vertical/horizontal IFFT compute shaders
-	std::vector<std::tuple<VkDescriptorType, void*>> horizontalComputeDesc {
-		std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &h0TildeTxDescImageInfo),
-		std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &h0TildeTyDescImageInfo),
-		std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &h0TildeTzDescImageInfo),
-		std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &horizontalDxDescImageInfo),
-		std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &horizontalDyDescImageInfo),
-		std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &horizontalDzDescImageInfo)
+	std::vector<std::tuple<VkDescriptorType, std::vector<void*>>> horizontalComputeDesc {
+		std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, std::vector<void*> { 
+			&waveheightResources_.h0TildeTxImgInfo,	
+			&waveheightResources_.h0TildeTyImgInfo,	
+			&waveheightResources_.h0TildeTzImgInfo,	
+			&waveheightResources_.h0TildeSlopeXImgInfo,
+			&waveheightResources_.h0TildeSlopeZImgInfo,
+		}),
+		std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, std::vector<void*> {
+			&horizontalIFFTResources_.DxImgInfo,
+			&horizontalIFFTResources_.DyImgInfo,
+			&horizontalIFFTResources_.DzImgInfo,
+			&horizontalIFFTResources_.DSlopeXImgInfo,
+			&horizontalIFFTResources_.DSlopeZImgInfo
+		})
 	};
 	
-	std::vector<std::tuple<VkDescriptorType, void*>> verticalComputeDesc {
-		std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &horizontalDxDescImageInfo),
-		std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &horizontalDyDescImageInfo),
-		std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &horizontalDzDescImageInfo),
-		std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &verticalDxDescImageInfo),
-		std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &verticalDyDescImageInfo),
-		std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &verticalDzDescImageInfo)
+	std::vector<std::tuple<VkDescriptorType, std::vector<void*>>> verticalComputeDesc {
+		std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, std::vector<void*> {
+			&horizontalIFFTResources_.DxImgInfo,		
+			&horizontalIFFTResources_.DyImgInfo,		
+			&horizontalIFFTResources_.DzImgInfo,		
+			&horizontalIFFTResources_.DSlopeXImgInfo,	
+			&horizontalIFFTResources_.DSlopeZImgInfo,	
+		}), 
+		std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, std::vector<void*> {
+			&verticalIFFTResources_.DxImgInfo,
+			&verticalIFFTResources_.DyImgInfo,
+			&verticalIFFTResources_.DzImgInfo,
+			&verticalIFFTResources_.DSlopeXImgInfo,
+			&verticalIFFTResources_.DSlopeZImgInfo
+		})
 	};
 	
-	horizontalIFFTInstance_ = renderer_->CreateComputeInstance(horizontalComputeDesc, "Resources/Shaders/Compiled/ifft_comp.spv", "main", &horizontalSpecInfo);
-	verticalIFFTInstance_ = renderer_->CreateComputeInstance(verticalComputeDesc, "Resources/Shaders/Compiled/ifft_comp.spv", "main", &verticalSpecInfo);
+	horizontalIFFTInstance_ = renderer_->CreateComputeInstance(horizontalComputeDesc, "Resources/Shaders/Compiled/ifft_comp.spv", "main", &horizontalSpecInfo, sizeof(IFFTPushConstants));
+	verticalIFFTInstance_ = renderer_->CreateComputeInstance(verticalComputeDesc, "Resources/Shaders/Compiled/ifft_comp.spv", "main", &verticalSpecInfo, sizeof(IFFTPushConstants));
 }
 
 void Water::InitDisplacementInstance() {
 	// Get render context
 	auto context = renderer_->RequestRenderContext();
 
-	// Create the final displacement image
+	// Create the final displacement image and the normal map image
 	VkImageCreateInfo imageCreateInfo = Quadbit::VkUtils::Init::ImageCreateInfo(WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT);
-	context->allocator->CreateImage(displacementResources_.displacement, imageCreateInfo, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
+	VkImageCreateInfo normalMapImageCreateInfo = Quadbit::VkUtils::Init::ImageCreateInfo(WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+	context->allocator->CreateImage(displacementResources_.displacementMap, imageCreateInfo, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
+	context->allocator->CreateImage(displacementResources_.normalMap, normalMapImageCreateInfo, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
 
 	// Fill descriptors
 	VkDescriptorImageInfo verticalDxDescImageInfo{};
@@ -533,23 +648,39 @@ void Water::InitDisplacementInstance() {
 	VkDescriptorImageInfo verticalDzDescImageInfo{};
 	verticalDzDescImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 	verticalDzDescImageInfo.imageView = Quadbit::VkUtils::CreateImageView(context, verticalIFFTResources_.Dz.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
+	VkDescriptorImageInfo verticalDSlopeXDescImageInfo{};
+	verticalDSlopeXDescImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+	verticalDSlopeXDescImageInfo.imageView = Quadbit::VkUtils::CreateImageView(context, verticalIFFTResources_.DSlopeX.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
+	VkDescriptorImageInfo verticalDSlopeZDescImageInfo{};
+	verticalDSlopeZDescImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+	verticalDSlopeZDescImageInfo.imageView = Quadbit::VkUtils::CreateImageView(context, verticalIFFTResources_.DSlopeZ.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
 
 	VkDescriptorImageInfo displacementDescImageInfo{};
 	displacementDescImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-	displacementDescImageInfo.imageView = Quadbit::VkUtils::CreateImageView(context, displacementResources_.displacement.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
+	displacementDescImageInfo.imageView = Quadbit::VkUtils::CreateImageView(context, displacementResources_.displacementMap.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
+
+	VkDescriptorImageInfo normalMapDescImageInfo{};
+	normalMapDescImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+	normalMapDescImageInfo.imageView = Quadbit::VkUtils::CreateImageView(context, displacementResources_.normalMap.img, IMAGE_FORMAT, VK_IMAGE_ASPECT_COLOR_BIT);
+
 
 	// Transition images from undefined layout and also copy the uniform randoms into the buffer on the GPU
 	VkCommandBuffer tempBuffer = Quadbit::VkUtils::InitSingleTimeCommandBuffer(context);
-	Quadbit::VkUtils::TransitionImageLayout(context, tempBuffer, displacementResources_.displacement.img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
+	Quadbit::VkUtils::TransitionImageLayout(context, tempBuffer, displacementResources_.displacementMap.img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
+		VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+	Quadbit::VkUtils::TransitionImageLayout(context, tempBuffer, displacementResources_.normalMap.img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
 		VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 	Quadbit::VkUtils::FlushCommandBuffer(context, tempBuffer);
 
 	// Setup the displacement compute shader
-	std::vector<std::tuple<VkDescriptorType, void*>> computeDescriptors {
-			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &verticalDxDescImageInfo),
-			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &verticalDyDescImageInfo),
-			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &verticalDzDescImageInfo),
-			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &displacementDescImageInfo)
+	std::vector<std::tuple<VkDescriptorType, std::vector<void*>>> computeDescriptors {
+			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, std::vector<void*> { &verticalDxDescImageInfo }),
+			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, std::vector<void*> { &verticalDyDescImageInfo }),
+			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, std::vector<void*> { &verticalDzDescImageInfo }),
+			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, std::vector<void*> { &verticalDSlopeXDescImageInfo }),
+			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, std::vector<void*> { &verticalDSlopeZDescImageInfo }),
+			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, std::vector<void*> { &displacementDescImageInfo }),
+			std::make_tuple(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, std::vector<void*> { &normalMapDescImageInfo })
 	};
 
 	displacementInstance_ = renderer_->CreateComputeInstance(computeDescriptors, "Resources/Shaders/Compiled/displacement_comp.spv", "main");

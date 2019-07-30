@@ -116,9 +116,9 @@ namespace Quadbit {
 		};
 	}
 
-	QbVkComputeInstance QbVkRenderer::CreateComputeInstance(std::vector<std::tuple<VkDescriptorType, void*>> descriptors, 
-		const char* shader, const char* shaderFunc, const VkSpecializationInfo* specInfo) {
-		return computePipeline_->CreateInstance(descriptors, shader, shaderFunc, specInfo);
+	QbVkComputeInstance QbVkRenderer::CreateComputeInstance(std::vector<std::tuple<VkDescriptorType, std::vector<void*>>> descriptors, 
+		const char* shader, const char* shaderFunc, const VkSpecializationInfo* specInfo, uint32_t pushConstantRangeSize) {
+		return computePipeline_->CreateInstance(descriptors, shader, shaderFunc, specInfo, pushConstantRangeSize);
 	}
 
 	void QbVkRenderer::UpdateComputeDescriptors(std::vector<std::tuple<VkDescriptorType, void*>> descriptors, QbVkComputeInstance& instance) {
@@ -324,6 +324,7 @@ namespace Quadbit {
 		VkPhysicalDeviceFeatures deviceFeatures{};
 		deviceFeatures.imageCubeArray = VK_TRUE;
 		deviceFeatures.fillModeNonSolid = VK_TRUE;
+		deviceFeatures.samplerAnisotropy = VK_TRUE;
 		//deviceFeatures.sampleRateShading = VK_TRUE;
 
 		// Now we will fill out the actual information for device creation

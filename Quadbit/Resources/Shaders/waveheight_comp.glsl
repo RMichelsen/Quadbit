@@ -17,6 +17,8 @@ layout(binding = 2, rgba32f) readonly uniform image2D h0tilde_conj;
 layout(binding = 3, rgba32f) writeonly uniform image2D h0tilde_tx;
 layout(binding = 4, rgba32f) writeonly uniform image2D h0tilde_ty;
 layout(binding = 5, rgba32f) writeonly uniform image2D h0tilde_tz;
+layout(binding = 6, rgba32f) writeonly uniform image2D h0tilde_slopex;
+layout(binding = 7, rgba32f) writeonly uniform image2D h0tilde_slopez;
 
 struct complex {
 	float re;
@@ -49,7 +51,7 @@ void main() {
 
 	// Use Eulers formula to compute the time-dependent variables hkt_(x,y,z)
 	float w = dispersion(k);
-	complex hkt_x, hkt_y, hkt_z;
+	complex hkt_x, hkt_y, hkt_z, hkt_slopex, hkt_slopez;
 	float cosine = cos(w * ubo.T);
 	float sine = sin(w * ubo.T);
 
@@ -65,7 +67,12 @@ void main() {
 		hkt_z = mul(hkt_y, complex(0.0f, -k.y / k_len));
 	}
 
+	hkt_slopex = mul(hkt_y, complex(0.0f, k.x));
+	hkt_slopez = mul(hkt_y, complex(0.0f, k.y));
+
 	imageStore(h0tilde_tx, ivec2(gl_GlobalInvocationID.xy), vec4(hkt_x.re, hkt_x.im, 0.0f, 0.0f));
 	imageStore(h0tilde_ty, ivec2(gl_GlobalInvocationID.xy), vec4(hkt_y.re, hkt_y.im, 0.0f, 0.0f));
 	imageStore(h0tilde_tz, ivec2(gl_GlobalInvocationID.xy), vec4(hkt_z.re, hkt_z.im, 0.0f, 0.0f));
+	imageStore(h0tilde_slopex, ivec2(gl_GlobalInvocationID.xy), vec4(hkt_slopex.re, hkt_slopex.im, 0.0f, 0.0f));
+	imageStore(h0tilde_slopez, ivec2(gl_GlobalInvocationID.xy), vec4(hkt_slopez.re, hkt_slopez.im, 0.0f, 0.0f));
 }

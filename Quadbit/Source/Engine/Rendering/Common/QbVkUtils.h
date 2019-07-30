@@ -269,11 +269,11 @@ namespace Quadbit::VkUtils {
 			return submitInfo;
 		}
 
-		inline VkDescriptorSetLayoutBinding DescriptorSetLayoutBinding(uint32_t index, VkDescriptorType descType, VkShaderStageFlags shaderFlags) {
+		inline VkDescriptorSetLayoutBinding DescriptorSetLayoutBinding(uint32_t index, VkDescriptorType descType, VkShaderStageFlags shaderFlags, uint32_t descCount = 1) {
 			VkDescriptorSetLayoutBinding descSetLayoutBinding{};
 			descSetLayoutBinding.binding = index;
 			descSetLayoutBinding.descriptorType = descType;
-			descSetLayoutBinding.descriptorCount = 1;
+			descSetLayoutBinding.descriptorCount = descCount;
 			descSetLayoutBinding.stageFlags = shaderFlags;
 			descSetLayoutBinding.pImmutableSamplers = nullptr;
 			return descSetLayoutBinding;

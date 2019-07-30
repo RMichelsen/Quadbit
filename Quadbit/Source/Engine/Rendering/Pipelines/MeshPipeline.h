@@ -63,7 +63,7 @@ namespace Quadbit {
 		VkPipelineLayout pipelineLayout_ = VK_NULL_HANDLE;
 		VkPipeline pipeline_ = VK_NULL_HANDLE;
 
-		MeshBuffers meshBufs_{};
+		MeshBuffers meshBuffers_{};
 
 		std::vector<QbVkRenderMeshInstance> externalInstances_;
 

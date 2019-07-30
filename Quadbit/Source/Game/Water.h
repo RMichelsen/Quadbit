@@ -6,7 +6,7 @@
 #include "../Engine/Rendering/Pipelines/ComputePipeline.h"
 
 
-constexpr int WATER_RESOLUTION = 512;
+constexpr int WATER_RESOLUTION = 1024;
 constexpr VkFormat IMAGE_FORMAT = VK_FORMAT_R32G32B32A32_SFLOAT;
 
 struct alignas(16) PrecalcUBO {
@@ -39,6 +39,18 @@ struct WaveheightResources {
 	Quadbit::QbVkImage h0TildeTx;
 	Quadbit::QbVkImage h0TildeTy;
 	Quadbit::QbVkImage h0TildeTz;
+	Quadbit::QbVkImage h0TildeSlopeX;
+	Quadbit::QbVkImage h0TildeSlopeZ;
+
+	VkDescriptorImageInfo h0TildeTxImgInfo{ VK_NULL_HANDLE, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL };
+	VkDescriptorImageInfo h0TildeTyImgInfo{ VK_NULL_HANDLE, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL };
+	VkDescriptorImageInfo h0TildeTzImgInfo{ VK_NULL_HANDLE, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL };
+	VkDescriptorImageInfo h0TildeSlopeXImgInfo{ VK_NULL_HANDLE, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL };
+	VkDescriptorImageInfo h0TildeSlopeZImgInfo{ VK_NULL_HANDLE, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL };
+};
+
+struct IFFTPushConstants {
+	int iteration;
 };
 
 struct InverseFFTResources {
@@ -46,11 +58,24 @@ struct InverseFFTResources {
 	Quadbit::QbVkImage Dy;
 	Quadbit::QbVkImage Dz;
 
+	Quadbit::QbVkImage DSlopeX;
+	Quadbit::QbVkImage DSlopeZ;
+
+	VkDescriptorImageInfo DxImgInfo{ VK_NULL_HANDLE, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL };
+	VkDescriptorImageInfo DyImgInfo{ VK_NULL_HANDLE, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL };
+	VkDescriptorImageInfo DzImgInfo{ VK_NULL_HANDLE, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL };
+	VkDescriptorImageInfo DSlopeXImgInfo{ VK_NULL_HANDLE, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL };
+	VkDescriptorImageInfo DSlopeZImgInfo{ VK_NULL_HANDLE, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL };
+
 	std::array<int, 6> specData;
+
+	IFFTPushConstants pushConstants;
 };
 
 struct DisplacementResources {
-	Quadbit::QbVkImage displacement;
+	Quadbit::QbVkImage displacementMap;
+	Quadbit::QbVkImage normalMap;
+	VkSampler normalMapSampler;
 };
 
 class Water {

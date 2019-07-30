@@ -33,10 +33,10 @@ namespace Quadbit {
 		//vkDestroyDescriptorPool(context_->device, descriptorPool_, nullptr);
 		//vkDestroyDescriptorSetLayout(context_->device, descriptorSetLayout_, nullptr);
 
-		for(auto&& vertexBuffer : meshBufs_.vertexBuffers_) {
+		for(auto&& vertexBuffer : meshBuffers_.vertexBuffers_) {
 			context_->allocator->DestroyBuffer(vertexBuffer);
 		}
-		for(auto&& indexBuffer : meshBufs_.indexBuffers_) {
+		for(auto&& indexBuffer : meshBuffers_.indexBuffers_) {
 			context_->allocator->DestroyBuffer(indexBuffer);
 		}
 	}
@@ -76,8 +76,8 @@ namespace Quadbit {
 				mesh.dynamicData.mvp = camera->perspective * camera->view * transform.model;
 				vkCmdPushConstants(commandbuffer, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RenderMeshPushConstants), &mesh.dynamicData);
 
-				vkCmdBindVertexBuffers(commandbuffer, 0, 1, &meshBufs_.vertexBuffers_[mesh.vertexHandle].buf, offsets);
-				vkCmdBindIndexBuffer(commandbuffer, meshBufs_.indexBuffers_[mesh.indexHandle].buf, 0, VK_INDEX_TYPE_UINT32);
+				vkCmdBindVertexBuffers(commandbuffer, 0, 1, &meshBuffers_.vertexBuffers_[mesh.vertexHandle].buf, offsets);
+				vkCmdBindIndexBuffer(commandbuffer, meshBuffers_.indexBuffers_[mesh.indexHandle].buf, 0, VK_INDEX_TYPE_UINT32);
 
 				//vkCmdBindDescriptorSets(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 0, 1, &descriptorSets_[resourceIndex], 0, nullptr);
 				vkCmdDrawIndexed(commandbuffer, mesh.indexCount, 1, 0, 0, 0);
@@ -103,8 +103,8 @@ namespace Quadbit {
 				mesh.dynamicData.mvp = camera->perspective * camera->view * transform.model;
 				vkCmdPushConstants(commandbuffer, mesh.externalInstance->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RenderMeshPushConstants), &mesh.dynamicData);
 
-				vkCmdBindVertexBuffers(commandbuffer, 0, 1, &meshBufs_.vertexBuffers_[mesh.vertexHandle].buf, offsets);
-				vkCmdBindIndexBuffer(commandbuffer, meshBufs_.indexBuffers_[mesh.indexHandle].buf, 0, VK_INDEX_TYPE_UINT32);
+				vkCmdBindVertexBuffers(commandbuffer, 0, 1, &meshBuffers_.vertexBuffers_[mesh.vertexHandle].buf, offsets);
+				vkCmdBindIndexBuffer(commandbuffer, meshBuffers_.indexBuffers_[mesh.indexHandle].buf, 0, VK_INDEX_TYPE_UINT32);
 
 				vkCmdBindDescriptorSets(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh.externalInstance->pipelineLayout, 0, 1, &mesh.externalInstance->descriptorSets[resourceIndex], 0, nullptr);
 				vkCmdDrawIndexed(commandbuffer, mesh.indexCount, 1, 0, 0, 0);
@@ -279,17 +279,17 @@ namespace Quadbit {
 	}
 
 	void MeshPipeline::DestroyVertexBuffer(VertexBufHandle handle) {
-		context_->allocator->DestroyBuffer(meshBufs_.vertexBuffers_[handle]);
-		meshBufs_.vertexBufferFreeList_.push_front(handle);
+		context_->allocator->DestroyBuffer(meshBuffers_.vertexBuffers_[handle]);
+		meshBuffers_.vertexBufferFreeList_.push_front(handle);
 	}
 
 	void MeshPipeline::DestroyIndexBuffer(IndexBufHandle handle) {
-		context_->allocator->DestroyBuffer(meshBufs_.indexBuffers_[handle]);
-		meshBufs_.indexBufferFreeList_.push_front(handle);
+		context_->allocator->DestroyBuffer(meshBuffers_.indexBuffers_[handle]);
+		meshBuffers_.indexBufferFreeList_.push_front(handle);
 	}
 
 	VertexBufHandle MeshPipeline::CreateVertexBuffer(const std::vector<MeshVertex>& vertices) {
-		VertexBufHandle handle = meshBufs_.GetNextVertexHandle();
+		VertexBufHandle handle = meshBuffers_.GetNextVertexHandle();
 
 		VkDeviceSize bufferSize = static_cast<uint32_t>(vertices.size()) * sizeof(MeshVertex);
 
@@ -297,9 +297,9 @@ namespace Quadbit {
 		context_->allocator->CreateStagingBuffer(stagingBuffer, bufferSize, vertices.data());
 
 		VkBufferCreateInfo bufferInfo = VkUtils::Init::BufferCreateInfo(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-		context_->allocator->CreateBuffer(meshBufs_.vertexBuffers_[handle], bufferInfo, QBVK_MEMORY_USAGE_GPU_ONLY);
+		context_->allocator->CreateBuffer(meshBuffers_.vertexBuffers_[handle], bufferInfo, QBVK_MEMORY_USAGE_GPU_ONLY);
 
-		VkUtils::CopyBuffer(context_, stagingBuffer.buf, meshBufs_.vertexBuffers_[handle].buf, bufferSize);
+		VkUtils::CopyBuffer(context_, stagingBuffer.buf, meshBuffers_.vertexBuffers_[handle].buf, bufferSize);
 
 		context_->allocator->DestroyBuffer(stagingBuffer);
 
@@ -307,7 +307,7 @@ namespace Quadbit {
 	}
 
 	IndexBufHandle MeshPipeline::CreateIndexBuffer(const std::vector<uint32_t>& indices) {
-		IndexBufHandle handle = meshBufs_.GetNextIndexHandle();
+		IndexBufHandle handle = meshBuffers_.GetNextIndexHandle();
 
 		VkDeviceSize bufferSize = static_cast<uint32_t>(indices.size()) * sizeof(uint32_t);
 
@@ -315,9 +315,9 @@ namespace Quadbit {
 		context_->allocator->CreateStagingBuffer(stagingBuffer, bufferSize, indices.data());
 
 		VkBufferCreateInfo bufferInfo = VkUtils::Init::BufferCreateInfo(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-		context_->allocator->CreateBuffer(meshBufs_.indexBuffers_[handle], bufferInfo, QBVK_MEMORY_USAGE_GPU_ONLY);
+		context_->allocator->CreateBuffer(meshBuffers_.indexBuffers_[handle], bufferInfo, QBVK_MEMORY_USAGE_GPU_ONLY);
 
-		VkUtils::CopyBuffer(context_, stagingBuffer.buf, meshBufs_.indexBuffers_[handle].buf, bufferSize);
+		VkUtils::CopyBuffer(context_, stagingBuffer.buf, meshBuffers_.indexBuffers_[handle].buf, bufferSize);
 
 		context_->allocator->DestroyBuffer(stagingBuffer);
 
@@ -365,7 +365,7 @@ namespace Quadbit {
 				if (std::get<0>(descriptors[j]) == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER || std::get<0>(descriptors[j]) == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) {
 					writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(renderMeshInstance.descriptorSets[i], std::get<0>(descriptors[j]), j, reinterpret_cast<VkDescriptorBufferInfo*>(std::get<1>(descriptors[j]))));
 				}
-				else if (std::get<0>(descriptors[j]) == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE) {
+				else if (std::get<0>(descriptors[j]) == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE || std::get<0>(descriptors[j]) == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) {
 					writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(renderMeshInstance.descriptorSets[i], std::get<0>(descriptors[j]), j, reinterpret_cast<VkDescriptorImageInfo*>(std::get<1>(descriptors[j]))));
 				}
 			}
