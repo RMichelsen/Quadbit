@@ -15,20 +15,31 @@ namespace Quadbit {
 
 		float GetAspectRatio();
 		void RegisterCamera(Entity entity);
-		RenderMeshComponent CreateMesh(const std::vector<MeshVertex>& vertices, const std::vector<uint32_t>& indices, QbVkRenderMeshInstance* externalInstance = nullptr);
-		QbVkComputeInstance CreateComputeInstance(std::vector<std::tuple<VkDescriptorType, std::vector<void*>>> descriptors, const char* shader, const char* shaderFunc, 
+
+		template<typename T>
+		RenderMeshComponent CreateMesh(std::vector<T> vertices, const std::vector<uint32_t>& indices, QbVkRenderMeshInstance* externalInstance) {
+			return RenderMeshComponent{
+				meshPipeline_->CreateVertexBuffer(vertices.data(), sizeof(T), static_cast<uint32_t>(vertices.size())),
+				meshPipeline_->CreateIndexBuffer(indices),
+				static_cast<uint32_t>(indices.size()),
+				RenderMeshPushConstants{},
+				externalInstance
+			};
+		}
+
+		void CreateTexture(QbVkTexture& texture, uint32_t width, uint32_t height, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage, VkImageLayout imageLayout,
+			VkImageAspectFlags imageAspectFlags, VkPipelineStageFlagBits srcStage, VkPipelineStageFlagBits dstStage, QbVkMemoryUsage memoryUsage, VkSamplerCreateInfo* samplerCreateInfo = nullptr,
+			VkSampleCountFlagBits numSamples = VK_SAMPLE_COUNT_1_BIT);
+		void CreateGPUBuffer(QbVkBuffer& buffer, VkDeviceSize size, VkBufferUsageFlags bufferUsage, QbVkMemoryUsage memoryUsage);
+		void TransferDataToGPUBuffer(QbVkBuffer& buffer, VkDeviceSize size, const void* data);
+		QbVkComputeInstance CreateComputeInstance(std::vector<QbComputeDescriptor>& descriptors, const char* shader, const char* shaderFunc,
 			const VkSpecializationInfo* specInfo = nullptr, uint32_t pushConstantRangeSize = 0);
-		void UpdateComputeDescriptors(std::vector<std::tuple<VkDescriptorType, void*>> descriptors, QbVkComputeInstance& instance);
-		QbVkRenderMeshInstance* CreateRenderMeshInstance(std::vector<std::tuple<VkDescriptorType, void*, VkShaderStageFlagBits>> descriptors,
-			const char* vertexShader, const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry);
+		QbVkRenderMeshInstance* CreateRenderMeshInstance(std::vector<QbRenderDescriptor> descriptors,
+			std::vector<QbVkVertexInputAttribute> vertexAttribs, const char* vertexShader, const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry);
 		void ComputeDispatch(QbVkComputeInstance& instance);
 		void DestroyComputeInstance(QbVkComputeInstance& instance);
 		void DestroyMesh(const RenderMeshComponent& mesh);
 		void DrawFrame();
-
-		// TODO: Questionable engine design, cleanup?
-		std::shared_ptr<QbVkContext> RequestRenderContext();
-		VkInstance GetInstance();
 
 	private:
 		bool canRender_ = false;

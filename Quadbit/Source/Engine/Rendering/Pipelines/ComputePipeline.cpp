@@ -50,14 +50,14 @@ namespace Quadbit {
 		VK_CHECK(vkResetFences(context_->device, 1, &computeFence_));
 	}
 	
-	QbVkComputeInstance ComputePipeline::CreateInstance(std::vector<std::tuple<VkDescriptorType, std::vector<void*>>> descriptors,  const char* shader, 
+	QbVkComputeInstance ComputePipeline::CreateInstance(std::vector<QbComputeDescriptor>& descriptors,  const char* shader, 
 		const char* shaderFunc, const VkSpecializationInfo* specInfo, const uint32_t pushConstantRangeSize) {
 		QbVkComputeInstance computeInstance;
 
 		// Create descriptor sets
 		std::vector<VkDescriptorSetLayoutBinding> descSetLayoutBindings;
 		for (auto i = 0; i < descriptors.size(); i++) {
-			descSetLayoutBindings.push_back(VkUtils::Init::DescriptorSetLayoutBinding(i, std::get<0>(descriptors[i]), VK_SHADER_STAGE_COMPUTE_BIT, static_cast<uint32_t>(std::get<1>(descriptors[i]).size())));
+			descSetLayoutBindings.push_back(VkUtils::Init::DescriptorSetLayoutBinding(i, descriptors[i].type, VK_SHADER_STAGE_COMPUTE_BIT, descriptors[i].count));
 		}
 
 		VkDescriptorSetLayoutCreateInfo descSetLayoutCreateInfo = VkUtils::Init::DescriptorSetLayoutCreateInfo();
@@ -74,13 +74,13 @@ namespace Quadbit {
 
 		std::vector<VkWriteDescriptorSet> writeDescSets;
 		for (auto i = 0; i < descriptors.size(); i++) {
-			if (std::get<0>(descriptors[i]) == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER || std::get<0>(descriptors[i]) == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) {
-				writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(computeInstance.descriptorSet, std::get<0>(descriptors[i]), i, 
-					static_cast<VkDescriptorBufferInfo*>(std::get<1>(descriptors[i])[0]), static_cast<uint32_t>(std::get<1>(descriptors[i]).size())));
+			if (descriptors[i].type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER || descriptors[i].type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER) {
+				writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(computeInstance.descriptorSet, descriptors[i].type, i, 
+					static_cast<VkDescriptorBufferInfo*>(descriptors[i].data), descriptors[i].count));
 			}
-			else if (std::get<0>(descriptors[i]) == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE) {
-				writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(computeInstance.descriptorSet, std::get<0>(descriptors[i]), i, 
-					static_cast<VkDescriptorImageInfo*>(std::get<1>(descriptors[i])[0]), static_cast<uint32_t>(std::get<1>(descriptors[i]).size())));
+			else if (descriptors[i].type == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE || descriptors[i].type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) {
+				writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(computeInstance.descriptorSet, descriptors[i].type, i, 
+					static_cast<VkDescriptorImageInfo*>(descriptors[i].data), descriptors[i].count));
 			}
 		}
 
@@ -129,18 +129,5 @@ namespace Quadbit {
 		vkDestroyPipelineLayout(context_->device, computeInstance.pipelineLayout, nullptr);
 		vkDestroyPipeline(context_->device, computeInstance.pipeline, nullptr);
 		vkFreeCommandBuffers(context_->device, commandPool_, 1, &computeInstance.commandBuffer);
-	}
-
-	void ComputePipeline::UpdateDescriptors(std::vector<std::tuple<VkDescriptorType, void*>> descriptors, QbVkComputeInstance& instance) {
-		std::vector<VkWriteDescriptorSet> writeDescSets;
-		for (auto i = 0; i < descriptors.size(); i++) {
-			if (std::get<0>(descriptors[i]) == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER || std::get<0>(descriptors[i]) == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) {
-				writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(instance.descriptorSet, std::get<0>(descriptors[i]), i, static_cast<VkDescriptorBufferInfo*>(std::get<1>(descriptors[i]))));
-			}
-			else if (std::get<0>(descriptors[i]) == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE) {
-				writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(instance.descriptorSet, std::get<0>(descriptors[i]), i, static_cast<VkDescriptorImageInfo*>(std::get<1>(descriptors[i]))));
-			}
-		}
-		vkUpdateDescriptorSets(context_->device, static_cast<uint32_t>(writeDescSets.size()), writeDescSets.data(), 0, nullptr);
 	}
 }

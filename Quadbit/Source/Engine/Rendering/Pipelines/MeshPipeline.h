@@ -74,11 +74,11 @@ namespace Quadbit {
 
 		void DestroyVertexBuffer(VertexBufHandle handle);
 		void DestroyIndexBuffer(IndexBufHandle handle);
-		VertexBufHandle CreateVertexBuffer(const std::vector<MeshVertex>& vertices);
+		VertexBufHandle CreateVertexBuffer(const void* vertices, uint32_t vertexStride, uint32_t vertexCount);
 		IndexBufHandle CreateIndexBuffer(const std::vector<uint32_t>& indices);
 
-		QbVkRenderMeshInstance* CreateInstance(std::vector<std::tuple<VkDescriptorType, void*, VkShaderStageFlagBits>> descriptors,
-			const char* vertexShader, const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry);
+		QbVkRenderMeshInstance* CreateInstance(std::vector<QbRenderDescriptor> descriptors,
+			std::vector<QbVkVertexInputAttribute> vertexAttribs, const char* vertexShader, const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry);
 		void CreateUniformBuffers(QbVkRenderMeshInstance& renderMeshInstance, VkDeviceSize size);
 	};
 }

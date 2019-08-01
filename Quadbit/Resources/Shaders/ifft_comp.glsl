@@ -64,7 +64,7 @@ void butterfly_pass(int pass_index, uint local_index, int pingpong_index, out co
 
 	complex c0 = pingpong[pingpong_index][indices.x];
 	complex c1 = pingpong[pingpong_index][indices.y];
-	res = add(c0, mul(c1, w));
+	res = mul(add(c0, mul(c1, w)), 0.5f);
 }
 
 void main() {

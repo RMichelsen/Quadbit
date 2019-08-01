@@ -343,6 +343,33 @@ namespace Quadbit::VkUtils {
 			mappedRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
 			return mappedRange;
 		}
+
+		inline VkSamplerCreateInfo SamplerCreateInfo(VkFilter samplerFilter, VkSamplerAddressMode addressMode, VkBool32 enableAnisotropy, 
+			float maxAnisotropy, VkCompareOp compareOperation, VkSamplerMipmapMode samplerMipmapMode) {
+
+			VkSamplerCreateInfo samplerCreateInfo{};
+			samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+			samplerCreateInfo.magFilter = samplerFilter;
+			samplerCreateInfo.minFilter = samplerFilter;
+			samplerCreateInfo.addressModeU = addressMode;
+			samplerCreateInfo.addressModeV = addressMode;
+			samplerCreateInfo.addressModeW = addressMode;
+			samplerCreateInfo.anisotropyEnable = enableAnisotropy;
+			samplerCreateInfo.maxAnisotropy = maxAnisotropy;
+			samplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
+			samplerCreateInfo.compareEnable = VK_FALSE;
+			samplerCreateInfo.compareOp = compareOperation;
+			samplerCreateInfo.mipmapMode = samplerMipmapMode;
+			return samplerCreateInfo;
+		}
+
+		inline VkMemoryBarrier MemoryBarrierVk(VkAccessFlags srcMask, VkAccessFlags dstMask) {
+			VkMemoryBarrier memoryBarrier{};
+			memoryBarrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+			memoryBarrier.srcAccessMask = srcMask;
+			memoryBarrier.dstAccessMask = dstMask;
+			return memoryBarrier;
+		}
 	}
 
 	inline bool IsSuitableGPUOfType(std::shared_ptr<QbVkContext> context, GPU& gpu, VkPhysicalDevice physicalDevice, VkPhysicalDeviceType GPUType) {
@@ -411,39 +438,29 @@ namespace Quadbit::VkUtils {
 			if(props.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
 				gpu.graphicsFamilyIdx = i;
 			}
-
-			VkBool32 supportsPresent = VK_FALSE;
-			VK_CHECK(vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, context->surface, &supportsPresent));
-			if (supportsPresent) {
-				gpu.presentFamilyIdx = i;
-			}
-
 			if (props.queueFlags & VK_QUEUE_COMPUTE_BIT) {
 				gpu.computeFamilyIdx = i;
 			}
 		}
-		//for(auto i = 0; i < gpu.queueProps.size(); i++) {
-		//	VkQueueFamilyProperties props = gpu.queueProps[i];
 
-		//	if(props.queueCount == 0) continue;
+		VkBool32 supportsPresent = VK_FALSE;
+		VK_CHECK(vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, gpu.graphicsFamilyIdx, context->surface, &supportsPresent));
+		if (supportsPresent) {
+			gpu.presentFamilyIdx = gpu.graphicsFamilyIdx;
+		}
+		else {
+			for (auto i = 0; i < gpu.queueProps.size(); i++) {
+				VkQueueFamilyProperties props = gpu.queueProps[i];
 
-		//	if(props.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-		//		gpu.graphicsFamilyIdx = i;
-		//		break;
-		//	}
-		//}
-		//for(auto i = 0; i < gpu.queueProps.size(); i++) {
-		//	VkQueueFamilyProperties props = gpu.queueProps[i];
+				if (props.queueCount == 0) continue;
 
-		//	if(props.queueCount == 0) continue;
+				VK_CHECK(vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, context->surface, &supportsPresent));
+				if (supportsPresent) {
+					gpu.presentFamilyIdx = i;
+				}
+			}
+		}
 
-		//	VkBool32 supportsPresent = VK_FALSE;
-		//	VK_CHECK(vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, context->surface, &supportsPresent));
-		//	if(supportsPresent) {
-		//		gpu.presentFamilyIdx = i;
-		//		break;
-		//	}
-		//}
 		if(gpu.graphicsFamilyIdx < 0 || gpu.presentFamilyIdx < 0 || gpu.computeFamilyIdx < 0) return false;
 
 		gpu.physicalDevice = physicalDevice;
@@ -837,5 +854,92 @@ namespace Quadbit::VkUtils {
 		}
 
 		vkCmdPipelineBarrier(commandBuffer, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1, &memoryBarrier);
+	}
+
+	inline std::vector<VkVertexInputAttributeDescription> CreateVertexInputAttributeDescription(std::vector<QbVkVertexInputAttribute> attributes) {
+		std::vector<VkVertexInputAttributeDescription> vertexAttributes;
+
+		uint32_t offset = 0;
+		for (uint32_t i = 0; i < attributes.size(); i++) {
+			switch (attributes[i]) {
+			case QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_POSITION:
+				vertexAttributes.push_back({ i, 0, VK_FORMAT_R32G32B32_SFLOAT, offset});
+				offset += sizeof(float) * 3;
+				break;
+			case QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_NORMAL:
+				vertexAttributes.push_back({ i, 0, VK_FORMAT_R32G32B32_SFLOAT, offset});
+				offset += sizeof(float) * 3;
+				break;
+			case QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_UV:
+				vertexAttributes.push_back({ i, 0, VK_FORMAT_R32G32_SFLOAT, offset});
+				offset += sizeof(float) * 2;
+				break;
+			case QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_COLOUR:
+				vertexAttributes.push_back({ i, 0, VK_FORMAT_R32G32B32_SFLOAT, offset});
+				offset += sizeof(float) * 3;
+				break;
+			case QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_FLOAT:
+				vertexAttributes.push_back({ i, 0, VK_FORMAT_R32G32B32_SFLOAT, offset});
+				offset += sizeof(float);
+				break;
+			case QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_FLOAT4:
+				vertexAttributes.push_back({ i, 0, VK_FORMAT_R32G32B32_SFLOAT, offset});
+				offset += sizeof(float) * 4;
+				break;
+			}
+		}
+
+		return vertexAttributes;
+	}
+
+	inline VkVertexInputBindingDescription GetVertexBindingDescription(std::vector<QbVkVertexInputAttribute> attributes) {
+
+		uint32_t stride = 0;
+		for (uint32_t i = 0; i < attributes.size(); i++) {
+			switch (attributes[i]) {
+			case QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_POSITION:
+				stride += sizeof(float) * 3;
+				break;
+			case QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_NORMAL:
+				stride += sizeof(float) * 3;
+				break;
+			case QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_UV:
+				stride += sizeof(float) * 2;
+				break;
+			case QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_COLOUR:
+				stride += sizeof(float) * 3;
+				break;
+			case QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_FLOAT:
+				stride += sizeof(float);
+				break;
+			case QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_FLOAT4:
+				stride += sizeof(float) * 4;
+				break;
+			}
+		}
+
+		VkVertexInputBindingDescription bindingDescription{};
+		bindingDescription.binding = 0;
+		bindingDescription.stride = stride;
+		bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+		return bindingDescription;
+	}
+
+	template<typename T>
+	inline QbComputeDescriptor CreateComputeDescriptor(VkDescriptorType type, std::vector<T>& data) {
+		return { type, static_cast<uint32_t>(data.size()), data.data() };
+	}
+
+	inline QbComputeDescriptor CreateComputeDescriptor(VkDescriptorType type, std::variant<VkDescriptorImageInfo, VkDescriptorBufferInfo> data) {
+		return { type, 1, &data };
+	}
+
+	template<typename T>
+	inline QbRenderDescriptor CreateRenderDescriptor(VkDescriptorType type, std::vector<T>& data, VkShaderStageFlagBits shaderStage) {
+		return { type, static_cast<uint32_t>(data.size()), data.data(), shaderStage };
+	}
+
+	inline QbRenderDescriptor CreateRenderDescriptor(VkDescriptorType type, std::variant<VkDescriptorImageInfo, VkDescriptorBufferInfo> data, VkShaderStageFlagBits shaderStage) {
+		return { type, 1, &data, shaderStage };
 	}
 }

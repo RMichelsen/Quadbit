@@ -41,14 +41,19 @@ namespace Quadbit {
 			memoryRequirements.memoryTypeBits, memoryUsage, QBVK_ALLOCATION_TYPE_BUFFER);
 
 		VK_CHECK(vkBindBufferMemory(device_, buffer.buf, buffer.alloc.deviceMemory, buffer.alloc.offset));
+
+		// Fill out the descriptor
+		buffer.descriptor.buffer = buffer.buf;
+		buffer.descriptor.offset = 0;
+		buffer.descriptor.range = bufferInfo.size;
 	}
 
 	void QbVkAllocator::CreateImage(QbVkImage& image, VkImageCreateInfo& imageInfo, QbVkMemoryUsage memoryUsage) {
-		VK_CHECK(vkCreateImage(device_, &imageInfo, nullptr, &image.img));
+		VK_CHECK(vkCreateImage(device_, &imageInfo, nullptr, &image.imgHandle));
 
 		// This part finds the required memory properties for the image allocation
 		VkMemoryRequirements memoryRequirements;
-		vkGetImageMemoryRequirements(device_, image.img, &memoryRequirements);
+		vkGetImageMemoryRequirements(device_, image.imgHandle, &memoryRequirements);
 
 		// Allocation type is determined by the tiling information
 		auto allocType = (imageInfo.tiling == VK_IMAGE_TILING_OPTIMAL) ? QBVK_ALLOCATION_TYPE_IMAGE_OPTIMAL : QBVK_ALLOCATION_TYPE_IMAGE_LINEAR;
@@ -56,7 +61,7 @@ namespace Quadbit {
 		image.alloc = Allocate(memoryRequirements.size, memoryRequirements.alignment,
 			memoryRequirements.memoryTypeBits, memoryUsage, allocType);
 
-		VK_CHECK(vkBindImageMemory(device_, image.img, image.alloc.deviceMemory, image.alloc.offset));
+		VK_CHECK(vkBindImageMemory(device_, image.imgHandle, image.alloc.deviceMemory, image.alloc.offset));
 	}
 
 	void QbVkAllocator::DestroyBuffer(QbVkBuffer& buffer) {
@@ -65,7 +70,7 @@ namespace Quadbit {
 	}
 
 	void QbVkAllocator::DestroyImage(QbVkImage& image) {
-		if(image.img != VK_NULL_HANDLE) vkDestroyImage(device_, image.img, nullptr);
+		if(image.imgHandle != VK_NULL_HANDLE) vkDestroyImage(device_, image.imgHandle, nullptr);
 		if(image.alloc.deviceMemory != VK_NULL_HANDLE) Free(image.alloc);
 	}
 

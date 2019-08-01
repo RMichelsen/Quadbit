@@ -102,6 +102,15 @@ namespace Quadbit {
 		QBVK_ALLOCATION_TYPE_IMAGE_OPTIMAL,
 	};
 
+	enum QbVkVertexInputAttribute {
+		QBVK_VERTEX_ATTRIBUTE_POSITION,
+		QBVK_VERTEX_ATTRIBUTE_NORMAL,
+		QBVK_VERTEX_ATTRIBUTE_UV,
+		QBVK_VERTEX_ATTRIBUTE_COLOUR,
+		QBVK_VERTEX_ATTRIBUTE_FLOAT,
+		QBVK_VERTEX_ATTRIBUTE_FLOAT4
+	};
+
 	class QbVkPool;
 	struct QbVkAllocation {
 		std::shared_ptr<QbVkPool> pool = nullptr;
@@ -115,11 +124,21 @@ namespace Quadbit {
 	struct QbVkBuffer {
 		VkBuffer buf = VK_NULL_HANDLE;
 		QbVkAllocation alloc{};
+		VkDescriptorBufferInfo descriptor{};
 	};
 
 	struct QbVkImage {
-		VkImage img = VK_NULL_HANDLE;
+		VkImage imgHandle = VK_NULL_HANDLE;
 		QbVkAllocation alloc{};
+	};
+
+	struct QbVkTexture {
+		QbVkImage image{};
+		VkImageLayout imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		VkImageView imageView = VK_NULL_HANDLE;
+		VkSampler sampler = VK_NULL_HANDLE;
+		VkDescriptorImageInfo descriptor;
+		VkFormat format = VK_FORMAT_UNDEFINED;
 	};
 
 	struct GPU {
@@ -187,5 +206,18 @@ namespace Quadbit {
 		VkRenderPass mainRenderPass = VK_NULL_HANDLE;
 
 		std::array<RenderingResources, MAX_FRAMES_IN_FLIGHT> renderingResources;
+	};
+
+	struct QbComputeDescriptor {
+		VkDescriptorType type;
+		uint32_t count;
+		void* data;
+	};
+
+	struct QbRenderDescriptor {
+		VkDescriptorType type;
+		uint32_t count;
+		void* data;
+		VkShaderStageFlagBits shaderStage;
 	};
 }

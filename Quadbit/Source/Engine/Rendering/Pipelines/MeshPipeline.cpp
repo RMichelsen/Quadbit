@@ -83,7 +83,7 @@ namespace Quadbit {
 				vkCmdDrawIndexed(commandbuffer, mesh.indexCount, 1, 0, 0, 0);
 			}
 			else {
-				// Dynamic update viewport and scissor for user-defined pipelines
+				// Dynamic update viewport and scissor for user-defined pipelines (also doesn't necessitate rebuilding the pipeline on window resize)
 				VkViewport viewport{};
 				VkRect2D scissor{};
 				// In our case the viewport covers the entire window
@@ -288,13 +288,13 @@ namespace Quadbit {
 		meshBuffers_.indexBufferFreeList_.push_front(handle);
 	}
 
-	VertexBufHandle MeshPipeline::CreateVertexBuffer(const std::vector<MeshVertex>& vertices) {
+	VertexBufHandle MeshPipeline::CreateVertexBuffer(const void* vertices, uint32_t vertexStride, uint32_t vertexCount) {
 		VertexBufHandle handle = meshBuffers_.GetNextVertexHandle();
 
-		VkDeviceSize bufferSize = static_cast<uint32_t>(vertices.size()) * sizeof(MeshVertex);
+		VkDeviceSize bufferSize = static_cast<uint64_t>(vertexCount) * vertexStride;
 
 		QbVkBuffer stagingBuffer;
-		context_->allocator->CreateStagingBuffer(stagingBuffer, bufferSize, vertices.data());
+		context_->allocator->CreateStagingBuffer(stagingBuffer, bufferSize, vertices);
 
 		VkBufferCreateInfo bufferInfo = VkUtils::Init::BufferCreateInfo(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 		context_->allocator->CreateBuffer(meshBuffers_.vertexBuffers_[handle], bufferInfo, QBVK_MEMORY_USAGE_GPU_ONLY);
@@ -324,7 +324,7 @@ namespace Quadbit {
 		return handle;
 	}
 
-	QbVkRenderMeshInstance* MeshPipeline::CreateInstance(std::vector<std::tuple<VkDescriptorType, void*, VkShaderStageFlagBits>> descriptors, 
+	QbVkRenderMeshInstance* MeshPipeline::CreateInstance(std::vector<QbRenderDescriptor> descriptors, std::vector<QbVkVertexInputAttribute> vertexAttribs, 
 		const char* vertexShader, const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry) {
 		QbVkRenderMeshInstance renderMeshInstance;
 
@@ -341,7 +341,7 @@ namespace Quadbit {
 
 		std::vector<VkDescriptorSetLayoutBinding> descSetLayoutBindings;
 		for (auto i = 0; i < descriptors.size(); i++) {
-			descSetLayoutBindings.push_back(VkUtils::Init::DescriptorSetLayoutBinding(i, std::get<0>(descriptors[i]), std::get<2>(descriptors[i])));
+			descSetLayoutBindings.push_back(VkUtils::Init::DescriptorSetLayoutBinding(i, descriptors[i].type, descriptors[i].shaderStage, descriptors[i].count));
 		}
 
 		VkDescriptorSetLayoutCreateInfo descSetLayoutCreateInfo = VkUtils::Init::DescriptorSetLayoutCreateInfo();
@@ -362,11 +362,14 @@ namespace Quadbit {
 		for (auto i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
 			std::vector<VkWriteDescriptorSet> writeDescSets;
 			for (auto j = 0; j < descriptors.size(); j++) {
-				if (std::get<0>(descriptors[j]) == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER || std::get<0>(descriptors[j]) == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) {
-					writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(renderMeshInstance.descriptorSets[i], std::get<0>(descriptors[j]), j, reinterpret_cast<VkDescriptorBufferInfo*>(std::get<1>(descriptors[j]))));
+				if (descriptors[j].type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER || descriptors[j].type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) {
+					writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(renderMeshInstance.descriptorSets[i], descriptors[j].type, j,
+						static_cast<VkDescriptorBufferInfo*>(descriptors[j].data), descriptors[j].count));
+				
 				}
-				else if (std::get<0>(descriptors[j]) == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE || std::get<0>(descriptors[j]) == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) {
-					writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(renderMeshInstance.descriptorSets[i], std::get<0>(descriptors[j]), j, reinterpret_cast<VkDescriptorImageInfo*>(std::get<1>(descriptors[j]))));
+				else if (descriptors[j].type == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE || descriptors[j].type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) {
+					writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(renderMeshInstance.descriptorSets[i], descriptors[j].type, j,
+						static_cast<VkDescriptorImageInfo*>(descriptors[j].data), descriptors[j].count));
 				}
 			}
 
@@ -397,8 +400,9 @@ namespace Quadbit {
 		shaderStageInfo[1].pName = fragmentEntry;
 
 		// This part specifies the format of the vertex data passed to the vertex shader
-		auto bindingDescription = MeshVertex::GetBindingDescription();
-		auto attributeDescriptions = MeshVertex::GetAttributeDescriptions();
+		auto bindingDescription = VkUtils::GetVertexBindingDescription(vertexAttribs);
+		auto attributeDescriptions = VkUtils::CreateVertexInputAttributeDescription(vertexAttribs);
+			//MeshVertex::GetAttributeDescriptions();
 		VkPipelineVertexInputStateCreateInfo vertexInputInfo =
 			VkUtils::Init::PipelineVertexInputStateCreateInfo();
 		vertexInputInfo.vertexBindingDescriptionCount = 1;

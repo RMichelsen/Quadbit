@@ -166,7 +166,7 @@ namespace Quadbit {
 		context_->allocator->CreateImage(fontImage_, imageInfo, QBVK_MEMORY_USAGE_GPU_ONLY);
 
 		// Create target image view
-		fontImageView_ = VkUtils::CreateImageView(context_, fontImage_.img, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+		fontImageView_ = VkUtils::CreateImageView(context_, fontImage_.imgHandle, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
 
 		// Create buffer for transfer
 		VkCommandBuffer commandBuffer = VkUtils::InitSingleTimeCommandBuffer(context_);
@@ -176,7 +176,7 @@ namespace Quadbit {
 		context_->allocator->CreateStagingBuffer(stagingBuffer, uploadSize, fontData);
 
 		// Prepare image for transfer
-		VkUtils::TransitionImageLayout(context_, commandBuffer, fontImage_.img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
+		VkUtils::TransitionImageLayout(context_, commandBuffer, fontImage_.imgHandle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
 			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 
 		// Copy image
@@ -186,10 +186,10 @@ namespace Quadbit {
 		bufferCopyRegion.imageExtent.width = textureWidth;
 		bufferCopyRegion.imageExtent.height = textureHeight;
 		bufferCopyRegion.imageExtent.depth = 1;
-		vkCmdCopyBufferToImage(commandBuffer, stagingBuffer.buf, fontImage_.img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &bufferCopyRegion);
+		vkCmdCopyBufferToImage(commandBuffer, stagingBuffer.buf, fontImage_.imgHandle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &bufferCopyRegion);
 
 		// Prepare for shader read
-		VkUtils::TransitionImageLayout(context_, commandBuffer, fontImage_.img, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		VkUtils::TransitionImageLayout(context_, commandBuffer, fontImage_.imgHandle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 
 		// Flush command buffer (also frees it)

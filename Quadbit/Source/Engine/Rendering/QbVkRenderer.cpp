@@ -106,28 +106,49 @@ namespace Quadbit {
 		meshPipeline_->userCamera_ = entity;
 	}
 
-	RenderMeshComponent QbVkRenderer::CreateMesh(const std::vector<MeshVertex>& vertices, const std::vector<uint32_t>& indices, QbVkRenderMeshInstance* externalInstance) {
-		return RenderMeshComponent{
-			meshPipeline_->CreateVertexBuffer(vertices),
-			meshPipeline_->CreateIndexBuffer(indices),
-			static_cast<uint32_t>(indices.size()),
-			RenderMeshPushConstants{},
-			externalInstance
-		};
+	void QbVkRenderer::CreateTexture(QbVkTexture& texture, uint32_t width, uint32_t height, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage, 
+		VkImageLayout imageLayout, VkImageAspectFlags imageAspectFlags, VkPipelineStageFlagBits srcStage, VkPipelineStageFlagBits dstStage, QbVkMemoryUsage memoryUsage, 
+		VkSamplerCreateInfo* samplerCreateInfo, VkSampleCountFlagBits numSamples) {
+
+		auto imageCreateInfo = VkUtils::Init::ImageCreateInfo(width, height, imageFormat, imageTiling, imageUsage, numSamples);
+		context_->allocator->CreateImage(texture.image, imageCreateInfo, memoryUsage);
+		texture.imageView = VkUtils::CreateImageView(context_, texture.image.imgHandle, imageFormat, imageAspectFlags);
+		texture.imageLayout = imageLayout;
+		texture.format = imageFormat;
+		if(samplerCreateInfo != nullptr) VK_CHECK(vkCreateSampler(context_->device, samplerCreateInfo, nullptr, &texture.sampler));
+		texture.descriptor = { texture.sampler, texture.imageView, imageLayout };
+
+
+		// Transition the image layout to the desired layout
+		VkCommandBuffer tempBuffer = Quadbit::VkUtils::InitSingleTimeCommandBuffer(context_);
+
+		Quadbit::VkUtils::TransitionImageLayout(context_, tempBuffer, texture.image.imgHandle, imageAspectFlags, VK_IMAGE_LAYOUT_UNDEFINED,
+			imageLayout, srcStage, dstStage);
+
+		Quadbit::VkUtils::FlushCommandBuffer(context_, tempBuffer);
 	}
 
-	QbVkComputeInstance QbVkRenderer::CreateComputeInstance(std::vector<std::tuple<VkDescriptorType, std::vector<void*>>> descriptors, 
+	void QbVkRenderer::CreateGPUBuffer(QbVkBuffer& buffer, VkDeviceSize size, VkBufferUsageFlags bufferUsage, QbVkMemoryUsage memoryUsage) {
+		auto bufferInfo = VkUtils::Init::BufferCreateInfo(size, bufferUsage);
+		context_->allocator->CreateBuffer(buffer, bufferInfo, memoryUsage);
+	}
+
+	void QbVkRenderer::TransferDataToGPUBuffer(QbVkBuffer& buffer, VkDeviceSize size, const void* data) {
+		// Utilize a staging buffer to transfer the data onto the GPU
+		Quadbit::QbVkBuffer stagingBuffer;
+		context_->allocator->CreateStagingBuffer(stagingBuffer, size, data);
+		Quadbit::VkUtils::CopyBuffer(context_, stagingBuffer.buf, buffer.buf, size);
+		context_->allocator->DestroyBuffer(stagingBuffer);
+	}
+
+	QbVkComputeInstance QbVkRenderer::CreateComputeInstance(std::vector<QbComputeDescriptor>& descriptors,
 		const char* shader, const char* shaderFunc, const VkSpecializationInfo* specInfo, uint32_t pushConstantRangeSize) {
 		return computePipeline_->CreateInstance(descriptors, shader, shaderFunc, specInfo, pushConstantRangeSize);
 	}
 
-	void QbVkRenderer::UpdateComputeDescriptors(std::vector<std::tuple<VkDescriptorType, void*>> descriptors, QbVkComputeInstance& instance) {
-		computePipeline_->UpdateDescriptors(descriptors, instance);
-	}
-
-	QbVkRenderMeshInstance* QbVkRenderer::CreateRenderMeshInstance(std::vector<std::tuple<VkDescriptorType, void*, VkShaderStageFlagBits>> descriptors,
-		const char* vertexShader, const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry) {
-		return meshPipeline_->CreateInstance(descriptors, vertexShader, vertexEntry, fragmentShader, fragmentEntry);
+	QbVkRenderMeshInstance* QbVkRenderer::CreateRenderMeshInstance(std::vector<QbRenderDescriptor> descriptors,
+		std::vector<QbVkVertexInputAttribute> vertexAttribs, const char* vertexShader, const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry) {
+		return meshPipeline_->CreateInstance(descriptors, vertexAttribs, vertexShader, vertexEntry, fragmentShader, fragmentEntry);
 	}
 
 	void QbVkRenderer::ComputeDispatch(QbVkComputeInstance& instance) {
@@ -209,14 +230,6 @@ namespace Quadbit {
 
 		// Increment (and mod) resource index to get the next resource
 		resourceIndex = (resourceIndex + 1) % MAX_FRAMES_IN_FLIGHT;
-	}
-
-	std::shared_ptr<QbVkContext> QbVkRenderer::RequestRenderContext() {
-		return context_;
-	}
-
-	VkInstance QbVkRenderer::GetInstance() {
-		return instance_;
 	}
 
 #ifdef QBDEBUG
@@ -395,11 +408,11 @@ namespace Quadbit {
 			VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, context_->multisamplingResources.msaaSamples);
 
 		context_->allocator->CreateImage(context_->multisamplingResources.msaaImage, imageInfo, QBVK_MEMORY_USAGE_GPU_ONLY);
-		context_->multisamplingResources.msaaImageView = VkUtils::CreateImageView(context_, context_->multisamplingResources.msaaImage.img, colourFormat, VK_IMAGE_ASPECT_COLOR_BIT);
+		context_->multisamplingResources.msaaImageView = VkUtils::CreateImageView(context_, context_->multisamplingResources.msaaImage.imgHandle, colourFormat, VK_IMAGE_ASPECT_COLOR_BIT);
 
 		// Transition image layout with a temporary command buffer
 		VkCommandBuffer transitionBuffer = VkUtils::InitSingleTimeCommandBuffer(context_);
-		VkUtils::TransitionImageLayout(context_, transitionBuffer, context_->multisamplingResources.msaaImage.img, 
+		VkUtils::TransitionImageLayout(context_, transitionBuffer, context_->multisamplingResources.msaaImage.imgHandle, 
 			VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 
 			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
 		VkUtils::FlushCommandBuffer(context_, transitionBuffer);
@@ -413,12 +426,12 @@ namespace Quadbit {
 			VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, context_->multisamplingResources.msaaSamples);;
 
 		context_->allocator->CreateImage(context_->depthResources.depthImage, imageInfo, QBVK_MEMORY_USAGE_GPU_ONLY);
-		context_->depthResources.imageView = VkUtils::CreateImageView(context_, context_->depthResources.depthImage.img, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
+		context_->depthResources.imageView = VkUtils::CreateImageView(context_, context_->depthResources.depthImage.imgHandle, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
 
 		// Create single time command buffer
 		VkCommandBuffer transitionBuffer = VkUtils::InitSingleTimeCommandBuffer(context_);
 		VkImageAspectFlags aspectFlags = VkUtils::HasStencilComponent(depthFormat) ? VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT : VK_IMAGE_ASPECT_DEPTH_BIT;
-		VkUtils::TransitionImageLayout(context_, transitionBuffer, context_->depthResources.depthImage.img, aspectFlags, VK_IMAGE_LAYOUT_UNDEFINED,
+		VkUtils::TransitionImageLayout(context_, transitionBuffer, context_->depthResources.depthImage.imgHandle, aspectFlags, VK_IMAGE_LAYOUT_UNDEFINED,
 			VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT);
 		// Flush command buffer
 		VkUtils::FlushCommandBuffer(context_, transitionBuffer);

@@ -6,7 +6,7 @@
 #include "../Engine/Rendering/Pipelines/ComputePipeline.h"
 
 
-constexpr int WATER_RESOLUTION = 1024;
+constexpr int WATER_RESOLUTION = 512;
 constexpr VkFormat IMAGE_FORMAT = VK_FORMAT_R32G32B32A32_SFLOAT;
 
 struct alignas(16) PrecalcUBO {
@@ -23,30 +23,28 @@ struct alignas(16) WaveheightUBO {
 	float T;
 };
 
+struct alignas(16) TogglesUBO {
+	int useNormalMap;
+};
+
 struct PreCalculatedResources {
-	Quadbit::QbVkBuffer ubo;
-
-	Quadbit::QbVkImage h0Tilde;
-	Quadbit::QbVkImage h0TildeConj;
-
 	std::vector<glm::float4> precalcUniformRandoms;
+
+	Quadbit::QbVkBuffer ubo;
 	Quadbit::QbVkBuffer uniformRandomsStorageBuffer;
+
+	Quadbit::QbVkTexture h0Tilde;
+	Quadbit::QbVkTexture h0TildeConj;
 };
 
 struct WaveheightResources {
 	Quadbit::QbVkBuffer ubo;
 
-	Quadbit::QbVkImage h0TildeTx;
-	Quadbit::QbVkImage h0TildeTy;
-	Quadbit::QbVkImage h0TildeTz;
-	Quadbit::QbVkImage h0TildeSlopeX;
-	Quadbit::QbVkImage h0TildeSlopeZ;
-
-	VkDescriptorImageInfo h0TildeTxImgInfo{ VK_NULL_HANDLE, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL };
-	VkDescriptorImageInfo h0TildeTyImgInfo{ VK_NULL_HANDLE, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL };
-	VkDescriptorImageInfo h0TildeTzImgInfo{ VK_NULL_HANDLE, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL };
-	VkDescriptorImageInfo h0TildeSlopeXImgInfo{ VK_NULL_HANDLE, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL };
-	VkDescriptorImageInfo h0TildeSlopeZImgInfo{ VK_NULL_HANDLE, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL };
+	Quadbit::QbVkTexture h0TildeTx;
+	Quadbit::QbVkTexture h0TildeTy;
+	Quadbit::QbVkTexture h0TildeTz;
+	Quadbit::QbVkTexture h0TildeSlopeX;
+	Quadbit::QbVkTexture h0TildeSlopeZ;
 };
 
 struct IFFTPushConstants {
@@ -54,18 +52,11 @@ struct IFFTPushConstants {
 };
 
 struct InverseFFTResources {
-	Quadbit::QbVkImage Dx;
-	Quadbit::QbVkImage Dy;
-	Quadbit::QbVkImage Dz;
-
-	Quadbit::QbVkImage DSlopeX;
-	Quadbit::QbVkImage DSlopeZ;
-
-	VkDescriptorImageInfo DxImgInfo{ VK_NULL_HANDLE, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL };
-	VkDescriptorImageInfo DyImgInfo{ VK_NULL_HANDLE, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL };
-	VkDescriptorImageInfo DzImgInfo{ VK_NULL_HANDLE, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL };
-	VkDescriptorImageInfo DSlopeXImgInfo{ VK_NULL_HANDLE, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL };
-	VkDescriptorImageInfo DSlopeZImgInfo{ VK_NULL_HANDLE, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL };
+	Quadbit::QbVkTexture dX{};
+	Quadbit::QbVkTexture dY{};
+	Quadbit::QbVkTexture dZ{};
+	Quadbit::QbVkTexture dSlopeX{};
+	Quadbit::QbVkTexture dSlopeZ{};
 
 	std::array<int, 6> specData;
 
@@ -73,15 +64,15 @@ struct InverseFFTResources {
 };
 
 struct DisplacementResources {
-	Quadbit::QbVkImage displacementMap;
-	Quadbit::QbVkImage normalMap;
-	VkSampler normalMapSampler;
+	Quadbit::QbVkTexture displacementMap;
+	Quadbit::QbVkTexture normalMap;
 };
 
 class Water {
 public:
 	inline static float step_;
 	inline static float repeat_;
+	inline static bool useNormalMap_ = false;
 
 	Water(HINSTANCE hInstance, HWND hwnd) {
 		renderer_ = std::make_unique<Quadbit::QbVkRenderer>(hInstance, hwnd);
@@ -98,7 +89,7 @@ private:
 
 	Quadbit::Entity camera_;
 
-	std::vector<Quadbit::MeshVertex> waterVertices_;
+	std::vector<glm::float3> waterVertices_;
 	std::vector<uint32_t> waterIndices_;
 
 	PreCalculatedResources precalcResources_{};
@@ -111,6 +102,8 @@ private:
 	Quadbit::QbVkComputeInstance horizontalIFFTInstance_;
 	Quadbit::QbVkComputeInstance verticalIFFTInstance_;
 	Quadbit::QbVkComputeInstance displacementInstance_;
+
+	Quadbit::QbVkBuffer togglesUBO_;
 
 	void InitPrecalcComputeInstance();
 	void InitWaveheightComputeInstance();
