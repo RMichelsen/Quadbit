@@ -24,6 +24,8 @@ struct alignas(16) WaveheightUBO {
 };
 
 struct alignas(16) TogglesUBO {
+	glm::float4 topColour;
+	glm::float4 botColour;
 	int useNormalMap;
 };
 
@@ -72,7 +74,10 @@ class Water {
 public:
 	inline static float step_;
 	inline static float repeat_;
-	inline static bool useNormalMap_ = false;
+
+	inline static bool useNormalMap_ = true;
+	inline static glm::float4 topColour = glm::float4(0.15f, 0.7f, 0.8f, 0.0f);
+	inline static glm::float4 botColour = glm::float4(0.10f, 0.45f, 0.7f, 0.0f);
 
 	Water(HINSTANCE hInstance, HWND hwnd) {
 		renderer_ = std::make_unique<Quadbit::QbVkRenderer>(hInstance, hwnd);
@@ -110,4 +115,5 @@ private:
 	void InitInverseFFTComputeInstances();
 	void InitDisplacementInstance();
 	void UpdateWaveheightUBO(float deltaTime);
+	void UpdateTogglesUBO(float deltaTime);
 };

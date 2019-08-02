@@ -75,6 +75,8 @@ void Water::Init() {
 		ImGui::SliderFloat("Step size", &step_, 0.1f, 10.0f, "%.3f");
 		ImGui::SliderFloat("Cycle length", &repeat_, 10.0f, 500.0f, "%.3f");
 		ImGui::Checkbox("Use Normal Map?", &useNormalMap_);
+		ImGui::ColorPicker4("Top colour", reinterpret_cast<float*>(&topColour));
+		ImGui::ColorPicker4("Bot colour", reinterpret_cast<float*>(&botColour));
 		ImGui::End();
 	});
 }
@@ -123,7 +125,7 @@ void Water::RecordComputeCommands() {
 	vkCmdBindPipeline(horizontalIFFTInstance_.commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, horizontalIFFTInstance_.pipeline);
 	vkCmdBindDescriptorSets(horizontalIFFTInstance_.commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, horizontalIFFTInstance_.pipelineLayout, 0, 1, &horizontalIFFTInstance_.descriptorSet, 0, 0);
 
-	for (int i = 0; i < 5; i++) {
+	for (auto i = 0; i < 5; i++) {
 		horizontalIFFTResources_.pushConstants.iteration = i;
 		vkCmdPushConstants(horizontalIFFTInstance_.commandBuffer, horizontalIFFTInstance_.pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(IFFTPushConstants), &horizontalIFFTResources_.pushConstants);
 		vkCmdDispatch(horizontalIFFTInstance_.commandBuffer, 1, WATER_RESOLUTION, 1);
@@ -136,7 +138,7 @@ void Water::RecordComputeCommands() {
 	VK_CHECK(vkBeginCommandBuffer(verticalIFFTInstance_.commandBuffer, &cmdBufInfo));
 	vkCmdBindPipeline(verticalIFFTInstance_.commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, verticalIFFTInstance_.pipeline);
 	vkCmdBindDescriptorSets(verticalIFFTInstance_.commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, verticalIFFTInstance_.pipelineLayout, 0, 1, &verticalIFFTInstance_.descriptorSet, 0, 0);
-	for (int i = 0; i < 5; i++) {
+	for (auto i = 0; i < 5; i++) {
 		verticalIFFTResources_.pushConstants.iteration = i;
 		vkCmdPushConstants(verticalIFFTInstance_.commandBuffer, verticalIFFTInstance_.pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(IFFTPushConstants), &verticalIFFTResources_.pushConstants);
 		vkCmdDispatch(verticalIFFTInstance_.commandBuffer, 1, WATER_RESOLUTION, 1);
@@ -156,7 +158,10 @@ void Water::RecordComputeCommands() {
 }
 
 void Water::Simulate(float deltaTime) {
-	// Update the deltatime 
+	// Update toggles
+	UpdateTogglesUBO(deltaTime);
+
+	// Increment the time in the wave functions 
 	UpdateWaveheightUBO(deltaTime);
 
 	// Compute waveheights
@@ -371,7 +376,12 @@ void Water::UpdateWaveheightUBO(float deltaTime) {
 	ubo->RT = repeat_;
 	ubo->T = t;
 
+	t += deltaTime * step_;
+}
+
+void Water::UpdateTogglesUBO(float deltaTime) {
 	TogglesUBO* togglesUBO = reinterpret_cast<TogglesUBO*>(togglesUBO_.alloc.data);
 	togglesUBO->useNormalMap = useNormalMap_ ? 1 : 0;
-	t += deltaTime * step_;
+	togglesUBO->topColour = topColour;
+	togglesUBO->botColour = botColour;
 }
