@@ -21,10 +21,7 @@ namespace Quadbit {
 
 		std::shared_ptr<QbVkContext> context_ = nullptr;
 
-		QbVkImage fontImage_{};
-		VkImageView fontImageView_ = VK_NULL_HANDLE;
-
-		VkSampler fontSampler_ = VK_NULL_HANDLE;
+		QbVkTexture fontTexture_{};
 
 		VkDescriptorPool descriptorPool_ = VK_NULL_HANDLE;
 		VkDescriptorSetLayout descriptorSetLayout_ = VK_NULL_HANDLE;
@@ -44,7 +41,6 @@ namespace Quadbit {
 
 		void InitImGui();
 		void CreateFontTexture();
-		void CreateFontTextureSampler();
 		void CreateDescriptorPoolAndSets();
 		void CreatePipeline();
 

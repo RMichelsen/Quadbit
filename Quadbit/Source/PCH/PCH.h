@@ -20,7 +20,7 @@
 
 #include <ImGui/imgui.h>
 
-#include <FastNoiseSIMD/FastNoiseSIMD.h>
+#include <stb/stb_image.h>
 
 #include "../Engine/Core/Logging.h"
 

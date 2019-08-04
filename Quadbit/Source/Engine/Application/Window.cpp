@@ -8,6 +8,10 @@ namespace Quadbit {
 	Window::Window(HINSTANCE hInstance, int nCmdShow, WNDPROC windowProc) {
 		this->instance_ = hInstance;
 
+		// No Windows bitmap-stretching
+		SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_SYSTEM_AWARE);
+
+
 		if(!SetupWindow(nCmdShow, windowProc)) {
 			QB_LOG_ERROR("Failed to setup win32 Window\n");
 			return;
@@ -68,8 +72,8 @@ namespace Quadbit {
 			windowTitle,
 			WS_OVERLAPPEDWINDOW,
 			CW_USEDEFAULT, CW_USEDEFAULT,
-			1920, // Resolution width
-			1080, // Resolution height
+			2560, // Resolution width
+			1440, // Resolution height
 			NULL,
 			NULL,
 			instance_,
@@ -77,6 +81,7 @@ namespace Quadbit {
 		);
 		if(hwnd_ == NULL) return false;
 		ShowWindow(hwnd_, nCmdShow);
+
 		return true;
 	}
 

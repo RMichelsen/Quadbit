@@ -1,4 +1,8 @@
 #include <PCH.h>
+
+#define TINYOBJLOADER_IMPLEMENTATION
+#include <tinyobjloader/tiny_obj_loader.h>
+
 #include "MeshPipeline.h"
 
 #include "../../Core/Time.h"
@@ -15,13 +19,14 @@ namespace Quadbit {
 	MeshPipeline::MeshPipeline(std::shared_ptr<QbVkContext> context) {
 		this->context_ = context;
 		this->entityManager_ = EntityManager::GetOrCreate();
-
+		 
 		// Register the mesh component to be used by the ECS
-		entityManager_->RegisterComponents<RenderMeshComponent, RenderTransformComponent, RenderCamera, CameraUpdateAspectRatioTag>();
+		entityManager_->RegisterComponents<RenderMeshComponent, RenderTexturedObjectComponent, RenderTransformComponent, RenderCamera, CameraUpdateAspectRatioTag>();
 
 		fallbackCamera_ = entityManager_->Create();
 		fallbackCamera_.AddComponent<RenderCamera>(Quadbit::RenderCamera(145.0f, -42.0f, glm::vec3(266.0f, 387.0f, 50.0f), 16.0f / 9.0f, 10000.0f));
 
+		CreateDescriptorPoolAndLayout();
 		CreatePipeline();
 	}
 
@@ -30,8 +35,8 @@ namespace Quadbit {
 		if(pipeline_ != VK_NULL_HANDLE) vkDestroyPipeline(context_->device, pipeline_, nullptr);
 		if(pipelineLayout_ != VK_NULL_HANDLE) vkDestroyPipelineLayout(context_->device, pipelineLayout_, nullptr);
 
-		//vkDestroyDescriptorPool(context_->device, descriptorPool_, nullptr);
-		//vkDestroyDescriptorSetLayout(context_->device, descriptorSetLayout_, nullptr);
+		vkDestroyDescriptorPool(context_->device, descriptorPool_, nullptr);
+		vkDestroyDescriptorSetLayout(context_->device, descriptorSetLayout_, nullptr);
 
 		for(auto&& vertexBuffer : meshBuffers_.vertexBuffers_) {
 			context_->allocator->DestroyBuffer(vertexBuffer);
@@ -68,21 +73,38 @@ namespace Quadbit {
 		(userCamera_ != NULL_ENTITY && userCamera_.IsValid()) ? camera = userCamera_.GetComponentPtr<RenderCamera>() : camera = fallbackCamera_.GetComponentPtr<RenderCamera>();
 
 		VkDeviceSize offsets[]{ 0 };
+
+		entityManager_->ForEach<RenderTexturedObjectComponent, RenderTransformComponent>([&](Entity entity, RenderTexturedObjectComponent& obj, RenderTransformComponent& transform) noexcept {
+			vkCmdBindPipeline(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
+
+			obj.dynamicData.model = transform.model;
+			obj.dynamicData.mvp = camera->perspective * camera->view * transform.model;
+			vkCmdPushConstants(commandbuffer, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RenderMeshPushConstants), &obj.dynamicData);
+
+			vkCmdBindVertexBuffers(commandbuffer, 0, 1, &meshBuffers_.vertexBuffers_[obj.vertexHandle].buf, offsets);
+			vkCmdBindIndexBuffer(commandbuffer, meshBuffers_.indexBuffers_[obj.indexHandle].buf, 0, VK_INDEX_TYPE_UINT32);
+
+			vkCmdBindDescriptorSets(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 0, 1, &descriptorSets_[obj.descriptorIndex][resourceIndex], 0, nullptr);
+			vkCmdDrawIndexed(commandbuffer, obj.indexCount, 1, 0, 0, 0);
+		});
+
 		entityManager_->ForEach<RenderMeshComponent, RenderTransformComponent>([&](Entity entity, RenderMeshComponent& mesh, RenderTransformComponent& transform) noexcept {
-			if (mesh.externalInstance == nullptr) {
-				vkCmdBindPipeline(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
+			//if (mesh.externalInstance == nullptr) {
+			//	vkCmdBindPipeline(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
 
-				mesh.dynamicData.model = transform.model;
-				mesh.dynamicData.mvp = camera->perspective * camera->view * transform.model;
-				vkCmdPushConstants(commandbuffer, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RenderMeshPushConstants), &mesh.dynamicData);
+			//	mesh.dynamicData.model = transform.model;
+			//	mesh.dynamicData.mvp = camera->perspective * camera->view * transform.model;
+			//	vkCmdPushConstants(commandbuffer, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RenderMeshPushConstants), &mesh.dynamicData);
 
-				vkCmdBindVertexBuffers(commandbuffer, 0, 1, &meshBuffers_.vertexBuffers_[mesh.vertexHandle].buf, offsets);
-				vkCmdBindIndexBuffer(commandbuffer, meshBuffers_.indexBuffers_[mesh.indexHandle].buf, 0, VK_INDEX_TYPE_UINT32);
+			//	vkCmdBindVertexBuffers(commandbuffer, 0, 1, &meshBuffers_.vertexBuffers_[mesh.vertexHandle].buf, offsets);
+			//	vkCmdBindIndexBuffer(commandbuffer, meshBuffers_.indexBuffers_[mesh.indexHandle].buf, 0, VK_INDEX_TYPE_UINT32);
 
-				//vkCmdBindDescriptorSets(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 0, 1, &descriptorSets_[resourceIndex], 0, nullptr);
-				vkCmdDrawIndexed(commandbuffer, mesh.indexCount, 1, 0, 0, 0);
-			}
-			else {
+			//	//vkCmdBindDescriptorSets(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 0, 1, &descriptorSets_[resourceIndex], 0, nullptr);
+			//	vkCmdDrawIndexed(commandbuffer, mesh.indexCount, 1, 0, 0, 0);
+			//}
+			 {
+				vkCmdBindPipeline(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh.instance->pipeline);
+
 				// Dynamic update viewport and scissor for user-defined pipelines (also doesn't necessitate rebuilding the pipeline on window resize)
 				VkViewport viewport{};
 				VkRect2D scissor{};
@@ -97,25 +119,45 @@ namespace Quadbit {
 				scissor.extent = context_->swapchain.extent;
 				vkCmdSetScissor(commandbuffer, 0, 1, &scissor);
 
-				vkCmdBindPipeline(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh.externalInstance->pipeline);
-
 				mesh.dynamicData.model = transform.model;
 				mesh.dynamicData.mvp = camera->perspective * camera->view * transform.model;
-				vkCmdPushConstants(commandbuffer, mesh.externalInstance->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RenderMeshPushConstants), &mesh.dynamicData);
+				vkCmdPushConstants(commandbuffer, mesh.instance->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RenderMeshPushConstants), &mesh.dynamicData);
 
 				vkCmdBindVertexBuffers(commandbuffer, 0, 1, &meshBuffers_.vertexBuffers_[mesh.vertexHandle].buf, offsets);
 				vkCmdBindIndexBuffer(commandbuffer, meshBuffers_.indexBuffers_[mesh.indexHandle].buf, 0, VK_INDEX_TYPE_UINT32);
 
-				vkCmdBindDescriptorSets(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh.externalInstance->pipelineLayout, 0, 1, &mesh.externalInstance->descriptorSets[resourceIndex], 0, nullptr);
+				vkCmdBindDescriptorSets(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh.instance->pipelineLayout, 0, 1, &mesh.instance->descriptorSets[resourceIndex], 0, nullptr);
 				vkCmdDrawIndexed(commandbuffer, mesh.indexCount, 1, 0, 0, 0);
 			}
 		});
 	}
 
+	void MeshPipeline::CreateDescriptorPoolAndLayout() {
+		VkDescriptorPoolSize poolSize = VkUtils::Init::DescriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_FRAMES_IN_FLIGHT);
+
+		VkDescriptorPoolCreateInfo poolInfo{};
+		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		poolInfo.poolSizeCount = 1;
+		poolInfo.pPoolSizes = &poolSize;
+		poolInfo.maxSets = MAX_TEXTURES;
+
+		VK_CHECK(vkCreateDescriptorPool(context_->device, &poolInfo, nullptr, &descriptorPool_));
+
+
+		std::vector<VkDescriptorSetLayoutBinding> descSetLayoutBindings;
+		descSetLayoutBindings.push_back(VkUtils::Init::DescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 1));
+
+		VkDescriptorSetLayoutCreateInfo descSetLayoutCreateInfo = VkUtils::Init::DescriptorSetLayoutCreateInfo();
+		descSetLayoutCreateInfo.pBindings = descSetLayoutBindings.data();
+		descSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(descSetLayoutBindings.size());
+
+		VK_CHECK(vkCreateDescriptorSetLayout(context_->device, &descSetLayoutCreateInfo, nullptr, &descriptorSetLayout_));
+	}
+
 	void MeshPipeline::CreatePipeline() {
 		// We start off by reading the shader bytecode from disk and creating the modules subsequently
-		std::vector<char> vertexShaderBytecode = VkUtils::ReadShader("Resources/Shaders/Compiled/mesh_vert.spv");
-		std::vector<char> fragmentShaderBytecode = VkUtils::ReadShader("Resources/Shaders/Compiled/mesh_frag.spv");
+		std::vector<char> vertexShaderBytecode = VkUtils::ReadShader("Resources/Shaders/Compiled/default_vert.spv");
+		std::vector<char> fragmentShaderBytecode = VkUtils::ReadShader("Resources/Shaders/Compiled/default_frag.spv");
 		VkShaderModule vertShaderModule = VkUtils::CreateShaderModule(vertexShaderBytecode, context_->device);
 		VkShaderModule fragShaderModule = VkUtils::CreateShaderModule(fragmentShaderBytecode, context_->device);
 
@@ -237,9 +279,8 @@ namespace Quadbit {
 
 		// This part specifies the pipeline layout, its mainly used to specify the layout of uniform values used in shaders
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo = VkUtils::Init::PipelineLayoutCreateInfo();
-		// ENABLE UBO
-		// pipelineLayoutInfo.setLayoutCount = 1;
-		// pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout_;
+		pipelineLayoutInfo.setLayoutCount = 1;
+		pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout_;
 
 		// ENABLE PUSHCONSTANTS
 		VkPushConstantRange pushConstantRange{};
@@ -538,10 +579,91 @@ namespace Quadbit {
 		return &externalInstances_.back();
 	}
 
-	void MeshPipeline::CreateUniformBuffers(QbVkRenderMeshInstance& renderMeshInstance, VkDeviceSize size) {
-		VkBufferCreateInfo bufferInfo = VkUtils::Init::BufferCreateInfo(size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-		for(auto i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-			context_->allocator->CreateBuffer(renderMeshInstance.uniformBuffers[i], bufferInfo, QBVK_MEMORY_USAGE_CPU_TO_GPU);
+	void MeshPipeline::DestroyInstance(QbVkRenderMeshInstance& instance) {
+		// Destroy pipeline
+		vkDestroyPipelineLayout(context_->device, instance.pipelineLayout, nullptr);
+		vkDestroyPipeline(context_->device, instance.pipeline, nullptr);
+
+		// Destroy descriptors
+		vkFreeDescriptorSets(context_->device, instance.descriptorPool, static_cast<uint32_t>(instance.descriptorSets.size()), instance.descriptorSets.data());
+		vkDestroyDescriptorPool(context_->device, instance.descriptorPool, nullptr);
+		vkDestroyDescriptorSetLayout(context_->device, instance.descriptorSetLayout, nullptr);
+	}
+
+	RenderTexturedObjectComponent MeshPipeline::CreateObject(const char* objPath, const char* texturePath) {
+		// First load the texture
+		VkSamplerCreateInfo samplerInfo = VkUtils::Init::SamplerCreateInfo(VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, 
+			VK_TRUE, 16.0f, VK_COMPARE_OP_ALWAYS, VK_SAMPLER_MIPMAP_MODE_LINEAR);
+
+		QbVkTexture texture = VkUtils::LoadTexture(context_, texturePath, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
+			VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			VK_IMAGE_ASPECT_COLOR_BIT, QbVkMemoryUsage::QBVK_MEMORY_USAGE_GPU_ONLY, &samplerInfo);
+
+		std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorSetLayout_);
+		VkDescriptorSetAllocateInfo descSetallocInfo = VkUtils::Init::DescriptorSetAllocateInfo();
+		descSetallocInfo.descriptorPool = descriptorPool_;
+		descSetallocInfo.descriptorSetCount = MAX_FRAMES_IN_FLIGHT;
+		descSetallocInfo.pSetLayouts = layouts.data();
+
+		VK_CHECK(vkAllocateDescriptorSets(context_->device, &descSetallocInfo, descriptorSets_[textureCount].data()));
+
+		for (auto i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+			std::vector<VkWriteDescriptorSet> writeDescSets;
+			writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(descriptorSets_[textureCount][i], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 0, &texture.descriptor));
+			vkUpdateDescriptorSets(context_->device, static_cast<uint32_t>(writeDescSets.size()), writeDescSets.data(), 0, nullptr);
 		}
+
+
+		// Now load the model
+		tinyobj::attrib_t attrib;
+		std::vector<tinyobj::shape_t> shapes;
+		std::vector<tinyobj::material_t> materials;
+		std::string warn, err;
+
+		if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, objPath)) {
+			QB_LOG_ERROR("Failed to load object from file: %s\n", objPath);
+			return {};
+		}
+
+		std::vector<MeshVertex> vertices;
+		std::vector<uint32_t> indices;
+
+		for (auto& shape : shapes) {
+			for (auto& index : shape.mesh.indices) {
+				MeshVertex v;
+				v.position = {
+					attrib.vertices[3 * static_cast<uint64_t>(index.vertex_index) + 0],
+					attrib.vertices[3 * static_cast<uint64_t>(index.vertex_index) + 1],
+					attrib.vertices[3 * static_cast<uint64_t>(index.vertex_index) + 2],
+				};
+				if (attrib.normals.empty()) {
+					v.normal = {
+						1.0f, 1.0f, 1.0f
+					};
+				}
+				else {
+					v.normal = {
+						attrib.normals[3 * static_cast<uint64_t>(index.normal_index) + 0],
+						attrib.normals[3 * static_cast<uint64_t>(index.normal_index) + 1],
+						attrib.normals[3 * static_cast<uint64_t>(index.normal_index) + 2],
+					};
+				}
+				v.uv = {
+					attrib.texcoords[2 * static_cast<uint64_t>(index.texcoord_index) + 0],
+					1.0f - attrib.texcoords[2 * static_cast<uint64_t>(index.texcoord_index) + 1]
+				};
+
+				vertices.push_back(v);
+				indices.push_back(static_cast<uint32_t>(indices.size()));
+			}
+		}
+
+		return RenderTexturedObjectComponent{
+			CreateVertexBuffer(vertices.data(), sizeof(MeshVertex), static_cast<uint32_t>(vertices.size())),
+			CreateIndexBuffer(indices),
+			static_cast<uint32_t>(indices.size()),
+			RenderMeshPushConstants{},
+			textureCount++
+		};
 	}
 }

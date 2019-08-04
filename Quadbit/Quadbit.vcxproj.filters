@@ -801,12 +801,6 @@
     <ClInclude Include="Source\Engine\Entities\EventTag.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Extern\FastNoiseSIMD\FastNoiseSIMD.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Extern\FastNoiseSIMD\FastNoiseSIMD_internal.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Engine\Rendering\Systems\NoClipCameraSystem.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -832,6 +826,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Source\Engine\Rendering\Pipelines\ComputePipeline.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\stb\stb_image.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\tinyobjloader\tiny_obj_loader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -1237,14 +1237,14 @@
     </None>
     <None Include="Resources\Shaders\imgui_frag.glsl" />
     <None Include="Resources\Shaders\imgui_vert.glsl" />
-    <None Include="Resources\Shaders\mesh_frag.glsl" />
-    <None Include="Resources\Shaders\mesh_vert.glsl" />
     <None Include="Resources\Shaders\precalc_comp.glsl" />
     <None Include="Resources\Shaders\waveheight_comp.glsl" />
     <None Include="Resources\Shaders\water_frag.glsl" />
     <None Include="Resources\Shaders\water_vert.glsl" />
     <None Include="Resources\Shaders\displacement_comp.glsl" />
     <None Include="Resources\Shaders\ifft_comp.glsl" />
+    <None Include="Resources\Shaders\default_frag.glsl" />
+    <None Include="Resources\Shaders\default_vert.glsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Extern\glm\detail\glm.cpp">
@@ -1287,27 +1287,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Source\Engine\Entities\EntityManager.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Extern\FastNoiseSIMD\FastNoiseSIMD.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Extern\FastNoiseSIMD\FastNoiseSIMD_avx2.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Extern\FastNoiseSIMD\FastNoiseSIMD_avx512.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Extern\FastNoiseSIMD\FastNoiseSIMD_internal.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Extern\FastNoiseSIMD\FastNoiseSIMD_neon.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Extern\FastNoiseSIMD\FastNoiseSIMD_sse2.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Extern\FastNoiseSIMD\FastNoiseSIMD_sse41.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Source\Game\Water.cpp">

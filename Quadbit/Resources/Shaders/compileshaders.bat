@@ -1,3 +1,6 @@
+if not exist "../../../Bin/Release/x64/Resources/Shaders/Compiled" mkdir "../../../Bin/Release/x64/Resources/Shaders/Compiled"
+if not exist "../../../Bin/Debug/x64/Resources/Shaders/Compiled" mkdir "../../../Bin/Debug/x64/Resources/Shaders/Compiled"
+
 glslangValidator.exe	 -V imgui_frag.glsl					-S frag		-o Compiled/imgui_frag.spv
 glslangValidator.exe	 -V imgui_frag.glsl					-S frag		-o ../../../Bin/Release/x64/Resources/Shaders/Compiled/imgui_frag.spv
 glslangValidator.exe	 -V imgui_frag.glsl					-S frag		-o ../../../Bin/Debug/x64/Resources/Shaders/Compiled/imgui_frag.spv
@@ -6,13 +9,13 @@ glslangValidator.exe	 -V imgui_vert.glsl					-S vert		-o Compiled/imgui_vert.spv
 glslangValidator.exe	 -V imgui_vert.glsl					-S vert		-o ../../../Bin/Release/x64/Resources/Shaders/Compiled/imgui_vert.spv
 glslangValidator.exe	 -V imgui_vert.glsl					-S vert		-o ../../../Bin/Debug/x64/Resources/Shaders/Compiled/imgui_vert.spv
 
-glslangValidator.exe	 -V mesh_frag.glsl					-S frag		-o Compiled/mesh_frag.spv
-glslangValidator.exe	 -V mesh_frag.glsl					-S frag		-o ../../../Bin/Release/x64/Resources/Shaders/Compiled/mesh_frag.spv
-glslangValidator.exe	 -V mesh_frag.glsl					-S frag		-o ../../../Bin/Debug/x64/Resources/Shaders/Compiled/mesh_frag.spv
+glslangValidator.exe	 -V default_frag.glsl				-S frag		-o Compiled/default_frag.spv
+glslangValidator.exe	 -V default_frag.glsl				-S frag		-o ../../../Bin/Release/x64/Resources/Shaders/Compiled/default_frag.spv
+glslangValidator.exe	 -V default_frag.glsl				-S frag		-o ../../../Bin/Debug/x64/Resources/Shaders/Compiled/default_frag.spv
 
-glslangValidator.exe	 -V mesh_vert.glsl					-S vert		-o Compiled/mesh_vert.spv
-glslangValidator.exe	 -V mesh_vert.glsl					-S vert		-o ../../../Bin/Release/x64/Resources/Shaders/Compiled/mesh_vert.spv
-glslangValidator.exe	 -V mesh_vert.glsl					-S vert		-o ../../../Bin/Debug/x64/Resources/Shaders/Compiled/mesh_vert.spv
+glslangValidator.exe	 -V default_vert.glsl				-S vert		-o Compiled/default_vert.spv
+glslangValidator.exe	 -V default_vert.glsl				-S vert		-o ../../../Bin/Release/x64/Resources/Shaders/Compiled/default_vert.spv
+glslangValidator.exe	 -V default_vert.glsl				-S vert		-o ../../../Bin/Debug/x64/Resources/Shaders/Compiled/default_vert.spv
 
 glslangValidator.exe	 -V water_frag.glsl					-S frag		-o Compiled/water_frag.spv
 glslangValidator.exe	 -V water_frag.glsl					-S frag		-o ../../../Bin/Release/x64/Resources/Shaders/Compiled/water_frag.spv

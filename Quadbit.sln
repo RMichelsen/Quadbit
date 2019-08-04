@@ -5,11 +5,6 @@ VisualStudioVersion = 16.0.28809.33
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Quadbit", "Quadbit\Quadbit.vcxproj", "{14239553-783C-4422-8E54-05B42EE4C906}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{A2ABBCF0-B395-4158-8432-54527C2F2CEF}"
-	ProjectSection(SolutionItems) = preProject
-		commands.json = commands.json
-	EndProjectSection
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64

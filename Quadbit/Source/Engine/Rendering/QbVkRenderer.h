@@ -27,6 +27,14 @@ namespace Quadbit {
 			};
 		}
 
+		RenderTexturedObjectComponent CreateObject(const char* objPath, const char* texturePath) {
+			return meshPipeline_->CreateObject(objPath, texturePath);
+		}
+
+
+		QbVkTexture LoadTexture(const char* imagePath, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage, VkImageLayout imageLayout,
+			VkImageAspectFlags imageAspectFlags, QbVkMemoryUsage memoryUsage, VkSamplerCreateInfo* samplerCreateInfo = nullptr,
+			VkSampleCountFlagBits numSamples = VK_SAMPLE_COUNT_1_BIT);
 		void CreateTexture(QbVkTexture& texture, uint32_t width, uint32_t height, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage, VkImageLayout imageLayout,
 			VkImageAspectFlags imageAspectFlags, VkPipelineStageFlagBits srcStage, VkPipelineStageFlagBits dstStage, QbVkMemoryUsage memoryUsage, VkSamplerCreateInfo* samplerCreateInfo = nullptr,
 			VkSampleCountFlagBits numSamples = VK_SAMPLE_COUNT_1_BIT);

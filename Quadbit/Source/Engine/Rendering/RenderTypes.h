@@ -12,7 +12,6 @@ namespace Quadbit {
 		VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
 		VkPipeline pipeline = VK_NULL_HANDLE;
 
-		std::array<QbVkBuffer, MAX_FRAMES_IN_FLIGHT> uniformBuffers;
 		VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
 		VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
 		std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> descriptorSets{};
@@ -20,7 +19,8 @@ namespace Quadbit {
 
 	struct MeshVertex {
 		glm::vec3 position;
-		glm::vec3 colour;
+		glm::vec3 normal;
+		glm::vec2 uv;
 
 		static VkVertexInputBindingDescription GetBindingDescription() {
 			VkVertexInputBindingDescription bindingDescription{};
@@ -30,18 +30,23 @@ namespace Quadbit {
 			return bindingDescription;
 		}
 
-		static std::array<VkVertexInputAttributeDescription, 2> GetAttributeDescriptions() {
-			std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions{};
+		static std::array<VkVertexInputAttributeDescription, 3> GetAttributeDescriptions() {
+			std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions{};
 			// Attribute description for the position
 			attributeDescriptions[0].binding = 0;
 			attributeDescriptions[0].location = 0;
 			attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
 			attributeDescriptions[0].offset = offsetof(MeshVertex, position);
-			// Attribute description for the colour
+			// Attribute description for the normal
 			attributeDescriptions[1].binding = 0;
 			attributeDescriptions[1].location = 1;
 			attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-			attributeDescriptions[1].offset = offsetof(MeshVertex, colour);
+			attributeDescriptions[1].offset = offsetof(MeshVertex, normal);
+			// Attribute description for the uv
+			attributeDescriptions[2].binding = 0;
+			attributeDescriptions[2].location = 2;
+			attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
+			attributeDescriptions[2].offset = offsetof(MeshVertex, uv);
 			return attributeDescriptions;
 		}
 	};
@@ -102,12 +107,20 @@ namespace Quadbit {
 		}
 	};
 
+	struct RenderTexturedObjectComponent {
+		VertexBufHandle vertexHandle;
+		IndexBufHandle indexHandle;
+		uint32_t indexCount;
+		RenderMeshPushConstants dynamicData;
+		uint32_t descriptorIndex;
+	};
+
 	struct RenderMeshComponent {
 		VertexBufHandle vertexHandle;
 		IndexBufHandle indexHandle;
 		uint32_t indexCount;
 		RenderMeshPushConstants dynamicData;
-		QbVkRenderMeshInstance* externalInstance = nullptr;
+		QbVkRenderMeshInstance* instance;
 	};
 
 	struct CameraUpdateAspectRatioTag : public EventTagComponent {};

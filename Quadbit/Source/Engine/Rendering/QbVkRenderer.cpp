@@ -1,4 +1,7 @@
 #include <PCH.h>
+// Necessary define for stb_image library and tiny obj loader
+#define STB_IMAGE_IMPLEMENTATION
+
 #include "QbVkRenderer.h"
 
 #include "Common/QbVkUtils.h"
@@ -106,39 +109,23 @@ namespace Quadbit {
 		meshPipeline_->userCamera_ = entity;
 	}
 
+	QbVkTexture QbVkRenderer::LoadTexture(const char* imagePath, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage, VkImageLayout imageLayout, 
+		VkImageAspectFlags imageAspectFlags, QbVkMemoryUsage memoryUsage, VkSamplerCreateInfo* samplerCreateInfo, VkSampleCountFlagBits numSamples) {
+		return VkUtils::LoadTexture(context_, imagePath, imageFormat, imageTiling, imageUsage, imageLayout, imageAspectFlags, memoryUsage, samplerCreateInfo, numSamples);
+	}
+
 	void QbVkRenderer::CreateTexture(QbVkTexture& texture, uint32_t width, uint32_t height, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage, 
 		VkImageLayout imageLayout, VkImageAspectFlags imageAspectFlags, VkPipelineStageFlagBits srcStage, VkPipelineStageFlagBits dstStage, QbVkMemoryUsage memoryUsage, 
 		VkSamplerCreateInfo* samplerCreateInfo, VkSampleCountFlagBits numSamples) {
-
-		auto imageCreateInfo = VkUtils::Init::ImageCreateInfo(width, height, imageFormat, imageTiling, imageUsage, numSamples);
-		context_->allocator->CreateImage(texture.image, imageCreateInfo, memoryUsage);
-		texture.imageView = VkUtils::CreateImageView(context_, texture.image.imgHandle, imageFormat, imageAspectFlags);
-		texture.imageLayout = imageLayout;
-		texture.format = imageFormat;
-		if(samplerCreateInfo != nullptr) VK_CHECK(vkCreateSampler(context_->device, samplerCreateInfo, nullptr, &texture.sampler));
-		texture.descriptor = { texture.sampler, texture.imageView, imageLayout };
-
-
-		// Transition the image layout to the desired layout
-		VkCommandBuffer tempBuffer = Quadbit::VkUtils::InitSingleTimeCommandBuffer(context_);
-
-		Quadbit::VkUtils::TransitionImageLayout(context_, tempBuffer, texture.image.imgHandle, imageAspectFlags, VK_IMAGE_LAYOUT_UNDEFINED,
-			imageLayout, srcStage, dstStage);
-
-		Quadbit::VkUtils::FlushCommandBuffer(context_, tempBuffer);
+		VkUtils::CreateTexture(context_, texture, width, height, imageFormat, imageTiling, imageUsage, imageLayout, imageAspectFlags, srcStage, dstStage, memoryUsage, samplerCreateInfo, numSamples);
 	}
 
 	void QbVkRenderer::CreateGPUBuffer(QbVkBuffer& buffer, VkDeviceSize size, VkBufferUsageFlags bufferUsage, QbVkMemoryUsage memoryUsage) {
-		auto bufferInfo = VkUtils::Init::BufferCreateInfo(size, bufferUsage);
-		context_->allocator->CreateBuffer(buffer, bufferInfo, memoryUsage);
+		VkUtils::CreateGPUBuffer(context_, buffer, size, bufferUsage, memoryUsage);
 	}
 
 	void QbVkRenderer::TransferDataToGPUBuffer(QbVkBuffer& buffer, VkDeviceSize size, const void* data) {
-		// Utilize a staging buffer to transfer the data onto the GPU
-		Quadbit::QbVkBuffer stagingBuffer;
-		context_->allocator->CreateStagingBuffer(stagingBuffer, size, data);
-		Quadbit::VkUtils::CopyBuffer(context_, stagingBuffer.buf, buffer.buf, size);
-		context_->allocator->DestroyBuffer(stagingBuffer);
+		VkUtils::TransferDataToGPUBuffer(context_, buffer, size, data);
 	}
 
 	QbVkComputeInstance QbVkRenderer::CreateComputeInstance(std::vector<QbComputeDescriptor>& descriptors,
@@ -411,11 +398,9 @@ namespace Quadbit {
 		context_->multisamplingResources.msaaImageView = VkUtils::CreateImageView(context_, context_->multisamplingResources.msaaImage.imgHandle, colourFormat, VK_IMAGE_ASPECT_COLOR_BIT);
 
 		// Transition image layout with a temporary command buffer
-		VkCommandBuffer transitionBuffer = VkUtils::InitSingleTimeCommandBuffer(context_);
-		VkUtils::TransitionImageLayout(context_, transitionBuffer, context_->multisamplingResources.msaaImage.imgHandle, 
+		VkUtils::TransitionImageLayout(context_, context_->multisamplingResources.msaaImage.imgHandle, 
 			VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 
 			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
-		VkUtils::FlushCommandBuffer(context_, transitionBuffer);
 
 	}
 
@@ -428,13 +413,10 @@ namespace Quadbit {
 		context_->allocator->CreateImage(context_->depthResources.depthImage, imageInfo, QBVK_MEMORY_USAGE_GPU_ONLY);
 		context_->depthResources.imageView = VkUtils::CreateImageView(context_, context_->depthResources.depthImage.imgHandle, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
 
-		// Create single time command buffer
-		VkCommandBuffer transitionBuffer = VkUtils::InitSingleTimeCommandBuffer(context_);
+		// Transition depth image
 		VkImageAspectFlags aspectFlags = VkUtils::HasStencilComponent(depthFormat) ? VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT : VK_IMAGE_ASPECT_DEPTH_BIT;
-		VkUtils::TransitionImageLayout(context_, transitionBuffer, context_->depthResources.depthImage.imgHandle, aspectFlags, VK_IMAGE_LAYOUT_UNDEFINED,
+		VkUtils::TransitionImageLayout(context_, context_->depthResources.depthImage.imgHandle, aspectFlags, VK_IMAGE_LAYOUT_UNDEFINED,
 			VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT);
-		// Flush command buffer
-		VkUtils::FlushCommandBuffer(context_, transitionBuffer);
 	}
 
 	void QbVkRenderer::CreateSwapChain() {

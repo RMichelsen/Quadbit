@@ -6,6 +6,7 @@
 
 namespace Quadbit {
 	constexpr int MAX_MESH_COUNT = 65536;
+	constexpr int MAX_TEXTURES = 50;
 
 	struct MeshBuffers {
 		VertexBufHandle vertexBufferIdx_;
@@ -62,6 +63,10 @@ namespace Quadbit {
 
 		VkPipelineLayout pipelineLayout_ = VK_NULL_HANDLE;
 		VkPipeline pipeline_ = VK_NULL_HANDLE;
+		VkDescriptorPool descriptorPool_;
+		VkDescriptorSetLayout descriptorSetLayout_;
+		std::array<std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT>, MAX_TEXTURES> descriptorSets_{};
+		uint32_t textureCount = 0;
 
 		MeshBuffers meshBuffers_{};
 
@@ -70,6 +75,7 @@ namespace Quadbit {
 		Entity fallbackCamera_ = NULL_ENTITY;
 		Entity userCamera_ = NULL_ENTITY;
 
+		void CreateDescriptorPoolAndLayout();
 		void CreatePipeline();
 
 		void DestroyVertexBuffer(VertexBufHandle handle);
@@ -79,6 +85,9 @@ namespace Quadbit {
 
 		QbVkRenderMeshInstance* CreateInstance(std::vector<QbRenderDescriptor> descriptors,
 			std::vector<QbVkVertexInputAttribute> vertexAttribs, const char* vertexShader, const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry);
+		void DestroyInstance(QbVkRenderMeshInstance& instance);
+
+		RenderTexturedObjectComponent CreateObject(const char* objPath, const char* texturePath);
 		void CreateUniformBuffers(QbVkRenderMeshInstance& renderMeshInstance, VkDeviceSize size);
 	};
 }

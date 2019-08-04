@@ -169,8 +169,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="Extern\FastNoiseSIMD\FastNoiseSIMD.h" />
-    <ClInclude Include="Extern\FastNoiseSIMD\FastNoiseSIMD_internal.h" />
     <ClInclude Include="Extern\glm\common.hpp" />
     <ClInclude Include="Extern\glm\detail\compute_common.hpp" />
     <ClInclude Include="Extern\glm\detail\compute_vector_relational.hpp" />
@@ -418,6 +416,8 @@
     <ClInclude Include="Extern\ImGui\imstb_rectpack.h" />
     <ClInclude Include="Extern\ImGui\imstb_textedit.h" />
     <ClInclude Include="Extern\ImGui\imstb_truetype.h" />
+    <ClInclude Include="Extern\stb\stb_image.h" />
+    <ClInclude Include="Extern\tinyobjloader\tiny_obj_loader.h" />
     <ClInclude Include="Source\Engine\Core\Logging.h" />
     <ClInclude Include="Source\Engine\Application\Window.h" />
     <ClInclude Include="Source\Engine\Entities\ComponentPool.h" />
@@ -580,8 +580,8 @@
     <None Include="Resources\Shaders\ifft_comp.glsl" />
     <None Include="Resources\Shaders\imgui_frag.glsl" />
     <None Include="Resources\Shaders\imgui_vert.glsl" />
-    <None Include="Resources\Shaders\mesh_frag.glsl" />
-    <None Include="Resources\Shaders\mesh_vert.glsl" />
+    <None Include="Resources\Shaders\default_frag.glsl" />
+    <None Include="Resources\Shaders\default_vert.glsl" />
     <None Include="Resources\Shaders\precalc_comp.glsl" />
     <None Include="Resources\Shaders\displacement_comp.glsl" />
     <None Include="Resources\Shaders\water_frag.glsl" />
@@ -589,53 +589,6 @@
     <None Include="Resources\Shaders\waveheight_comp.glsl" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Extern\FastNoiseSIMD\FastNoiseSIMD.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">MultiThreadedDebug</RuntimeLibrary>
-    </ClCompile>
-    <ClCompile Include="Extern\FastNoiseSIMD\FastNoiseSIMD_avx2.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|x64'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
-      <WholeProgramOptimization Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</WholeProgramOptimization>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
-      <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">MultiThreadedDebug</RuntimeLibrary>
-    </ClCompile>
-    <ClCompile Include="Extern\FastNoiseSIMD\FastNoiseSIMD_avx512.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|x64'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
-      <WholeProgramOptimization Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</WholeProgramOptimization>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
-      <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">MultiThreadedDebug</RuntimeLibrary>
-    </ClCompile>
-    <ClCompile Include="Extern\FastNoiseSIMD\FastNoiseSIMD_internal.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">MultiThreadedDebug</RuntimeLibrary>
-    </ClCompile>
-    <ClCompile Include="Extern\FastNoiseSIMD\FastNoiseSIMD_neon.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">MultiThreadedDebug</RuntimeLibrary>
-    </ClCompile>
-    <ClCompile Include="Extern\FastNoiseSIMD\FastNoiseSIMD_sse2.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotSet</EnableEnhancedInstructionSet>
-      <WholeProgramOptimization Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</WholeProgramOptimization>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotSet</EnableEnhancedInstructionSet>
-      <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">MultiThreadedDebug</RuntimeLibrary>
-    </ClCompile>
-    <ClCompile Include="Extern\FastNoiseSIMD\FastNoiseSIMD_sse41.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotSet</EnableEnhancedInstructionSet>
-      <WholeProgramOptimization Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</WholeProgramOptimization>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotSet</EnableEnhancedInstructionSet>
-      <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">MultiThreadedDebug</RuntimeLibrary>
-    </ClCompile>
     <ClCompile Include="Extern\glm\detail\glm.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>

@@ -6,6 +6,15 @@
 #include "../Engine/Global/ImGuiState.h"
 
 void Water::Init() {
+
+	auto entity1 = Quadbit::EntityManager::GetOrCreate()->Create();
+	entity1.AddComponent<Quadbit::RenderTexturedObjectComponent>(renderer_->CreateObject("Resources/Objects/boat.obj", "Resources/Textures/lion.jpg"));
+	entity1.AddComponent<Quadbit::RenderTransformComponent>(Quadbit::RenderTransformComponent(1.0f, { 0.0f, 0.0f, 0.0f }, { 0, 0, 0, 1 }));
+
+	auto entity2 = Quadbit::EntityManager::GetOrCreate()->Create();
+	entity2.AddComponent<Quadbit::RenderTexturedObjectComponent>(renderer_->CreateObject("Resources/Objects/chalet.obj", "Resources/Textures/chalet.jpg"));
+	entity2.AddComponent<Quadbit::RenderTransformComponent>(Quadbit::RenderTransformComponent(1.0f, { 0.0f, 0.0f, 0.0f }, { 0, 0, 0, 1 }));
+
 	InitializeCompute();
 
 	// Initialize vertices and indices for the water mesh
@@ -29,6 +38,8 @@ void Water::Init() {
 		}
 	}
 
+
+
 	// Create UBO
 	renderer_->CreateGPUBuffer(togglesUBO_, sizeof(TogglesUBO), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, Quadbit::QBVK_MEMORY_USAGE_CPU_TO_GPU);
 	TogglesUBO* ubo = reinterpret_cast<TogglesUBO*>(togglesUBO_.alloc.data);
@@ -47,22 +58,22 @@ void Water::Init() {
 
 
 	// Setup water plane entity
-	auto entityManager = Quadbit::EntityManager::GetOrCreate();
-	auto entity = entityManager->Create();
-	entity.AddComponent<Quadbit::RenderMeshComponent>(renderer_->CreateMesh(waterVertices_, waterIndices_, rMeshInstance));
-	entity.AddComponent<Quadbit::RenderTransformComponent>(Quadbit::RenderTransformComponent(1.0f, { 0.0f, 0.0f, 0.0f }, { 0, 0, 0, 1 }));
+	//auto entityManager = Quadbit::EntityManager::GetOrCreate();
+	//auto entity = entityManager->Create();
+	//entity.AddComponent<Quadbit::RenderMeshComponent>(renderer_->CreateMesh(waterVertices_, waterIndices_, rMeshInstance));
+	//entity.AddComponent<Quadbit::RenderTransformComponent>(Quadbit::RenderTransformComponent(1.0f, { 0.0f, 0.0f, 0.0f }, { 0, 0, 0, 1 }));
 
-	entity = entityManager->Create();
-	entity.AddComponent<Quadbit::RenderMeshComponent>(renderer_->CreateMesh(waterVertices_, waterIndices_, rMeshInstance));
-	entity.AddComponent<Quadbit::RenderTransformComponent>(Quadbit::RenderTransformComponent(1.0f, { WATER_RESOLUTION, 0.0f, 0.0f }, { 0, 0, 0, 1 }));
+	//entity = entityManager->Create();
+	//entity.AddComponent<Quadbit::RenderMeshComponent>(renderer_->CreateMesh(waterVertices_, waterIndices_, rMeshInstance));
+	//entity.AddComponent<Quadbit::RenderTransformComponent>(Quadbit::RenderTransformComponent(1.0f, { WATER_RESOLUTION, 0.0f, 0.0f }, { 0, 0, 0, 1 }));
 
-	entity = entityManager->Create();
-	entity.AddComponent<Quadbit::RenderMeshComponent>(renderer_->CreateMesh(waterVertices_, waterIndices_, rMeshInstance));
-	entity.AddComponent<Quadbit::RenderTransformComponent>(Quadbit::RenderTransformComponent(1.0f, { 0.0f, 0.0f, WATER_RESOLUTION }, { 0, 0, 0, 1 }));
+	//entity = entityManager->Create();
+	//entity.AddComponent<Quadbit::RenderMeshComponent>(renderer_->CreateMesh(waterVertices_, waterIndices_, rMeshInstance));
+	//entity.AddComponent<Quadbit::RenderTransformComponent>(Quadbit::RenderTransformComponent(1.0f, { 0.0f, 0.0f, WATER_RESOLUTION }, { 0, 0, 0, 1 }));
 
-	entity = entityManager->Create();
-	entity.AddComponent<Quadbit::RenderMeshComponent>(renderer_->CreateMesh(waterVertices_, waterIndices_, rMeshInstance));
-	entity.AddComponent<Quadbit::RenderTransformComponent>(Quadbit::RenderTransformComponent(1.0f, { WATER_RESOLUTION, 0.0f, WATER_RESOLUTION }, { 0, 0, 0, 1 }));
+	//entity = entityManager->Create();
+	//entity.AddComponent<Quadbit::RenderMeshComponent>(renderer_->CreateMesh(waterVertices_, waterIndices_, rMeshInstance));
+	//entity.AddComponent<Quadbit::RenderTransformComponent>(Quadbit::RenderTransformComponent(1.0f, { WATER_RESOLUTION, 0.0f, WATER_RESOLUTION }, { 0, 0, 0, 1 }));
 
 
 	// Some ImGui debug stuff 

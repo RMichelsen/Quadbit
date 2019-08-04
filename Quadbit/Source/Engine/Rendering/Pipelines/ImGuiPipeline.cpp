@@ -12,7 +12,6 @@ namespace Quadbit {
 		InitImGui();
 
 		CreateFontTexture();
-		CreateFontTextureSampler();
 		CreateDescriptorPoolAndSets();
 		CreatePipeline();
 	}
@@ -29,9 +28,9 @@ namespace Quadbit {
 		}
 
 		// Destroy font resources
-		context_->allocator->DestroyImage(fontImage_);
-		vkDestroyImageView(context_->device, fontImageView_, nullptr);
-		vkDestroySampler(context_->device, fontSampler_, nullptr);
+		context_->allocator->DestroyImage(fontTexture_.image);
+		vkDestroyImageView(context_->device, fontTexture_.imageView, nullptr);
+		vkDestroySampler(context_->device, fontTexture_.sampler, nullptr);
 
 		// Since both the pipeline and pipeline layout are destroyed by the swapchain we ignore them here.
 		vkDestroyDescriptorPool(context_->device, descriptorPool_, nullptr);
@@ -159,48 +158,8 @@ namespace Quadbit {
 		unsigned char* fontData;
 		int textureWidth, textureHeight;
 		io.Fonts->GetTexDataAsRGBA32(&fontData, &textureWidth, &textureHeight);
-		VkDeviceSize uploadSize = static_cast<uint64_t>(textureWidth) * static_cast<uint64_t>(textureHeight) * 4;
 
-		VkImageCreateInfo imageInfo = VkUtils::Init::ImageCreateInfo(textureWidth, textureHeight, VK_FORMAT_R8G8B8A8_UNORM,
-			VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
-		context_->allocator->CreateImage(fontImage_, imageInfo, QBVK_MEMORY_USAGE_GPU_ONLY);
-
-		// Create target image view
-		fontImageView_ = VkUtils::CreateImageView(context_, fontImage_.imgHandle, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
-
-		// Create buffer for transfer
-		VkCommandBuffer commandBuffer = VkUtils::InitSingleTimeCommandBuffer(context_);
-
-		// Create staging buffer
-		QbVkBuffer stagingBuffer;
-		context_->allocator->CreateStagingBuffer(stagingBuffer, uploadSize, fontData);
-
-		// Prepare image for transfer
-		VkUtils::TransitionImageLayout(context_, commandBuffer, fontImage_.imgHandle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
-			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
-
-		// Copy image
-		VkBufferImageCopy bufferCopyRegion{};
-		bufferCopyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		bufferCopyRegion.imageSubresource.layerCount = 1;
-		bufferCopyRegion.imageExtent.width = textureWidth;
-		bufferCopyRegion.imageExtent.height = textureHeight;
-		bufferCopyRegion.imageExtent.depth = 1;
-		vkCmdCopyBufferToImage(commandBuffer, stagingBuffer.buf, fontImage_.imgHandle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &bufferCopyRegion);
-
-		// Prepare for shader read
-		VkUtils::TransitionImageLayout(context_, commandBuffer, fontImage_.imgHandle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
-
-		// Flush command buffer (also frees it)
-		VkUtils::FlushCommandBuffer(context_, commandBuffer);
-
-		// Free staging buffer
-		context_->allocator->DestroyBuffer(stagingBuffer);
-	}
-
-	void ImGuiPipeline::CreateFontTextureSampler() {
-		// Create font texture sampler
+		// Font texture sampler
 		VkSamplerCreateInfo samplerInfo = VkUtils::Init::SamplerCreateInfo();
 		samplerInfo.magFilter = VK_FILTER_LINEAR;
 		samplerInfo.minFilter = VK_FILTER_LINEAR;
@@ -209,7 +168,10 @@ namespace Quadbit {
 		samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 		samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 		samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-		VK_CHECK(vkCreateSampler(context_->device, &samplerInfo, nullptr, &fontSampler_));
+
+		fontTexture_ = VkUtils::LoadTexture(context_, textureWidth, textureHeight, fontData, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
+			VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			VK_IMAGE_ASPECT_COLOR_BIT, QbVkMemoryUsage::QBVK_MEMORY_USAGE_GPU_ONLY, &samplerInfo);
 	}
 
 	void ImGuiPipeline::CreateDescriptorPoolAndSets() {
@@ -245,22 +207,8 @@ namespace Quadbit {
 		// Allocate
 		VK_CHECK(vkAllocateDescriptorSets(context_->device, &descAllocInfo, &descriptorSet_));
 
-		// Create descriptor
-		VkDescriptorImageInfo fontDescriptor{};
-		fontDescriptor.sampler = fontSampler_;
-		fontDescriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		fontDescriptor.imageView = fontImageView_;
-
 		// Write
-		VkWriteDescriptorSet writeDesc = VkUtils::Init::WriteDescriptorSet(descriptorSet_, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 0, &fontDescriptor);
-		//writeDesc.dstSet = descriptorSet_;
-		//writeDesc.dstBinding = 0;
-		//writeDesc.dstArrayElement = 0;
-		//writeDesc.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		//writeDesc.descriptorCount = 1;
-		//writeDesc.pBufferInfo = nullptr;
-		//writeDesc.pImageInfo = &fontDescriptor;
-		//writeDesc.pTexelBufferView = nullptr;
+		VkWriteDescriptorSet writeDesc = VkUtils::Init::WriteDescriptorSet(descriptorSet_, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 0, &fontTexture_.descriptor);
 
 		// Update
 		vkUpdateDescriptorSets(context_->device, 1, &writeDesc, 0, nullptr);
