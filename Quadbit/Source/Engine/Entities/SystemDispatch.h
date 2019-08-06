@@ -39,7 +39,7 @@ namespace Quadbit {
 			ptr->UpdateEnd();
 		}
 
-		void ImGuiDrawSystemStats() {
+		void ImGuiDrawState() {
 			ImGui::SetNextWindowSize(ImVec2(500, 200), ImGuiCond_FirstUseEver);
 			ImGui::Begin("ECS System Status", nullptr);
 

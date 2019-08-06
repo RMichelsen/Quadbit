@@ -1,6 +1,5 @@
 #version 460
 
-#define M_PI 3.1415926535897932384626433832795
 #define M_TWOPI 6.283185307179586476925286766559
 
 layout(local_size_x_id = 0) in;
@@ -56,7 +55,7 @@ void get_butterfly_values(int pass_index, uint pos, out uvec2 indices, out compl
 	}
 }
 
-// Perform the butterfly calculation ?? (multiply by 0.5 since its an inverse FFT, its possible to scale at the end by 1/N^2 instead) ??
+// Perform the butterfly calculation (multiply by 0.5 since its an inverse FFT, its possible to scale at the end by 1/N^2 instead)
 void butterfly_pass(int pass_index, uint local_index, int pingpong_index, out complex res) {
 	uvec2 indices;
 	complex w;

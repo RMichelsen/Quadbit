@@ -6,6 +6,8 @@
 #include "../../Core/Time.h"
 #include "../../Global/ImGuiState.h"
 #include "../../Entities/EntityManager.h"
+#include "ComputePipeline.h"
+
 
 namespace Quadbit {
 	ImGuiPipeline::ImGuiPipeline(std::shared_ptr<QbVkContext> context) : context_(context) {
@@ -79,8 +81,6 @@ namespace Quadbit {
 	}
 
 	void ImGuiPipeline::DrawFrame(uint32_t resourceIndex, VkCommandBuffer commandbuffer) {
-		// Setup a new frame
-		NewFrame();
 		// Build new commandbuffer
 		UpdateBuffers(resourceIndex);
 
@@ -148,6 +148,7 @@ namespace Quadbit {
 		style.GrabRounding = 0.0f;
 		// Dimensions
 		ImGuiIO& io = ImGui::GetIO();
+		io.Fonts->AddFontFromFileTTF("C:/Windows/Fonts/calibri.ttf", 20.0f);
 		io.DisplaySize = ImVec2((float)context_->swapchain.extent.width, (float)context_->swapchain.extent.height);
 	}
 
@@ -345,7 +346,14 @@ namespace Quadbit {
 		vkDestroyShaderModule(context_->device, fragShaderModule, nullptr);
 	}
 
-	void ImGuiPipeline::DrawStats() {
+	void ImGuiPipeline::ImGuiDrawState() {
+		ImGuiIO& io = ImGui::GetIO();
+		io.DeltaTime = Time::deltaTime;
+		frametimeCache_.push_back(Time::deltaTime);
+		io.MousePos = ImVec2(static_cast<float>(InputHandler::clientMousePos.x), static_cast<float>(InputHandler::clientMousePos.y));
+		io.MouseDown[0] = InputHandler::mouseButtonStatus.left;
+		io.MouseDown[1] = InputHandler::mouseButtonStatus.right;
+
 		static auto tStart = std::chrono::time_point_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now());
 		auto tEnd = std::chrono::high_resolution_clock::now();
 
@@ -357,8 +365,6 @@ namespace Quadbit {
 		}
 
 		const float margin = 10.0f;
-		ImGuiIO& io = ImGui::GetIO();
-
 		ImVec2 window_pos = ImVec2(margin, margin);
 		ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always);
 		ImGui::SetNextWindowBgAlpha(0.5f);
@@ -370,29 +376,5 @@ namespace Quadbit {
 		ImGui::Text("FPS: %i", currentFPS_);
 
 		ImGui::End();
-	}
-
-	void ImGuiPipeline::NewFrame() {
-		ImGuiIO& io = ImGui::GetIO();
-		io.DeltaTime = Time::deltaTime;
-		frametimeCache_.push_back(Time::deltaTime);
-
-		io.MousePos = ImVec2(static_cast<float>(InputHandler::clientMousePos.x), static_cast<float>(InputHandler::clientMousePos.y));
-		io.MouseDown[0] = InputHandler::mouseButtonStatus.left;
-		io.MouseDown[1] = InputHandler::mouseButtonStatus.right;
-
-		ImGui::NewFrame();
-
-		DrawStats();
-		EntityManager::GetOrCreate()->systemDispatch_->ImGuiDrawSystemStats();
-		context_->allocator->ImGuiDrawState();
-
-		// Get injected ImGui commands from the global state
-		for(const auto& injector : ImGuiState::injectors) {
-			injector();
-		}
-
-		// Render to generate draw buffers
-		ImGui::Render();
 	}
 }

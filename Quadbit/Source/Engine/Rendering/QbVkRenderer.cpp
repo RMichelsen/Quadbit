@@ -1,11 +1,14 @@
 #include <PCH.h>
 // Necessary define for stb_image library and tiny obj loader
 #define STB_IMAGE_IMPLEMENTATION
+#define TINYOBJLOADER_IMPLEMENTATION
 
 #include "QbVkRenderer.h"
 
 #include "Common/QbVkUtils.h"
 #include "../Core/InputHandler.h"
+#include "../Core/Time.h"
+#include "../Global/ImGuiState.h"
 
 namespace Quadbit {
 	QbVkRenderer::QbVkRenderer(HINSTANCE hInstance, HWND hwnd) : 
@@ -109,7 +112,41 @@ namespace Quadbit {
 		meshPipeline_->userCamera_ = entity;
 	}
 
-	QbVkTexture QbVkRenderer::LoadTexture(const char* imagePath, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage, VkImageLayout imageLayout, 
+	RenderMeshComponent QbVkRenderer::CreateMesh(const char* objPath, std::vector<QbVkVertexInputAttribute> vertexModel, std::shared_ptr<QbVkRenderMeshInstance> externalInstance,
+		int pushConstantStride) {
+		QbVkModel model = VkUtils::LoadModel(objPath, vertexModel);
+
+		return RenderMeshComponent{
+			meshPipeline_->CreateVertexBuffer(model.vertices.data(), model.vertexStride, static_cast<uint32_t>(model.vertices.size())),
+			meshPipeline_->CreateIndexBuffer(model.indices),
+			static_cast<uint32_t>(model.indices.size()),
+			std::array<float, 32>(),
+			pushConstantStride,
+			externalInstance
+		};
+	}
+
+	RenderTexturedObjectComponent QbVkRenderer::CreateObject(const char* objPath, const char* texturePath, VkFormat textureFormat) {
+		return meshPipeline_->CreateObject(objPath, texturePath, textureFormat);
+	}
+
+	void QbVkRenderer::LoadEnvironmentMap(const char* environmentTexture, VkFormat textureFormat) {
+		meshPipeline_->LoadEnvironmentMap(environmentTexture, textureFormat);
+	}
+
+	Entity QbVkRenderer::GetActiveCamera() {
+		return meshPipeline_->GetActiveCamera();
+	}
+
+	VkDescriptorImageInfo QbVkRenderer::GetEnvironmentMapDescriptor() {
+		return meshPipeline_->GetEnvironmentMapDescriptor();
+	}
+
+	QbVkTexture QbVkRenderer::LoadCubemap(const char* imagePath, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage, VkImageLayout imageLayout, VkImageAspectFlags imageAspectFlags, QbVkMemoryUsage memoryUsage) {
+		return VkUtils::LoadCubemap(context_, imagePath, imageFormat, imageTiling, imageUsage, imageLayout, imageAspectFlags, memoryUsage);
+	}
+
+	QbVkTexture QbVkRenderer::LoadTexture(const char* imagePath, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage, VkImageLayout imageLayout,
 		VkImageAspectFlags imageAspectFlags, QbVkMemoryUsage memoryUsage, VkSamplerCreateInfo* samplerCreateInfo, VkSampleCountFlagBits numSamples) {
 		return VkUtils::LoadTexture(context_, imagePath, imageFormat, imageTiling, imageUsage, imageLayout, imageAspectFlags, memoryUsage, samplerCreateInfo, numSamples);
 	}
@@ -128,22 +165,23 @@ namespace Quadbit {
 		VkUtils::TransferDataToGPUBuffer(context_, buffer, size, data);
 	}
 
-	QbVkComputeInstance QbVkRenderer::CreateComputeInstance(std::vector<QbComputeDescriptor>& descriptors,
+	std::shared_ptr<QbVkComputeInstance> QbVkRenderer::CreateComputeInstance(std::vector<QbVkComputeDescriptor>& descriptors,
 		const char* shader, const char* shaderFunc, const VkSpecializationInfo* specInfo, uint32_t pushConstantRangeSize) {
 		return computePipeline_->CreateInstance(descriptors, shader, shaderFunc, specInfo, pushConstantRangeSize);
 	}
 
-	QbVkRenderMeshInstance* QbVkRenderer::CreateRenderMeshInstance(std::vector<QbRenderDescriptor> descriptors,
-		std::vector<QbVkVertexInputAttribute> vertexAttribs, const char* vertexShader, const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry) {
-		return meshPipeline_->CreateInstance(descriptors, vertexAttribs, vertexShader, vertexEntry, fragmentShader, fragmentEntry);
+	std::shared_ptr<QbVkRenderMeshInstance> QbVkRenderer::CreateRenderMeshInstance(std::vector<QbVkRenderDescriptor>& descriptors,
+		std::vector<QbVkVertexInputAttribute> vertexAttribs, const char* vertexShader, const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry,
+		int pushConstantStride, VkShaderStageFlags pushConstantShaderStage) {
+		return meshPipeline_->CreateInstance(descriptors, vertexAttribs, vertexShader, vertexEntry, fragmentShader, fragmentEntry, pushConstantStride, pushConstantShaderStage);
 	}
 
-	void QbVkRenderer::ComputeDispatch(QbVkComputeInstance& instance) {
+	void QbVkRenderer::ComputeDispatch(std::shared_ptr<QbVkComputeInstance> instance) {
 		computePipeline_->Dispatch(instance);
 	}
 
-	void QbVkRenderer::DestroyComputeInstance(QbVkComputeInstance& instance) {
-		computePipeline_->DestroyInstance(instance);
+	void QbVkRenderer::ComputeRecord(std::shared_ptr<QbVkComputeInstance> instance, std::function<void()> func) {
+		computePipeline_->RecordCommands(instance, func);
 	}
 
 	void QbVkRenderer::DestroyMesh(const RenderMeshComponent& mesh) {
@@ -642,6 +680,23 @@ namespace Quadbit {
 		VK_CHECK(vkCreateRenderPass(context_->device, &renderPassInfo, nullptr, &context_->mainRenderPass));
 	}
 
+	void QbVkRenderer::ImGuiUpdateContent() {
+		ImGui::NewFrame();
+
+		imGuiPipeline_->ImGuiDrawState();
+		EntityManager::GetOrCreate()->systemDispatch_->ImGuiDrawState();
+		context_->allocator->ImGuiDrawState();
+		computePipeline_->ImGuiDrawState();
+
+		// Get injected ImGui commands from the global state
+		for (const auto& injector : ImGuiState::injectors) {
+			injector();
+		}
+
+		// Render to generate draw buffers
+		ImGui::Render();
+	}
+
 	void QbVkRenderer::PrepareFrame(uint32_t resourceIndex, VkCommandBuffer commandbuffer, VkFramebuffer& framebuffer, VkImageView imageView) {
 		// Let the allocator cleanup stuff before preparing the frame
 		context_->allocator->EmptyGarbage();
@@ -671,6 +726,7 @@ namespace Quadbit {
 
 		meshPipeline_->DrawFrame(resourceIndex, commandbuffer);
 
+		ImGuiUpdateContent();
 		imGuiPipeline_->DrawFrame(resourceIndex, commandbuffer);
 
 		vkCmdEndRenderPass(commandbuffer);

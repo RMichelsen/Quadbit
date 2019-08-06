@@ -17,35 +17,44 @@ namespace Quadbit {
 		void RegisterCamera(Entity entity);
 
 		template<typename T>
-		RenderMeshComponent CreateMesh(std::vector<T> vertices, const std::vector<uint32_t>& indices, QbVkRenderMeshInstance* externalInstance) {
-			return RenderMeshComponent{
-				meshPipeline_->CreateVertexBuffer(vertices.data(), sizeof(T), static_cast<uint32_t>(vertices.size())),
+		RenderMeshComponent CreateMesh(std::vector<T> vertices, uint32_t vertexStride, const std::vector<uint32_t>& indices, std::shared_ptr<QbVkRenderMeshInstance> externalInstance,
+			int pushConstantStride = -1) {
+
+			return RenderMeshComponent {
+				meshPipeline_->CreateVertexBuffer(vertices.data(), vertexStride, static_cast<uint32_t>(vertices.size())),
 				meshPipeline_->CreateIndexBuffer(indices),
 				static_cast<uint32_t>(indices.size()),
-				RenderMeshPushConstants{},
+				std::array<float, 32>(),
+				pushConstantStride,
 				externalInstance
 			};
 		}
 
-		RenderTexturedObjectComponent CreateObject(const char* objPath, const char* texturePath) {
-			return meshPipeline_->CreateObject(objPath, texturePath);
-		}
-
-
+		RenderMeshComponent CreateMesh(const char* objPath, std::vector<QbVkVertexInputAttribute> vertexModel, std::shared_ptr<QbVkRenderMeshInstance> externalInstance, 
+			int pushConstantStride = -1);
+		RenderTexturedObjectComponent CreateObject(const char* objPath, const char* texturePath, VkFormat textureFormat);
+		void LoadEnvironmentMap(const char* environmentTexture, VkFormat textureFormat);
+		Entity GetActiveCamera();
+		VkDescriptorImageInfo GetEnvironmentMapDescriptor();
+		QbVkTexture LoadCubemap(const char* imagePath, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage, VkImageLayout imageLayout,
+			VkImageAspectFlags imageAspectFlags, QbVkMemoryUsage memoryUsage);
 		QbVkTexture LoadTexture(const char* imagePath, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage, VkImageLayout imageLayout,
 			VkImageAspectFlags imageAspectFlags, QbVkMemoryUsage memoryUsage, VkSamplerCreateInfo* samplerCreateInfo = nullptr,
 			VkSampleCountFlagBits numSamples = VK_SAMPLE_COUNT_1_BIT);
 		void CreateTexture(QbVkTexture& texture, uint32_t width, uint32_t height, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage, VkImageLayout imageLayout,
 			VkImageAspectFlags imageAspectFlags, VkPipelineStageFlagBits srcStage, VkPipelineStageFlagBits dstStage, QbVkMemoryUsage memoryUsage, VkSamplerCreateInfo* samplerCreateInfo = nullptr,
 			VkSampleCountFlagBits numSamples = VK_SAMPLE_COUNT_1_BIT);
+
 		void CreateGPUBuffer(QbVkBuffer& buffer, VkDeviceSize size, VkBufferUsageFlags bufferUsage, QbVkMemoryUsage memoryUsage);
 		void TransferDataToGPUBuffer(QbVkBuffer& buffer, VkDeviceSize size, const void* data);
-		QbVkComputeInstance CreateComputeInstance(std::vector<QbComputeDescriptor>& descriptors, const char* shader, const char* shaderFunc,
+
+		std::shared_ptr<QbVkComputeInstance> CreateComputeInstance(std::vector<QbVkComputeDescriptor>& descriptors, const char* shader, const char* shaderFunc,
 			const VkSpecializationInfo* specInfo = nullptr, uint32_t pushConstantRangeSize = 0);
-		QbVkRenderMeshInstance* CreateRenderMeshInstance(std::vector<QbRenderDescriptor> descriptors,
-			std::vector<QbVkVertexInputAttribute> vertexAttribs, const char* vertexShader, const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry);
-		void ComputeDispatch(QbVkComputeInstance& instance);
-		void DestroyComputeInstance(QbVkComputeInstance& instance);
+		std::shared_ptr<QbVkRenderMeshInstance> CreateRenderMeshInstance(std::vector<QbVkRenderDescriptor>& descriptors,
+			std::vector<QbVkVertexInputAttribute> vertexAttribs, const char* vertexShader, const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry,
+			int pushConstantStride = -1, VkShaderStageFlags pushConstantShaderStage = VK_SHADER_STAGE_VERTEX_BIT);
+		void ComputeDispatch(std::shared_ptr<QbVkComputeInstance> instance);
+		void ComputeRecord(std::shared_ptr<QbVkComputeInstance> instance, std::function<void()> func);
 		void DestroyMesh(const RenderMeshComponent& mesh);
 		void DrawFrame();
 
@@ -84,6 +93,7 @@ namespace Quadbit {
 		void RecreateSwapchain();
 		void CreateMainRenderPass();
 
+		void ImGuiUpdateContent();
 		void PrepareFrame(uint32_t resourceIndex, VkCommandBuffer commandbuffer, VkFramebuffer& framebuffer, VkImageView imageView);
 	};
 }

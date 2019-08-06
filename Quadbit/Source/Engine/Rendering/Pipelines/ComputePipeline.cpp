@@ -7,20 +7,6 @@ namespace Quadbit {
 	ComputePipeline::ComputePipeline(std::shared_ptr<QbVkContext> context) {
 		this->context_ = context;
 
-		std::vector<VkDescriptorPoolSize> poolSizes{
-			VkUtils::Init::DescriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1),
-			VkUtils::Init::DescriptorPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2),
-			VkUtils::Init::DescriptorPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 5),
-		};
-
-		// Create descriptor pool
-		VkDescriptorPoolCreateInfo descriptorPoolCreateInfo{};
-		descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		descriptorPoolCreateInfo.poolSizeCount = 1;
-		descriptorPoolCreateInfo.pPoolSizes = poolSizes.data();
-		descriptorPoolCreateInfo.maxSets = 10;
-		VK_CHECK(vkCreateDescriptorPool(context_->device, &descriptorPoolCreateInfo, nullptr, &descriptorPool_));
-
 		// Create command pool
 		VkCommandPoolCreateInfo cmdPoolCreateInfo = VkUtils::Init::CommandPoolCreateInfo();
 		cmdPoolCreateInfo.queueFamilyIndex = context_->gpu->computeFamilyIdx;
@@ -33,26 +19,61 @@ namespace Quadbit {
 	}
 
 	ComputePipeline::~ComputePipeline() {
-		vkDestroyDescriptorPool(context_->device, descriptorPool_, nullptr);
+		for (auto instance : activeInstances_) {
+			DestroyInstance(std::get<std::shared_ptr<QbVkComputeInstance>>(instance));
+		}
+
 		vkDestroyCommandPool(context_->device, commandPool_, nullptr);
 		vkDestroyFence(context_->device, computeFence_, nullptr);
 	}
 
-	void ComputePipeline::Dispatch(QbVkComputeInstance& computeInstance) {
+	void ComputePipeline::RecordCommands(std::shared_ptr<QbVkComputeInstance> instance, std::function<void()> func) {
+		VkCommandBufferBeginInfo cmdBufInfo = VkUtils::Init::CommandBufferBeginInfo();
+		VK_CHECK(vkBeginCommandBuffer(instance->commandBuffer, &cmdBufInfo));
+		vkCmdResetQueryPool(instance->commandBuffer, instance->queryPool, 0, 128);
+		vkCmdWriteTimestamp(instance->commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, instance->queryPool, 0);
+
+		func();
+
+		vkCmdWriteTimestamp(instance->commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, instance->queryPool, 1);
+		VK_CHECK(vkEndCommandBuffer(instance->commandBuffer));
+	}
+
+	void ComputePipeline::Dispatch(std::shared_ptr<QbVkComputeInstance> computeInstance) {
 		VkSubmitInfo computeSubmitInfo = VkSubmitInfo{};
 		computeSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 		computeSubmitInfo.commandBufferCount = 1;
-		computeSubmitInfo.pCommandBuffers = &computeInstance.commandBuffer;
+		computeSubmitInfo.pCommandBuffers = &computeInstance->commandBuffer;
 
 		VK_CHECK(vkQueueSubmit(context_->computeQueue, 1, &computeSubmitInfo, computeFence_));
 
 		VK_CHECK(vkWaitForFences(context_->device, 1, &computeFence_, VK_TRUE, std::numeric_limits<uint64_t>().max()));
 		VK_CHECK(vkResetFences(context_->device, 1, &computeFence_));
+
+		uint64_t timestamps[2]{};
+		VK_CHECK(vkGetQueryPoolResults(context_->device, computeInstance->queryPool, 0, 2, sizeof(timestamps), timestamps, sizeof(uint64_t), VK_QUERY_RESULT_64_BIT));
+
+		double computeStart = double(timestamps[0]) * context_->gpu->deviceProps.limits.timestampPeriod * 1e-6;
+		double computeEnd = double(timestamps[1]) * context_->gpu->deviceProps.limits.timestampPeriod * 1e-6;
+		computeInstance->msAvgTime = computeInstance->msAvgTime * 0.95 + (computeEnd - computeStart) * 0.05;
 	}
 	
-	QbVkComputeInstance ComputePipeline::CreateInstance(std::vector<QbComputeDescriptor>& descriptors,  const char* shader, 
+	std::shared_ptr<QbVkComputeInstance> ComputePipeline::CreateInstance(std::vector<QbVkComputeDescriptor>& descriptors,  const char* shader, 
 		const char* shaderFunc, const VkSpecializationInfo* specInfo, const uint32_t pushConstantRangeSize) {
-		QbVkComputeInstance computeInstance;
+		auto computeInstance = std::make_shared<QbVkComputeInstance>();
+
+		std::vector<VkDescriptorPoolSize> poolSizes;
+		for (auto i = 0; i < descriptors.size(); i++) {
+			poolSizes.push_back(VkUtils::Init::DescriptorPoolSize(descriptors[i].type, descriptors[i].count));
+		}
+
+		VkDescriptorPoolCreateInfo poolInfo{};
+		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+		poolInfo.pPoolSizes = poolSizes.data();
+		poolInfo.maxSets = 1;
+
+		VK_CHECK(vkCreateDescriptorPool(context_->device, &poolInfo, nullptr, &computeInstance->descriptorPool));
 
 		// Create descriptor sets
 		std::vector<VkDescriptorSetLayoutBinding> descSetLayoutBindings;
@@ -64,22 +85,22 @@ namespace Quadbit {
 		descSetLayoutCreateInfo.pBindings = descSetLayoutBindings.data();
 		descSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(descSetLayoutBindings.size());
 
-		VK_CHECK(vkCreateDescriptorSetLayout(context_->device, &descSetLayoutCreateInfo, nullptr, &computeInstance.descriptorSetLayout));
+		VK_CHECK(vkCreateDescriptorSetLayout(context_->device, &descSetLayoutCreateInfo, nullptr, &computeInstance->descriptorSetLayout));
 
 		VkDescriptorSetAllocateInfo descSetAllocInfo = VkUtils::Init::DescriptorSetAllocateInfo();
-		descSetAllocInfo.descriptorPool = descriptorPool_;
-		descSetAllocInfo.pSetLayouts = &computeInstance.descriptorSetLayout;
+		descSetAllocInfo.descriptorPool = computeInstance->descriptorPool;
+		descSetAllocInfo.pSetLayouts = &computeInstance->descriptorSetLayout;
 		descSetAllocInfo.descriptorSetCount = 1;
-		VK_CHECK(vkAllocateDescriptorSets(context_->device, &descSetAllocInfo, &computeInstance.descriptorSet));
+		VK_CHECK(vkAllocateDescriptorSets(context_->device, &descSetAllocInfo, &computeInstance->descriptorSet));
 
 		std::vector<VkWriteDescriptorSet> writeDescSets;
 		for (auto i = 0; i < descriptors.size(); i++) {
 			if (descriptors[i].type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER || descriptors[i].type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER) {
-				writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(computeInstance.descriptorSet, descriptors[i].type, i, 
+				writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(computeInstance->descriptorSet, descriptors[i].type, i,
 					static_cast<VkDescriptorBufferInfo*>(descriptors[i].data), descriptors[i].count));
 			}
 			else if (descriptors[i].type == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE || descriptors[i].type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) {
-				writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(computeInstance.descriptorSet, descriptors[i].type, i, 
+				writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(computeInstance->descriptorSet, descriptors[i].type, i,
 					static_cast<VkDescriptorImageInfo*>(descriptors[i].data), descriptors[i].count));
 			}
 		}
@@ -99,7 +120,7 @@ namespace Quadbit {
 
 		// Create pipeline layout and pipeline
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = VkUtils::Init::PipelineLayoutCreateInfo();
-		pipelineLayoutCreateInfo.pSetLayouts = &computeInstance.descriptorSetLayout;
+		pipelineLayoutCreateInfo.pSetLayouts = &computeInstance->descriptorSetLayout;
 		pipelineLayoutCreateInfo.setLayoutCount = 1;
 		VkPushConstantRange pushConstantRange{};
 		pushConstantRange.offset = 0;
@@ -108,26 +129,47 @@ namespace Quadbit {
 		// Push constant ranges are only part of the main pipeline layout
 		pipelineLayoutCreateInfo.pushConstantRangeCount = pushConstantRangeSize > 0 ? 1 : 0;
 		pipelineLayoutCreateInfo.pPushConstantRanges = pushConstantRangeSize > 0 ? &pushConstantRange : nullptr;
-		VK_CHECK(vkCreatePipelineLayout(context_->device, &pipelineLayoutCreateInfo, nullptr, &computeInstance.pipelineLayout));
+		VK_CHECK(vkCreatePipelineLayout(context_->device, &pipelineLayoutCreateInfo, nullptr, &computeInstance->pipelineLayout));
 
 		VkComputePipelineCreateInfo computePipelineCreateInfo = VkUtils::Init::ComputePipelineCreateInfo();
-		computePipelineCreateInfo.layout = computeInstance.pipelineLayout;
+		computePipelineCreateInfo.layout = computeInstance->pipelineLayout;
 		computePipelineCreateInfo.stage = shaderStageInfo;
-		VK_CHECK(vkCreateComputePipelines(context_->device, nullptr, 1, &computePipelineCreateInfo, nullptr, &computeInstance.pipeline));
+		VK_CHECK(vkCreateComputePipelines(context_->device, nullptr, 1, &computePipelineCreateInfo, nullptr, &computeInstance->pipeline));
 
 		// Create command buffer
 		VkCommandBufferAllocateInfo cmdBufferAllocateInfo = VkUtils::Init::CommandBufferAllocateInfo(commandPool_, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
-		VK_CHECK(vkAllocateCommandBuffers(context_->device, &cmdBufferAllocateInfo, &computeInstance.commandBuffer));
+		VK_CHECK(vkAllocateCommandBuffers(context_->device, &cmdBufferAllocateInfo, &computeInstance->commandBuffer));
+
+		// Create query pool for timestamp statistics
+		VkQueryPoolCreateInfo queryPoolCreateInfo{};
+		queryPoolCreateInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+		queryPoolCreateInfo.queryType = VK_QUERY_TYPE_TIMESTAMP;
+		queryPoolCreateInfo.queryCount = 128;
+		VK_CHECK(vkCreateQueryPool(context_->device, &queryPoolCreateInfo, nullptr, &computeInstance->queryPool));
 
 		vkDestroyShaderModule(context_->device, computeShaderModule, nullptr);
 
+		activeInstances_.push_back(std::make_tuple(shader, computeInstance));
 		return computeInstance;
 	}
 
-	void ComputePipeline::DestroyInstance(QbVkComputeInstance& computeInstance) {
-		vkDestroyDescriptorSetLayout(context_->device, computeInstance.descriptorSetLayout, nullptr);
-		vkDestroyPipelineLayout(context_->device, computeInstance.pipelineLayout, nullptr);
-		vkDestroyPipeline(context_->device, computeInstance.pipeline, nullptr);
-		vkFreeCommandBuffers(context_->device, commandPool_, 1, &computeInstance.commandBuffer);
+	void ComputePipeline::DestroyInstance(std::shared_ptr<QbVkComputeInstance> computeInstance) {
+		vkDestroyDescriptorSetLayout(context_->device, computeInstance->descriptorSetLayout, nullptr);
+		vkFreeDescriptorSets(context_->device, computeInstance->descriptorPool, 1, &computeInstance->descriptorSet);
+		vkDestroyDescriptorPool(context_->device, computeInstance->descriptorPool, nullptr);
+		vkDestroyPipelineLayout(context_->device, computeInstance->pipelineLayout, nullptr);
+		vkDestroyPipeline(context_->device, computeInstance->pipeline, nullptr);
+		vkFreeCommandBuffers(context_->device, commandPool_, 1, &computeInstance->commandBuffer);
+	}
+
+	void ComputePipeline::ImGuiDrawState() {
+		ImGui::SetNextWindowSize(ImVec2(500, 200), ImGuiCond_FirstUseEver);
+		ImGui::Begin("Quadbit Compute Shader Performance", nullptr);
+		for (auto instance : activeInstances_) {
+			auto computeInstance = std::get<std::shared_ptr<QbVkComputeInstance>>(instance);
+			auto label = std::get<const char*>(instance);
+			ImGui::Text("%s %.5fms", label, computeInstance->msAvgTime);
+		}
+		ImGui::End();
 	}
 }

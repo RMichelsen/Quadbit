@@ -5,6 +5,7 @@
 #include <vector>
 
 #include <stb/stb_image.h>
+#include <tinyobjloader/tiny_obj_loader.h>
 
 #include "QbVkDefines.h"
 #include "../Memory/QbVkAllocator.h"
@@ -61,21 +62,23 @@ namespace Quadbit::VkUtils {
 			return imageViewCreateInfo;
 		}
 
-		inline VkImageCreateInfo ImageCreateInfo(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkSampleCountFlagBits numSamples = VK_SAMPLE_COUNT_1_BIT) {
+		inline VkImageCreateInfo ImageCreateInfo(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, 
+			VkSampleCountFlagBits numSamples = VK_SAMPLE_COUNT_1_BIT, uint32_t mipLevels = 1, uint32_t arrayLayers = 1, VkImageCreateFlags flags = 0) {
 			VkImageCreateInfo imageCreateInfo{};
 			imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 			imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
 			imageCreateInfo.extent.width = width;
 			imageCreateInfo.extent.height = height;
 			imageCreateInfo.extent.depth = 1;
-			imageCreateInfo.mipLevels = 1;
-			imageCreateInfo.arrayLayers = 1;
+			imageCreateInfo.mipLevels = mipLevels;
+			imageCreateInfo.arrayLayers = arrayLayers;
 			imageCreateInfo.format = format;
 			imageCreateInfo.tiling = tiling;
 			imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 			imageCreateInfo.usage = usage;
 			imageCreateInfo.samples = numSamples;
 			imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+			imageCreateInfo.flags = flags;
 			return imageCreateInfo;
 		}
 
@@ -346,8 +349,8 @@ namespace Quadbit::VkUtils {
 			return mappedRange;
 		}
 
-		inline VkSamplerCreateInfo SamplerCreateInfo(VkFilter samplerFilter, VkSamplerAddressMode addressMode, VkBool32 enableAnisotropy, 
-			float maxAnisotropy, VkCompareOp compareOperation, VkSamplerMipmapMode samplerMipmapMode) {
+		inline VkSamplerCreateInfo SamplerCreateInfo(VkFilter samplerFilter, VkSamplerAddressMode addressMode, VkBool32 enableAnisotropy,
+			float maxAnisotropy, VkCompareOp compareOperation, VkSamplerMipmapMode samplerMipmapMode, float maxLod = 0.0f) {
 
 			VkSamplerCreateInfo samplerCreateInfo{};
 			samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -362,6 +365,7 @@ namespace Quadbit::VkUtils {
 			samplerCreateInfo.compareEnable = VK_FALSE;
 			samplerCreateInfo.compareOp = compareOperation;
 			samplerCreateInfo.mipmapMode = samplerMipmapMode;
+			samplerCreateInfo.maxLod = maxLod;
 			return samplerCreateInfo;
 		}
 
@@ -678,10 +682,11 @@ namespace Quadbit::VkUtils {
 			VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 	}
 
-	inline VkImageView CreateImageView(const std::shared_ptr<QbVkContext>& context, VkImage image, VkFormat format, VkImageAspectFlags aspectFlags) {
+	inline VkImageView CreateImageView(const std::shared_ptr<QbVkContext>& context, VkImage image, VkFormat format, 
+		VkImageAspectFlags aspectFlags, VkImageViewType imageViewType = VK_IMAGE_VIEW_TYPE_2D, uint32_t levelCount = 1, uint32_t layerCount = 1) {
 		VkImageViewCreateInfo imageViewInfo = Init::ImageViewCreateInfo();
 		imageViewInfo.image = image;
-		imageViewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		imageViewInfo.viewType = imageViewType;
 		imageViewInfo.format = format;
 
 		imageViewInfo.components.r = VK_COMPONENT_SWIZZLE_R;
@@ -693,11 +698,11 @@ namespace Quadbit::VkUtils {
 
 		imageViewInfo.subresourceRange.baseMipLevel = 0;
 		// Level count is the number of images in the mipmap
-		imageViewInfo.subresourceRange.levelCount = 1;
+		imageViewInfo.subresourceRange.levelCount = levelCount;
 
 		// We don't use multiple layers
 		imageViewInfo.subresourceRange.baseArrayLayer = 0;
-		imageViewInfo.subresourceRange.layerCount = 1;
+		imageViewInfo.subresourceRange.layerCount = layerCount;
 		imageViewInfo.flags = 0;
 
 		// Create the image view
@@ -772,6 +777,34 @@ namespace Quadbit::VkUtils {
 		FlushCommandBuffer(context, commandBuffer);
 	}
 
+	inline void CopyCubeBufferToImage(const std::shared_ptr<QbVkContext>& context, VkBuffer src, VkImage dst, gli::texture_cube& cube) {
+		VkCommandBuffer commandBuffer = InitSingleTimeCommandBuffer(context);
+
+		std::vector<VkBufferImageCopy> bufferCopyRegions;
+		uint32_t offset = 0;
+
+		for (auto face = 0; face < cube.faces(); face++) {
+			for (auto level = 0; level < cube.levels(); level++) {
+				VkBufferImageCopy copyRegion{};
+				copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				copyRegion.imageSubresource.baseArrayLayer = face;
+				copyRegion.imageSubresource.mipLevel = level;
+				copyRegion.imageSubresource.layerCount = 1;
+				copyRegion.imageOffset = { 0, 0, 0 };
+				copyRegion.imageExtent = { static_cast<uint32_t>(cube[face][level].extent().x), static_cast<uint32_t>(cube[face][level].extent().y), 1 };
+				copyRegion.bufferOffset = offset;
+				offset += static_cast<uint32_t>(cube[face][level].size());
+
+				bufferCopyRegions.push_back(copyRegion);
+			}
+		}
+
+		vkCmdCopyBufferToImage(commandBuffer, src, dst, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, static_cast<uint32_t>(bufferCopyRegions.size()), bufferCopyRegions.data());
+
+		// Flush command buffer
+		FlushCommandBuffer(context, commandBuffer);
+	}
+
 	inline void CreateGPUBuffer(const std::shared_ptr<QbVkContext>& context, QbVkBuffer& buffer, VkDeviceSize size, VkBufferUsageFlags bufferUsage, QbVkMemoryUsage memoryUsage) {
 		auto bufferInfo = VkUtils::Init::BufferCreateInfo(size, bufferUsage);
 		context->allocator->CreateBuffer(buffer, bufferInfo, memoryUsage);
@@ -810,8 +843,8 @@ namespace Quadbit::VkUtils {
 		VK_CHECK(vkCreateFramebuffer(context->device, &framebufferInfo, nullptr, &framebuffer))
 	}
 
-	inline void TransitionImageLayout(const std::shared_ptr<QbVkContext>& context, VkImage image, VkImageAspectFlags aspectFlags, 
-		VkImageLayout oldLayout, VkImageLayout newLayout, VkPipelineStageFlags srcStage, VkPipelineStageFlags dstStage) {
+	inline void TransitionImageLayout(const std::shared_ptr<QbVkContext>& context, VkImage image, VkImageAspectFlags aspectFlags,
+		VkImageLayout oldLayout, VkImageLayout newLayout, VkPipelineStageFlags srcStage, VkPipelineStageFlags dstStage, uint32_t levelCount = 1, uint32_t layerCount = 1) {
 
 		VkCommandBuffer commandBuffer = InitSingleTimeCommandBuffer(context);
 
@@ -821,9 +854,9 @@ namespace Quadbit::VkUtils {
 		memoryBarrier.image = image;
 
 		memoryBarrier.subresourceRange.baseMipLevel = 0;
-		memoryBarrier.subresourceRange.levelCount = 1;
+		memoryBarrier.subresourceRange.levelCount = levelCount;
 		memoryBarrier.subresourceRange.baseArrayLayer = 0;
-		memoryBarrier.subresourceRange.layerCount = 1;
+		memoryBarrier.subresourceRange.layerCount = layerCount;
 		memoryBarrier.subresourceRange.aspectMask = aspectFlags;
 
 		switch(oldLayout) {
@@ -964,47 +997,107 @@ namespace Quadbit::VkUtils {
 		return bindingDescription;
 	}
 
+	inline QbVkTexture LoadCubemap(const std::shared_ptr<QbVkContext>& context, const char* imagePath, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage, VkImageLayout imageLayout,
+		VkImageAspectFlags imageAspectFlags, QbVkMemoryUsage memoryUsage, VkSampleCountFlagBits numSamples = VK_SAMPLE_COUNT_1_BIT) {
+		
+		QbVkTexture cubemap{};
+
+		gli::texture_cube cube(gli::load(imagePath));
+		assert(!cube.empty());
+
+		uint32_t width = static_cast<uint32_t>(cube.extent().x);
+		uint32_t height = static_cast<uint32_t>(cube.extent().y);
+		uint32_t mipLevels = static_cast<uint32_t>(cube.levels());
+
+		VkSamplerCreateInfo samplerCreateInfo = Init::SamplerCreateInfo(VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, VK_TRUE, 16.0f,
+			VK_COMPARE_OP_NEVER, VK_SAMPLER_MIPMAP_MODE_LINEAR, static_cast<float>(mipLevels));
+
+		auto imageCreateInfo = VkUtils::Init::ImageCreateInfo(width, height, imageFormat, imageTiling, imageUsage, numSamples, 
+			mipLevels, static_cast<uint32_t>(cube.faces()), VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT);;
+		context->allocator->CreateImage(cubemap.image, imageCreateInfo, memoryUsage);
+
+		// Create buffer and copy data
+		QbVkBuffer pixelBuffer;
+		CreateGPUBuffer(context, pixelBuffer, cube.size(), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, QbVkMemoryUsage::QBVK_MEMORY_USAGE_CPU_TO_GPU);
+		memcpy(pixelBuffer.alloc.data, cube.data(), cube.size());
+
+		// Transition the image layout to the desired layout
+		TransitionImageLayout(context, cubemap.image.imgHandle, imageAspectFlags, VK_IMAGE_LAYOUT_UNDEFINED,
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 
+			static_cast<uint32_t>(cube.levels()), static_cast<uint32_t>(cube.faces()));
+
+		// Copy the pixel data to the image
+		CopyCubeBufferToImage(context, pixelBuffer.buf, cubemap.image.imgHandle, cube);
+
+		// Transition the image to be read in shader
+		TransitionImageLayout(context, cubemap.image.imgHandle, imageAspectFlags, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+			static_cast<uint32_t>(cube.levels()), static_cast<uint32_t>(cube.faces()));
+
+		cubemap.imageView = VkUtils::CreateImageView(context, cubemap.image.imgHandle, imageFormat, imageAspectFlags, 
+			VK_IMAGE_VIEW_TYPE_CUBE, static_cast<uint32_t>(cube.levels()), static_cast<uint32_t>(cube.faces()));
+		cubemap.imageLayout = imageLayout;
+		cubemap.format = imageFormat;
+		VK_CHECK(vkCreateSampler(context->device, &samplerCreateInfo, nullptr, &cubemap.sampler));
+		cubemap.descriptor = { cubemap.sampler, cubemap.imageView, imageLayout };
+
+		// Destroy the buffer and free the image
+		DestroyBuffer(context, pixelBuffer);
+
+		return cubemap;
+	}
+
 	inline QbVkTexture LoadTexture(const std::shared_ptr<QbVkContext>& context, const char* imagePath, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage, VkImageLayout imageLayout,
 		VkImageAspectFlags imageAspectFlags, QbVkMemoryUsage memoryUsage, VkSamplerCreateInfo* samplerCreateInfo = nullptr, VkSampleCountFlagBits numSamples = VK_SAMPLE_COUNT_1_BIT) {
+		
 		QbVkTexture texture{};
 
 		int width, height, channels;
 		stbi_uc* pixels = stbi_load(imagePath, &width, &height, &channels, STBI_rgb_alpha);
+		void* data = static_cast<void*>(pixels);
+		uint32_t mipLevels = 1;
+		VkDeviceSize size = static_cast<uint64_t>(width) * static_cast<uint64_t>(height) * 4;
+		gli::texture2d tex2d;
 		if (pixels == nullptr) {
-			QB_LOG_ERROR("Couldn't load texture %s\n", imagePath);
-			return {};
+			tex2d = gli::texture2d(gli::load(imagePath));
+
+			assert(!tex2d.empty());
+
+			width = tex2d[0].extent().x;
+			height = tex2d[0].extent().y;
+			mipLevels = static_cast<uint32_t>(tex2d.levels());
+			size = tex2d.size();
+			data = tex2d.data();
 		}
 
-		auto imageCreateInfo = VkUtils::Init::ImageCreateInfo(width, height, imageFormat, imageTiling, imageUsage, numSamples);
+		auto imageCreateInfo = VkUtils::Init::ImageCreateInfo(width, height, imageFormat, imageTiling, imageUsage, numSamples, mipLevels);
 		context->allocator->CreateImage(texture.image, imageCreateInfo, memoryUsage);
+
+		// Create buffer and copy data
+		QbVkBuffer pixelBuffer;
+		CreateGPUBuffer(context, pixelBuffer, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, QbVkMemoryUsage::QBVK_MEMORY_USAGE_CPU_TO_GPU);
+		memcpy(pixelBuffer.alloc.data, data, size);
 
 		// Transition the image layout to the desired layout
 		TransitionImageLayout(context, texture.image.imgHandle, imageAspectFlags, VK_IMAGE_LAYOUT_UNDEFINED,
 			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 
-		// Create buffer and copy data
-		QbVkBuffer pixelBuffer;
-		VkDeviceSize bufferSize = static_cast<uint64_t>(width) * static_cast<uint64_t>(height) * 4;
-		CreateGPUBuffer(context, pixelBuffer, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, QbVkMemoryUsage::QBVK_MEMORY_USAGE_CPU_TO_GPU);
-		memcpy(pixelBuffer.alloc.data, pixels, bufferSize);
-
 		// Copy the pixel data to the image
 		CopyBufferToImage(context, pixelBuffer.buf, texture.image.imgHandle, width, height);
-
-		// Destroy the buffer and free the image
-		DestroyBuffer(context, pixelBuffer);
-		stbi_image_free(pixels);
 
 		// Transition the image to be read in shader
 		TransitionImageLayout(context, texture.image.imgHandle, imageAspectFlags, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
-
 
 		texture.imageView = VkUtils::CreateImageView(context, texture.image.imgHandle, imageFormat, imageAspectFlags);
 		texture.imageLayout = imageLayout;
 		texture.format = imageFormat;
 		if (samplerCreateInfo != nullptr) VK_CHECK(vkCreateSampler(context->device, samplerCreateInfo, nullptr, &texture.sampler));
 		texture.descriptor = { texture.sampler, texture.imageView, imageLayout };
+
+		// Destroy the buffer and free the image
+		DestroyBuffer(context, pixelBuffer);
+		if (pixels != nullptr) stbi_image_free(pixels);
 
 		return texture;
 	}
@@ -1066,20 +1159,105 @@ namespace Quadbit::VkUtils {
 	}
 
 	template<typename T>
-	inline QbComputeDescriptor CreateComputeDescriptor(VkDescriptorType type, std::vector<T>& data) {
+	inline QbVkComputeDescriptor CreateComputeDescriptor(VkDescriptorType type, std::vector<T>& data) {
 		return { type, static_cast<uint32_t>(data.size()), data.data() };
 	}
 
-	inline QbComputeDescriptor CreateComputeDescriptor(VkDescriptorType type, std::variant<VkDescriptorImageInfo, VkDescriptorBufferInfo> data) {
+	inline QbVkComputeDescriptor CreateComputeDescriptor(VkDescriptorType type, std::variant<VkDescriptorImageInfo, VkDescriptorBufferInfo> data) {
 		return { type, 1, &data };
 	}
 
 	template<typename T>
-	inline QbRenderDescriptor CreateRenderDescriptor(VkDescriptorType type, std::vector<T>& data, VkShaderStageFlagBits shaderStage) {
+	inline QbVkRenderDescriptor CreateRenderDescriptor(VkDescriptorType type, std::vector<T>& data, VkShaderStageFlagBits shaderStage) {
 		return { type, static_cast<uint32_t>(data.size()), data.data(), shaderStage };
 	}
 
-	inline QbRenderDescriptor CreateRenderDescriptor(VkDescriptorType type, std::variant<VkDescriptorImageInfo, VkDescriptorBufferInfo> data, VkShaderStageFlagBits shaderStage) {
+	inline QbVkRenderDescriptor CreateRenderDescriptor(VkDescriptorType type, std::variant<VkDescriptorImageInfo, VkDescriptorBufferInfo> data, VkShaderStageFlagBits shaderStage) {
 		return { type, 1, &data, shaderStage };
+	}
+
+	inline QbVkModel LoadModel(const char* objPath, std::vector<QbVkVertexInputAttribute> vertexModel) {
+		QbVkModel model;
+
+		// Now load the model
+		tinyobj::attrib_t attrib;
+		std::vector<tinyobj::shape_t> shapes;
+		std::vector<tinyobj::material_t> materials;
+		std::string warn, err;
+
+		if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, objPath)) {
+			QB_LOG_ERROR("Failed to load object from file: %s\n", objPath);
+			return {};
+		}
+
+		uint32_t stride = 0;
+
+		for (auto inputAttribute : vertexModel) {
+			switch (inputAttribute) {
+			case QBVK_VERTEX_ATTRIBUTE_POSITION:
+				stride += sizeof(glm::float3);
+				break;
+			case QBVK_VERTEX_ATTRIBUTE_NORMAL:
+				stride += sizeof(glm::float3);
+				break;
+			case QBVK_VERTEX_ATTRIBUTE_UV:
+				stride += sizeof(glm::float2);
+				break;
+			case QBVK_VERTEX_ATTRIBUTE_COLOUR:
+				stride += sizeof(glm::float3);
+				break;
+			case QBVK_VERTEX_ATTRIBUTE_FLOAT:
+				stride += sizeof(glm::float1);
+				break;
+			case QBVK_VERTEX_ATTRIBUTE_FLOAT4:
+				stride += sizeof(glm::float4);
+				break;
+			}
+		}
+
+		model.vertexStride = stride;
+
+		for (auto& shape : shapes) {
+			for (auto& index : shape.mesh.indices) {
+				for (auto inputAttribute : vertexModel) {
+					switch (inputAttribute) {
+					case QBVK_VERTEX_ATTRIBUTE_POSITION:
+						model.vertices.push_back(attrib.vertices[3 * static_cast<uint64_t>(index.vertex_index) + 0]);
+						model.vertices.push_back(-attrib.vertices[3 * static_cast<uint64_t>(index.vertex_index) + 1] );
+						model.vertices.push_back(attrib.vertices[3 * static_cast<uint64_t>(index.vertex_index) + 2]);
+						break;
+					case QBVK_VERTEX_ATTRIBUTE_NORMAL:
+						if (attrib.normals.empty()) {
+							model.vertices.push_back(1.0f);
+							model.vertices.push_back(-1.0f);
+							model.vertices.push_back(1.0f);
+						}
+						else {
+							model.vertices.push_back(attrib.normals[3 * static_cast<uint64_t>(index.normal_index) + 0]);
+							model.vertices.push_back(-attrib.normals[3 * static_cast<uint64_t>(index.normal_index) + 1]);
+							model.vertices.push_back(attrib.normals[3 * static_cast<uint64_t>(index.normal_index) + 2]);
+						}
+						break;
+					case QBVK_VERTEX_ATTRIBUTE_UV:
+						model.vertices.push_back(attrib.texcoords[2 * static_cast<uint64_t>(index.texcoord_index) + 0]);
+						model.vertices.push_back(attrib.texcoords[2 * static_cast<uint64_t>(index.texcoord_index) + 1]);
+						break;
+					case QBVK_VERTEX_ATTRIBUTE_COLOUR:
+						model.vertices.push_back(attrib.colors[3 * static_cast<uint64_t>(index.vertex_index) + 0]);
+						model.vertices.push_back(attrib.colors[3 * static_cast<uint64_t>(index.vertex_index) + 1]);
+						model.vertices.push_back(attrib.colors[3 * static_cast<uint64_t>(index.vertex_index) + 2]);
+						break;
+					case QBVK_VERTEX_ATTRIBUTE_FLOAT:
+						break;
+					case QBVK_VERTEX_ATTRIBUTE_FLOAT4:
+						break;
+					}
+				}
+				//model.indices.push_back(static_cast<uint32_t>(model.indices.size()));
+			}
+		}
+
+		model.indices = { 2, 1, 0, 5, 4, 3, 8, 7, 6, 11, 10, 9, 14, 13, 12, 17, 16, 15, 20, 19, 18, 23, 22, 21, 26, 25, 24, 29, 28, 27, 32, 31, 30, 35, 34, 33 };
+		return model;
 	}
 }

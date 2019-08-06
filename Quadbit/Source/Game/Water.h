@@ -3,7 +3,6 @@
 #include "../Engine/Rendering/QbVkRenderer.h"
 #include "../Engine/Rendering/Common/QbVkDefines.h"
 #include "../Engine/Entities/EntityManager.h"
-#include "../Engine/Rendering/Pipelines/ComputePipeline.h"
 
 
 constexpr int WATER_RESOLUTION = 512;
@@ -26,7 +25,9 @@ struct alignas(16) WaveheightUBO {
 struct alignas(16) TogglesUBO {
 	glm::float4 topColour;
 	glm::float4 botColour;
+	glm::float3 cameraPos;
 	int useNormalMap;
+	float colourIntensity;
 };
 
 struct PreCalculatedResources {
@@ -76,8 +77,9 @@ public:
 	inline static float repeat_;
 
 	inline static bool useNormalMap_ = true;
-	inline static glm::float4 topColour = glm::float4(0.15f, 0.7f, 0.8f, 0.0f);
-	inline static glm::float4 botColour = glm::float4(0.10f, 0.45f, 0.7f, 0.0f);
+	inline static float colourIntensity_ = 0.0f;
+	inline static glm::float4 topColour_ = glm::float4(0.15f, 0.7f, 0.8f, 0.0f);
+	inline static glm::float4 botColour_ = glm::float4(0.10f, 0.45f, 0.7f, 0.0f);
 
 	Water(HINSTANCE hInstance, HWND hwnd) {
 		renderer_ = std::make_unique<Quadbit::QbVkRenderer>(hInstance, hwnd);
@@ -90,9 +92,10 @@ public:
 	void DrawFrame();
 
 private:
-	std::unique_ptr<Quadbit::QbVkRenderer> renderer_;
 
-	Quadbit::Entity camera_;
+	Quadbit::Entity skybox;
+
+	std::unique_ptr<Quadbit::QbVkRenderer> renderer_;
 
 	std::vector<glm::float3> waterVertices_;
 	std::vector<uint32_t> waterIndices_;
@@ -102,11 +105,11 @@ private:
 	InverseFFTResources horizontalIFFTResources_{};
 	InverseFFTResources verticalIFFTResources_{};
 	DisplacementResources displacementResources_{};
-	Quadbit::QbVkComputeInstance precalcInstance_;
-	Quadbit::QbVkComputeInstance waveheightInstance_;
-	Quadbit::QbVkComputeInstance horizontalIFFTInstance_;
-	Quadbit::QbVkComputeInstance verticalIFFTInstance_;
-	Quadbit::QbVkComputeInstance displacementInstance_;
+	std::shared_ptr<Quadbit::QbVkComputeInstance> precalcInstance_;
+	std::shared_ptr<Quadbit::QbVkComputeInstance> waveheightInstance_;
+	std::shared_ptr<Quadbit::QbVkComputeInstance> horizontalIFFTInstance_;
+	std::shared_ptr<Quadbit::QbVkComputeInstance> verticalIFFTInstance_;
+	std::shared_ptr<Quadbit::QbVkComputeInstance> displacementInstance_;
 
 	Quadbit::QbVkBuffer togglesUBO_;
 

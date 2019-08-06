@@ -1,6 +1,5 @@
 #include <PCH.h>
 
-#define TINYOBJLOADER_IMPLEMENTATION
 #include <tinyobjloader/tiny_obj_loader.h>
 
 #include "MeshPipeline.h"
@@ -72,14 +71,43 @@ namespace Quadbit {
 		Quadbit::RenderCamera* camera;
 		(userCamera_ != NULL_ENTITY && userCamera_.IsValid()) ? camera = userCamera_.GetComponentPtr<RenderCamera>() : camera = fallbackCamera_.GetComponentPtr<RenderCamera>();
 
+		// Update environment map if applicable, use camera stuff to do this
+		if(environmentMap_ != NULL_ENTITY) {
+			auto mesh = environmentMap_.GetComponentPtr<Quadbit::RenderMeshComponent>();
+			EnvironmentMapPushConstants* pc = mesh->GetSafePushConstPtr<EnvironmentMapPushConstants>();
+			pc->proj = camera->perspective;
+			pc->proj[1][1] *= -1;
+
+			// Invert pitch??
+			camera->front.x = cos(glm::radians(camera->yaw)) * cos(glm::radians(-camera->pitch));
+			camera->front.y = sin(glm::radians(-camera->pitch));
+			camera->front.z = sin(glm::radians(camera->yaw)) * cos(glm::radians(-camera->pitch));
+			camera->front = glm::normalize(camera->front);
+			camera->view = glm::lookAt(camera->position, camera->position + camera->front, camera->up);
+			pc->view = glm::mat4(glm::mat3(camera->view));
+
+			// Reset
+			camera->front.x = cos(glm::radians(camera->yaw)) * cos(glm::radians(camera->pitch));
+			camera->front.y = sin(glm::radians(camera->pitch));
+			camera->front.z = sin(glm::radians(camera->yaw)) * cos(glm::radians(camera->pitch));
+			camera->front = glm::normalize(camera->front);
+			camera->view = glm::lookAt(camera->position, camera->position + camera->front, camera->up);				   
+		}								   
+
 		VkDeviceSize offsets[]{ 0 };
 
 		entityManager_->ForEach<RenderTexturedObjectComponent, RenderTransformComponent>([&](Entity entity, RenderTexturedObjectComponent& obj, RenderTransformComponent& transform) noexcept {
 			vkCmdBindPipeline(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
 
-			obj.dynamicData.model = transform.model;
-			obj.dynamicData.mvp = camera->perspective * camera->view * transform.model;
-			vkCmdPushConstants(commandbuffer, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RenderMeshPushConstants), &obj.dynamicData);
+			if(obj.pushConstantStride == -1) {
+				RenderMeshPushConstants* pushConstants = obj.GetSafePushConstPtr<RenderMeshPushConstants>();
+				pushConstants->model = transform.model;
+				pushConstants->mvp = camera->perspective * camera->view * transform.model;
+				vkCmdPushConstants(commandbuffer, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RenderMeshPushConstants), pushConstants);
+			}
+			else if(obj.pushConstantStride > 0) {
+				vkCmdPushConstants(commandbuffer, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, obj.pushConstantStride, obj.pushConstants.data());
+			}
 
 			vkCmdBindVertexBuffers(commandbuffer, 0, 1, &meshBuffers_.vertexBuffers_[obj.vertexHandle].buf, offsets);
 			vkCmdBindIndexBuffer(commandbuffer, meshBuffers_.indexBuffers_[obj.indexHandle].buf, 0, VK_INDEX_TYPE_UINT32);
@@ -89,46 +117,37 @@ namespace Quadbit {
 		});
 
 		entityManager_->ForEach<RenderMeshComponent, RenderTransformComponent>([&](Entity entity, RenderMeshComponent& mesh, RenderTransformComponent& transform) noexcept {
-			//if (mesh.externalInstance == nullptr) {
-			//	vkCmdBindPipeline(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
+			vkCmdBindPipeline(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh.instance->pipeline);
 
-			//	mesh.dynamicData.model = transform.model;
-			//	mesh.dynamicData.mvp = camera->perspective * camera->view * transform.model;
-			//	vkCmdPushConstants(commandbuffer, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RenderMeshPushConstants), &mesh.dynamicData);
+			// Dynamic update viewport and scissor for user-defined pipelines (also doesn't necessitate rebuilding the pipeline on window resize)
+			VkViewport viewport{};
+			VkRect2D scissor{};
+			// In our case the viewport covers the entire window
+			viewport.width = static_cast<float>(context_->swapchain.extent.width);
+			viewport.height = static_cast<float>(context_->swapchain.extent.height);
+			viewport.minDepth = 0.0f;
+			viewport.maxDepth = 1.0f;
+			vkCmdSetViewport(commandbuffer, 0, 1, &viewport);
+			// And so does the scissor
+			scissor.offset = { 0, 0 };
+			scissor.extent = context_->swapchain.extent;
+			vkCmdSetScissor(commandbuffer, 0, 1, &scissor);
 
-			//	vkCmdBindVertexBuffers(commandbuffer, 0, 1, &meshBuffers_.vertexBuffers_[mesh.vertexHandle].buf, offsets);
-			//	vkCmdBindIndexBuffer(commandbuffer, meshBuffers_.indexBuffers_[mesh.indexHandle].buf, 0, VK_INDEX_TYPE_UINT32);
-
-			//	//vkCmdBindDescriptorSets(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 0, 1, &descriptorSets_[resourceIndex], 0, nullptr);
-			//	vkCmdDrawIndexed(commandbuffer, mesh.indexCount, 1, 0, 0, 0);
-			//}
-			 {
-				vkCmdBindPipeline(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh.instance->pipeline);
-
-				// Dynamic update viewport and scissor for user-defined pipelines (also doesn't necessitate rebuilding the pipeline on window resize)
-				VkViewport viewport{};
-				VkRect2D scissor{};
-				// In our case the viewport covers the entire window
-				viewport.width = static_cast<float>(context_->swapchain.extent.width);
-				viewport.height = static_cast<float>(context_->swapchain.extent.height);
-				viewport.minDepth = 0.0f;
-				viewport.maxDepth = 1.0f;
-				vkCmdSetViewport(commandbuffer, 0, 1, &viewport);
-				// And so does the scissor
-				scissor.offset = { 0, 0 };
-				scissor.extent = context_->swapchain.extent;
-				vkCmdSetScissor(commandbuffer, 0, 1, &scissor);
-
-				mesh.dynamicData.model = transform.model;
-				mesh.dynamicData.mvp = camera->perspective * camera->view * transform.model;
-				vkCmdPushConstants(commandbuffer, mesh.instance->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RenderMeshPushConstants), &mesh.dynamicData);
-
-				vkCmdBindVertexBuffers(commandbuffer, 0, 1, &meshBuffers_.vertexBuffers_[mesh.vertexHandle].buf, offsets);
-				vkCmdBindIndexBuffer(commandbuffer, meshBuffers_.indexBuffers_[mesh.indexHandle].buf, 0, VK_INDEX_TYPE_UINT32);
-
-				vkCmdBindDescriptorSets(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh.instance->pipelineLayout, 0, 1, &mesh.instance->descriptorSets[resourceIndex], 0, nullptr);
-				vkCmdDrawIndexed(commandbuffer, mesh.indexCount, 1, 0, 0, 0);
+			if(mesh.pushConstantStride == -1) {
+				RenderMeshPushConstants* pushConstants = mesh.GetSafePushConstPtr<RenderMeshPushConstants>();
+				pushConstants->model = transform.model;
+				pushConstants->mvp = camera->perspective * camera->view * transform.model;
+				vkCmdPushConstants(commandbuffer, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RenderMeshPushConstants), pushConstants);
 			}
+			else if(mesh.pushConstantStride > 0) {
+				vkCmdPushConstants(commandbuffer, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, mesh.pushConstantStride, mesh.pushConstants.data());
+			}
+
+			vkCmdBindVertexBuffers(commandbuffer, 0, 1, &meshBuffers_.vertexBuffers_[mesh.vertexHandle].buf, offsets);
+			vkCmdBindIndexBuffer(commandbuffer, meshBuffers_.indexBuffers_[mesh.indexHandle].buf, 0, VK_INDEX_TYPE_UINT32);
+
+			vkCmdBindDescriptorSets(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh.instance->pipelineLayout, 0, 1, &mesh.instance->descriptorSets[resourceIndex], 0, nullptr);
+			vkCmdDrawIndexed(commandbuffer, mesh.indexCount, 1, 0, 0, 0);
 		});
 	}
 
@@ -365,19 +384,24 @@ namespace Quadbit {
 		return handle;
 	}
 
-	QbVkRenderMeshInstance* MeshPipeline::CreateInstance(std::vector<QbRenderDescriptor> descriptors, std::vector<QbVkVertexInputAttribute> vertexAttribs, 
-		const char* vertexShader, const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry) {
-		QbVkRenderMeshInstance renderMeshInstance;
+	std::shared_ptr<QbVkRenderMeshInstance> MeshPipeline::CreateInstance(std::vector<QbVkRenderDescriptor>& descriptors, std::vector<QbVkVertexInputAttribute> vertexAttribs, 
+		const char* vertexShader, const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry, 
+		int pushConstantStride, VkShaderStageFlags pushConstantShaderStage, VkBool32 depthTestingEnabled) {
 
-		VkDescriptorPoolSize poolSize = VkUtils::Init::DescriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, MAX_FRAMES_IN_FLIGHT);
+		auto renderMeshInstance = std::make_shared<QbVkRenderMeshInstance>();
+
+		std::vector<VkDescriptorPoolSize> poolSizes;
+		for (auto i = 0; i < descriptors.size(); i++) {
+			poolSizes.push_back(VkUtils::Init::DescriptorPoolSize(descriptors[i].type, descriptors[i].count));
+		}
 
 		VkDescriptorPoolCreateInfo poolInfo{};
 		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		poolInfo.poolSizeCount = 1;
-		poolInfo.pPoolSizes = &poolSize;
+		poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+		poolInfo.pPoolSizes = poolSizes.data();
 		poolInfo.maxSets = MAX_FRAMES_IN_FLIGHT;
 
-		VK_CHECK(vkCreateDescriptorPool(context_->device, &poolInfo, nullptr, &renderMeshInstance.descriptorPool));
+		VK_CHECK(vkCreateDescriptorPool(context_->device, &poolInfo, nullptr, &renderMeshInstance->descriptorPool));
 
 
 		std::vector<VkDescriptorSetLayoutBinding> descSetLayoutBindings;
@@ -389,27 +413,27 @@ namespace Quadbit {
 		descSetLayoutCreateInfo.pBindings = descSetLayoutBindings.data();
 		descSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(descSetLayoutBindings.size());
 
-		VK_CHECK(vkCreateDescriptorSetLayout(context_->device, &descSetLayoutCreateInfo, nullptr, &renderMeshInstance.descriptorSetLayout));
+		VK_CHECK(vkCreateDescriptorSetLayout(context_->device, &descSetLayoutCreateInfo, nullptr, &renderMeshInstance->descriptorSetLayout));
 
 
-		std::vector<VkDescriptorSetLayout> layouts(context_->swapchain.images.size(), renderMeshInstance.descriptorSetLayout);
+		std::vector<VkDescriptorSetLayout> layouts(context_->swapchain.images.size(), renderMeshInstance->descriptorSetLayout);
 		VkDescriptorSetAllocateInfo descSetallocInfo = VkUtils::Init::DescriptorSetAllocateInfo();
-		descSetallocInfo.descriptorPool = renderMeshInstance.descriptorPool;
+		descSetallocInfo.descriptorPool = renderMeshInstance->descriptorPool;
 		descSetallocInfo.descriptorSetCount = MAX_FRAMES_IN_FLIGHT;
 		descSetallocInfo.pSetLayouts = layouts.data();
 
-		VK_CHECK(vkAllocateDescriptorSets(context_->device, &descSetallocInfo, renderMeshInstance.descriptorSets.data()));
+		VK_CHECK(vkAllocateDescriptorSets(context_->device, &descSetallocInfo, renderMeshInstance->descriptorSets.data()));
 
 		for (auto i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
 			std::vector<VkWriteDescriptorSet> writeDescSets;
 			for (auto j = 0; j < descriptors.size(); j++) {
 				if (descriptors[j].type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER || descriptors[j].type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) {
-					writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(renderMeshInstance.descriptorSets[i], descriptors[j].type, j,
+					writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(renderMeshInstance->descriptorSets[i], descriptors[j].type, j,
 						static_cast<VkDescriptorBufferInfo*>(descriptors[j].data), descriptors[j].count));
 				
 				}
 				else if (descriptors[j].type == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE || descriptors[j].type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) {
-					writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(renderMeshInstance.descriptorSets[i], descriptors[j].type, j,
+					writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(renderMeshInstance->descriptorSets[i], descriptors[j].type, j,
 						static_cast<VkDescriptorImageInfo*>(descriptors[j].data), descriptors[j].count));
 				}
 			}
@@ -525,7 +549,7 @@ namespace Quadbit {
 
 		// This part specifies the depth and stencil testing
 		VkPipelineDepthStencilStateCreateInfo depthStencilInfo =
-			VkUtils::Init::PipelineDepthStencilStateCreateInfo(VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL);
+			VkUtils::Init::PipelineDepthStencilStateCreateInfo(depthTestingEnabled, depthTestingEnabled, VK_COMPARE_OP_LESS_OR_EQUAL);
 		depthStencilInfo.depthBoundsTestEnable = VK_FALSE;
 		depthStencilInfo.minDepthBounds = 0.0f;
 		depthStencilInfo.maxDepthBounds = 1.0f;
@@ -537,17 +561,17 @@ namespace Quadbit {
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo = VkUtils::Init::PipelineLayoutCreateInfo();
 		// ENABLE UBO
 		pipelineLayoutInfo.setLayoutCount = (descriptors.size() > 0) ? 1 : 0;
-		pipelineLayoutInfo.pSetLayouts = (descriptors.size() > 0) ? &renderMeshInstance.descriptorSetLayout : nullptr;
+		pipelineLayoutInfo.pSetLayouts = (descriptors.size() > 0) ? &renderMeshInstance->descriptorSetLayout : nullptr;
 
 		// ENABLE PUSHCONSTANTS
 		VkPushConstantRange pushConstantRange{};
 		pushConstantRange.offset = 0;
-		pushConstantRange.size = sizeof(RenderMeshPushConstants);
-		pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+		pushConstantRange.size = (pushConstantStride == -1) ? sizeof(RenderMeshPushConstants) : pushConstantStride;
+		pushConstantRange.stageFlags = pushConstantShaderStage;
 		// Push constant ranges are only part of the main pipeline layout
-		pipelineLayoutInfo.pushConstantRangeCount = 1;
-		pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
-		VK_CHECK(vkCreatePipelineLayout(context_->device, &pipelineLayoutInfo, nullptr, &renderMeshInstance.pipelineLayout));
+		pipelineLayoutInfo.pushConstantRangeCount = (pushConstantStride != 0) ? 1 : 0;
+		pipelineLayoutInfo.pPushConstantRanges = (pushConstantStride != 0) ? &pushConstantRange : nullptr;
+		VK_CHECK(vkCreatePipelineLayout(context_->device, &pipelineLayoutInfo, nullptr, &renderMeshInstance->pipelineLayout));
 
 		// It's finally time to create the actual pipeline
 		VkGraphicsPipelineCreateInfo pipelineInfo = VkUtils::Init::GraphicsPipelineCreateInfo();
@@ -562,7 +586,7 @@ namespace Quadbit {
 		pipelineInfo.pColorBlendState = &colorBlendInfo;
 		// IF USING DYNAMIC STATE REMEMBER TO CALL vkCmdSetViewport
 		pipelineInfo.pDynamicState = &dynamicStateInfo;
-		pipelineInfo.layout = renderMeshInstance.pipelineLayout;
+		pipelineInfo.layout = renderMeshInstance->pipelineLayout;
 		pipelineInfo.renderPass = context_->mainRenderPass;
 
 		// It's possible to make derivatives of pipelines, 
@@ -571,12 +595,12 @@ namespace Quadbit {
 		pipelineInfo.basePipelineIndex = -1;
 
 		// Finally we can create the pipeline
-		VK_CHECK(vkCreateGraphicsPipelines(context_->device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &renderMeshInstance.pipeline));
+		VK_CHECK(vkCreateGraphicsPipelines(context_->device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &renderMeshInstance->pipeline));
 		vkDestroyShaderModule(context_->device, vertShaderModule, nullptr);
 		vkDestroyShaderModule(context_->device, fragShaderModule, nullptr);
 
 		externalInstances_.push_back(renderMeshInstance);
-		return &externalInstances_.back();
+		return renderMeshInstance;
 	}
 
 	void MeshPipeline::DestroyInstance(QbVkRenderMeshInstance& instance) {
@@ -590,14 +614,52 @@ namespace Quadbit {
 		vkDestroyDescriptorSetLayout(context_->device, instance.descriptorSetLayout, nullptr);
 	}
 
-	RenderTexturedObjectComponent MeshPipeline::CreateObject(const char* objPath, const char* texturePath) {
+	Entity MeshPipeline::GetActiveCamera() {
+		return (userCamera_ == NULL_ENTITY) ? fallbackCamera_ : userCamera_;
+	}
+
+	VkDescriptorImageInfo MeshPipeline::GetEnvironmentMapDescriptor() {
+		return environmentTexture_.descriptor;
+	}
+
+	void MeshPipeline::LoadEnvironmentMap(const char* environmentTexture, VkFormat textureFormat) {
+		environmentTexture_ = VkUtils::LoadCubemap(context_, environmentTexture, textureFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT, Quadbit::QbVkMemoryUsage::QBVK_MEMORY_USAGE_GPU_ONLY);
+
+		std::vector<Quadbit::QbVkRenderDescriptor> renderDescriptors {
+			Quadbit::VkUtils::CreateRenderDescriptor(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, environmentTexture_.descriptor, VK_SHADER_STAGE_FRAGMENT_BIT),
+		};
+
+		std::vector <Quadbit::QbVkVertexInputAttribute> vertexModel {
+			Quadbit::QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_POSITION
+		};
+
+		std::shared_ptr<Quadbit::QbVkRenderMeshInstance> instance = CreateInstance(renderDescriptors, vertexModel,
+			"Resources/Shaders/Compiled/skybox_vert.spv", "main", "Resources/Shaders/Compiled/skybox_frag.spv", "main", 
+			sizeof(EnvironmentMapPushConstants), VK_SHADER_STAGE_VERTEX_BIT, VK_FALSE);
+
+		environmentMap_ = entityManager_->Create();
+
+		QbVkModel model = VkUtils::LoadModel("Resources/Objects/cube.obj", vertexModel);
+		environmentMap_.AddComponent<Quadbit::RenderMeshComponent>({
+			CreateVertexBuffer(model.vertices.data(), model.vertexStride, static_cast<uint32_t>(model.vertices.size())),
+			CreateIndexBuffer(model.indices),
+			static_cast<uint32_t>(model.indices.size()),
+			std::array<float, 32>(),
+			sizeof(EnvironmentMapPushConstants),
+			instance
+			});
+		environmentMap_.AddComponent<Quadbit::RenderTransformComponent>(Quadbit::RenderTransformComponent(1.0f, { 0.0f, 0.0f, 0.0f }, { 0, 0, 0, 1 }));
+	}
+
+	RenderTexturedObjectComponent MeshPipeline::CreateObject(const char* objPath, const char* texturePath, VkFormat textureFormat) {
 		// First load the texture
 		VkSamplerCreateInfo samplerInfo = VkUtils::Init::SamplerCreateInfo(VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, 
 			VK_TRUE, 16.0f, VK_COMPARE_OP_ALWAYS, VK_SAMPLER_MIPMAP_MODE_LINEAR);
 
-		QbVkTexture texture = VkUtils::LoadTexture(context_, texturePath, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
-			VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-			VK_IMAGE_ASPECT_COLOR_BIT, QbVkMemoryUsage::QBVK_MEMORY_USAGE_GPU_ONLY, &samplerInfo);
+		QbVkTexture texture = VkUtils::LoadTexture(context_, texturePath, textureFormat, VK_IMAGE_TILING_OPTIMAL,
+				VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				VK_IMAGE_ASPECT_COLOR_BIT, QbVkMemoryUsage::QBVK_MEMORY_USAGE_GPU_ONLY, &samplerInfo);
 
 		std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorSetLayout_);
 		VkDescriptorSetAllocateInfo descSetallocInfo = VkUtils::Init::DescriptorSetAllocateInfo();
@@ -662,8 +724,9 @@ namespace Quadbit {
 			CreateVertexBuffer(vertices.data(), sizeof(MeshVertex), static_cast<uint32_t>(vertices.size())),
 			CreateIndexBuffer(indices),
 			static_cast<uint32_t>(indices.size()),
-			RenderMeshPushConstants{},
-			textureCount++
+			textureCount++,
+			std::array<float, 32>(),
+			0,
 		};
 	}
 }

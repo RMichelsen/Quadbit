@@ -54,6 +54,11 @@ namespace Quadbit {
 	using VertexBufHandle = uint16_t;
 	using IndexBufHandle = uint16_t;
 
+	struct alignas(16) EnvironmentMapPushConstants {
+		glm::mat4 proj;
+		glm::mat4 view;
+	};
+
 	struct alignas(16) RenderMeshPushConstants {
 		glm::mat4 model;
 		glm::mat4 mvp;
@@ -111,16 +116,36 @@ namespace Quadbit {
 		VertexBufHandle vertexHandle;
 		IndexBufHandle indexHandle;
 		uint32_t indexCount;
-		RenderMeshPushConstants dynamicData;
 		uint32_t descriptorIndex;
+		std::array<float, 32> pushConstants;
+		int pushConstantStride;
+
+		template<typename T>
+		T* GetSafePushConstPtr() {
+			if (sizeof(T) > 128) {
+				QB_LOG_ERROR("Push Constants must have a max size of 128 bytes");
+				return nullptr;
+			}
+			return reinterpret_cast<T*>(pushConstants.data());
+		}
 	};
 
 	struct RenderMeshComponent {
 		VertexBufHandle vertexHandle;
 		IndexBufHandle indexHandle;
 		uint32_t indexCount;
-		RenderMeshPushConstants dynamicData;
-		QbVkRenderMeshInstance* instance;
+		std::array<float, 32> pushConstants;
+		int pushConstantStride;
+		std::shared_ptr<QbVkRenderMeshInstance> instance;
+
+		template<typename T>
+		T* GetSafePushConstPtr() {
+			if (sizeof(T) > 128) {
+				QB_LOG_ERROR("Push Constants must have a max size of 128 bytes");
+				return nullptr;
+			}
+			return reinterpret_cast<T*>(pushConstants.data());
+		}
 	};
 
 	struct CameraUpdateAspectRatioTag : public EventTagComponent {};

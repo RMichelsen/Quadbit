@@ -3,8 +3,8 @@
 
 #include "../Common/QbVkUtils.h"
 
-constexpr int DEFAULT_DEVICE_LOCAL_POOLSIZE = 256 * 1024 * 1024;
-constexpr int DEFAULT_HOST_VISIBLE_POOLSIZE = 128 * 1024 * 1024;
+constexpr int DEFAULT_DEVICE_LOCAL_POOLSIZE = 512 * 1024 * 1024;
+constexpr int DEFAULT_HOST_VISIBLE_POOLSIZE = 512 * 1024 * 1024;
 
 namespace Quadbit {
 	QbVkAllocator::QbVkAllocator(VkDevice device, VkDeviceSize bufferImageGranularity, VkPhysicalDeviceMemoryProperties memoryProperties) :

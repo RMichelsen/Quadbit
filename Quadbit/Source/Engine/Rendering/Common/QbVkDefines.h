@@ -17,10 +17,9 @@ if(!(x)) QB_LOG_WARN("VK: %s - %s\n", msg, #x); \
 }
 
 #ifdef QBDEBUG
-constexpr int VALIDATION_LAYER_COUNT = 2;
+constexpr int VALIDATION_LAYER_COUNT = 1;
 constexpr const char* VALIDATION_LAYERS[VALIDATION_LAYER_COUNT]{
-"VK_LAYER_LUNARG_standard_validation",
-"VK_LAYER_LUNARG_monitor",
+"VK_LAYER_LUNARG_standard_validation"
 };
 #endif
 
@@ -46,8 +45,6 @@ constexpr const char* DEVICE_EXT_NAMES[DEVICE_EXT_COUNT]{
 };
 
 constexpr int MAX_FRAMES_IN_FLIGHT = 2;
-
-constexpr VkFormat SHADOWMAP_DEPTH_FORMAT = VK_FORMAT_D16_UNORM;
 
 constexpr const char* VulkanErrorToString(VkResult vkResult) {
 	switch(vkResult) {
@@ -208,16 +205,22 @@ namespace Quadbit {
 		std::array<RenderingResources, MAX_FRAMES_IN_FLIGHT> renderingResources;
 	};
 
-	struct QbComputeDescriptor {
+	struct QbVkComputeDescriptor {
 		VkDescriptorType type;
 		uint32_t count;
 		void* data;
 	};
 
-	struct QbRenderDescriptor {
+	struct QbVkRenderDescriptor {
 		VkDescriptorType type;
 		uint32_t count;
 		void* data;
 		VkShaderStageFlagBits shaderStage;
+	};
+
+	struct QbVkModel {
+		std::vector<float> vertices;
+		uint32_t vertexStride;
+		std::vector<uint32_t> indices;
 	};
 }

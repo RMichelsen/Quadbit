@@ -70,10 +70,13 @@ namespace Quadbit {
 
 		MeshBuffers meshBuffers_{};
 
-		std::vector<QbVkRenderMeshInstance> externalInstances_;
+		std::vector<std::shared_ptr<QbVkRenderMeshInstance>> externalInstances_;
 
 		Entity fallbackCamera_ = NULL_ENTITY;
 		Entity userCamera_ = NULL_ENTITY;
+
+		QbVkTexture environmentTexture_{};
+		Entity environmentMap_ = NULL_ENTITY;
 
 		void CreateDescriptorPoolAndLayout();
 		void CreatePipeline();
@@ -83,11 +86,16 @@ namespace Quadbit {
 		VertexBufHandle CreateVertexBuffer(const void* vertices, uint32_t vertexStride, uint32_t vertexCount);
 		IndexBufHandle CreateIndexBuffer(const std::vector<uint32_t>& indices);
 
-		QbVkRenderMeshInstance* CreateInstance(std::vector<QbRenderDescriptor> descriptors,
-			std::vector<QbVkVertexInputAttribute> vertexAttribs, const char* vertexShader, const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry);
+		std::shared_ptr<QbVkRenderMeshInstance> CreateInstance(std::vector<QbVkRenderDescriptor>& descriptors, std::vector<QbVkVertexInputAttribute> vertexAttribs, 
+			const char* vertexShader, const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry, int pushConstantStride = -1,
+			VkShaderStageFlags pushConstantShaderStage = VK_SHADER_STAGE_VERTEX_BIT, VkBool32 depthTestingEnabled = VK_TRUE);
 		void DestroyInstance(QbVkRenderMeshInstance& instance);
 
-		RenderTexturedObjectComponent CreateObject(const char* objPath, const char* texturePath);
-		void CreateUniformBuffers(QbVkRenderMeshInstance& renderMeshInstance, VkDeviceSize size);
+		Entity GetActiveCamera();
+		VkDescriptorImageInfo GetEnvironmentMapDescriptor();
+		void LoadEnvironmentMap(const char* environmentTexture, VkFormat textureFormat);
+
+
+		RenderTexturedObjectComponent CreateObject(const char* objPath, const char* texturePath, VkFormat textureFormat);
 	};
 }

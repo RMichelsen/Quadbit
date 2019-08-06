@@ -834,6 +834,171 @@
     <ClInclude Include="Extern\tinyobjloader\tiny_obj_loader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Extern\gli\core\bc.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\core\clear.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\core\convert_func.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\core\coord.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\core\file.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\core\filter.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\core\filter_compute.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\core\flip.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\core\mipmaps_compute.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\core\s3tc.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\core\storage.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\core\storage_linear.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\core\workaround.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\clear.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\comparison.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\convert.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\copy.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\duplicate.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\dx.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\format.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\generate_mipmaps.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\gl.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\gli.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\image.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\levels.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\load.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\load_dds.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\load_kmg.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\load_ktx.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\make_texture.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\reduce.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\sampler.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\sampler_cube.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\sampler_cube_array.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\sampler1d.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\sampler1d_array.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\sampler2d.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\sampler2d_array.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\sampler3d.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\save.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\save_dds.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\save_kmg.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\save_ktx.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\target.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\texture.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\texture_cube.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\texture_cube_array.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\texture1d.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\texture1d_array.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\texture2d.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\texture2d_array.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\texture3d.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\transform.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\type.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Extern\gli\view.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="Extern\glm\detail\func_common.inl">
@@ -1245,6 +1410,146 @@
     <None Include="Resources\Shaders\ifft_comp.glsl" />
     <None Include="Resources\Shaders\default_frag.glsl" />
     <None Include="Resources\Shaders\default_vert.glsl" />
+    <None Include="Extern\gli\core\bc.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\clear.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\comparison.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\convert.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\copy.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\duplicate.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\dx.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\file.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\filter.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\flip.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\format.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\generate_mipmaps.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\gl.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\image.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\levels.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\load.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\load_dds.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\load_kmg.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\load_ktx.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\make_texture.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\reduce.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\s3tc.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\sampler.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\sampler_cube.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\sampler_cube_array.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\sampler1d.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\sampler1d_array.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\sampler2d.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\sampler2d_array.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\sampler3d.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\save.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\save_dds.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\save_kmg.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\save_ktx.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\storage.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\storage_linear.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\texture.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\texture_cube.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\texture_cube_array.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\texture1d.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\texture1d_array.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\texture2d.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\texture2d_array.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\texture3d.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\transform.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Extern\gli\core\view.inl">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="Resources\Shaders\skybox_frag.glsl" />
+    <None Include="Resources\Shaders\skybox_vert.glsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Extern\glm\detail\glm.cpp">

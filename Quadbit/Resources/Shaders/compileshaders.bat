@@ -40,3 +40,11 @@ glslangValidator.exe	 -V ifft_comp.glsl					-S comp		-o ../../../Bin/Debug/x64/R
 glslangValidator.exe	 -V displacement_comp.glsl			-S comp		-o Compiled/displacement_comp.spv
 glslangValidator.exe	 -V displacement_comp.glsl			-S comp		-o ../../../Bin/Release/x64/Resources/Shaders/Compiled/displacement_comp.spv
 glslangValidator.exe	 -V displacement_comp.glsl			-S comp		-o ../../../Bin/Debug/x64/Resources/Shaders/Compiled/displacement_comp.spv
+
+glslangValidator.exe	 -V skybox_frag.glsl					-S frag		-o Compiled/skybox_frag.spv
+glslangValidator.exe	 -V skybox_frag.glsl					-S frag		-o ../../../Bin/Release/x64/Resources/Shaders/Compiled/skybox_frag.spv
+glslangValidator.exe	 -V skybox_frag.glsl					-S frag		-o ../../../Bin/Debug/x64/Resources/Shaders/Compiled/skybox_frag.spv
+						
+glslangValidator.exe	 -V skybox_vert.glsl					-S vert		-o Compiled/skybox_vert.spv
+glslangValidator.exe	 -V skybox_vert.glsl					-S vert		-o ../../../Bin/Release/x64/Resources/Shaders/Compiled/skybox_vert.spv
+glslangValidator.exe	 -V skybox_vert.glsl					-S vert		-o ../../../Bin/Debug/x64/Resources/Shaders/Compiled/skybox_vert.spv
