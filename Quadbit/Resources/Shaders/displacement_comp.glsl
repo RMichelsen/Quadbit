@@ -12,7 +12,7 @@ layout(binding = 6, rgba32f) uniform writeonly image2D normal_map;
 
 void main() {
 	// Choppy-ness factor
-	float lambda = 1.25f;
+	float lambda = 1.5f;
 
 	// Assemble the RGB displacement map from the individual displacement components
 	vec4 DxPixel = imageLoad(Dx, ivec2(gl_GlobalInvocationID.xy));
