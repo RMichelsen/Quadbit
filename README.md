@@ -5,8 +5,8 @@ Quadbit is a Vulkan game engine written in C++
 - Multi sampling
 - Model and texture loading
 - Compute pipeline
+- Pipeline for visual debugging
 - Data-Oriented Entity Component System (ECS)
-- Pipeline for visual debugging (Utilizing ImGui https://github.com/ocornut/imgui)
 
 # Planned features
 - Shadow mapping
