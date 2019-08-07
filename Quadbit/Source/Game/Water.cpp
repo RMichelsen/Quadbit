@@ -7,8 +7,7 @@
 
 void Water::Init() {
 	// Create skybox
-	//renderer_->LoadEnvironmentMap("Resources/Textures/encoded_sunset_skybox.ktx", VK_FORMAT_BC3_UNORM_BLOCK);
-	renderer_->LoadEnvironmentMap("Resources/Textures/default_skybox.ktx", VK_FORMAT_R32G32B32A32_SFLOAT);
+	renderer_->LoadEnvironmentMap("Resources/Textures/encoded_sunset_skybox.ktx", VK_FORMAT_BC3_UNORM_BLOCK);
 
 	InitializeCompute();
 
