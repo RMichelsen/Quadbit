@@ -5,7 +5,7 @@ VisualStudioVersion = 16.0.28809.33
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Quadbit", "Quadbit\Quadbit.vcxproj", "{14239553-783C-4422-8E54-05B42EE4C906}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Water", "Water\Water.vcxproj", "{6D4EC1BE-0057-49A6-B4DD-7B0ACDB00C11}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Water", "Examples\Water\Water.vcxproj", "{6D4EC1BE-0057-49A6-B4DD-7B0ACDB00C11}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
