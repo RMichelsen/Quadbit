@@ -6,6 +6,7 @@
 #include "Pipelines/ComputePipeline.h"
 #include "Memory/QbVkAllocator.h"
 #include "../Entities/EntityManager.h"
+#include "../Core/Logging.h"
 
 namespace Quadbit {
 	class QbVkRenderer {

@@ -1,4 +1,7 @@
 #pragma once
+#include <forward_list>
+
+#include <gli/gli.hpp>
 
 #include "../Common/QbVkDefines.h"
 #include "QbVkPool.h"

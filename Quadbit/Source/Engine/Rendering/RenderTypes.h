@@ -1,11 +1,16 @@
 #pragma once
+#include <stdint.h>
+
 #include "../Entities/EventTag.h"
 #include "Common/QbVkDefines.h"
 
-#include <stdint.h>
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/quaternion.hpp>
+
+#include "../Core/Logging.h"
 
 namespace Quadbit {
 	struct QbVkRenderMeshInstance {

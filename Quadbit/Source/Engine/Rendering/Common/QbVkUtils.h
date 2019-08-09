@@ -1,14 +1,17 @@
 #pragma once
+#include <vector>
+#include <variant>
 
 #define VK_USE_PLATFORM_WIN32_KHR
 #include <vulkan/vulkan.h>
-#include <vector>
-
 #include <stb/stb_image.h>
 #include <tinyobjloader/tiny_obj_loader.h>
+#include <glm/glm.hpp>
+#include <glm/gtx/compatibility.hpp>
 
 #include "QbVkDefines.h"
 #include "../Memory/QbVkAllocator.h"
+#include "../../Core/Logging.h"
 
 namespace Quadbit::VkUtils {
 	// Wrappers around various Vulkan structs

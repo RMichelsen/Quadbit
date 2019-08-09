@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include <ImGui/imgui.h>
 
 #include "EntityManager.h"
 #include "EntityDefines.h"

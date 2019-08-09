@@ -1,4 +1,7 @@
 #pragma once
+#include <deque>
+
+
 #include "EventTag.h"
 #include "ComponentPool.h"
 #include "SystemDispatch.h"

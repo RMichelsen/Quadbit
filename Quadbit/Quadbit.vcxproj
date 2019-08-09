@@ -39,13 +39,13 @@
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
+    <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
+    <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
@@ -80,13 +80,13 @@
     <IncludePath>$(ProjectDir)\Extern;$(ProjectDir)\Source\PCH;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <OutDir>$(SolutionDir)Bin\$(Configuration)\$(Platform)\</OutDir>
-    <IntDir>$(SolutionDir)Bin\$(Configuration)\$(Platform)-int\</IntDir>
+    <OutDir>$(SolutionDir)BinLib\$(Configuration)\$(Platform)\</OutDir>
+    <IntDir>$(SolutionDir)BinLib\$(Configuration)\$(Platform)-int\</IntDir>
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <OutDir>$(SolutionDir)Bin\$(Configuration)\$(Platform)\</OutDir>
-    <IntDir>$(SolutionDir)Bin\$(Configuration)\$(Platform)-int\</IntDir>
+    <OutDir>$(SolutionDir)BinLib\$(Configuration)\$(Platform)\</OutDir>
+    <IntDir>$(SolutionDir)BinLib\$(Configuration)\$(Platform)-int\</IntDir>
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -108,7 +108,7 @@
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)Extern;$(ProjectDir)Source\PCH;C:\VulkanSDK\1.1.114.0\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)Extern;$(ProjectDir)Source\PCH;$(VULKAN_SDK)\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>QBDEBUG;_CRT_SECURE_NO_WARNINGS;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>PCH.h</PrecompiledHeaderFile>
@@ -151,7 +151,7 @@
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)Extern;$(ProjectDir)Source\PCH;C:\VulkanSDK\1.1.114.0\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)Extern;$(ProjectDir)Source\PCH;$(VULKAN_SDK)\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>NDEBUG;_CRT_SECURE_NO_WARNINGS;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>PCH.h</PrecompiledHeaderFile>
@@ -495,7 +495,6 @@
     <ClInclude Include="Source\Engine\Rendering\QbVkRenderer.h" />
     <ClInclude Include="Source\Engine\Rendering\RenderTypes.h" />
     <ClInclude Include="Source\Engine\Rendering\Systems\NoClipCameraSystem.h" />
-    <ClInclude Include="Source\Game\Water.h" />
     <ClInclude Include="Source\PCH\PCH.h" />
   </ItemGroup>
   <ItemGroup>
@@ -720,8 +719,6 @@
     <ClCompile Include="Source\Engine\Rendering\Pipelines\ImGuiPipeline.cpp" />
     <ClCompile Include="Source\Engine\Rendering\Pipelines\MeshPipeline.cpp" />
     <ClCompile Include="Source\Engine\Rendering\QbVkRenderer.cpp" />
-    <ClCompile Include="Source\Game\Water.cpp" />
-    <ClCompile Include="Source\Main.cpp" />
     <ClCompile Include="Source\PCH\PCH.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">PCH.h</PrecompiledHeaderFile>

@@ -1,4 +1,6 @@
 #pragma once
+#include <array>
+#include <windowsx.h>
 
 #include "Logging.h"
 

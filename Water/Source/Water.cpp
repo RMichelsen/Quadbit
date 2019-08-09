@@ -1,9 +1,8 @@
-#include <PCH.h>
 #include <random>
 
 #include "Water.h"
-#include "../Engine/Rendering/Common/QbVkUtils.h"
-#include "../Engine/Global/ImGuiState.h"
+#include "Engine/Rendering/Common/QbVkUtils.h"
+#include "Engine/Global/ImGuiState.h"
 
 void Water::Init() {
 	// Create skybox
