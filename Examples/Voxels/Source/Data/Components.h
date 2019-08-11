@@ -2,6 +2,8 @@
 #include <type_traits>
 #include <array>
 
+#include <glm/gtx/compatibility.hpp>
+
 #include "Defines.h"
 
 enum class VisibleFaces {

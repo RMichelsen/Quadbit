@@ -3,8 +3,8 @@
 
 #include <gli/gli.hpp>
 
-#include "../Common/QbVkDefines.h"
-#include "QbVkPool.h"
+#include "Engine/Core/QbVulkanDefs.h"
+#include "Engine/Rendering/Memory/QbVkPool.h"
 
 namespace Quadbit {
 

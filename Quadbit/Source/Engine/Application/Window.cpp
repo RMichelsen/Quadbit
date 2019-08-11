@@ -1,8 +1,8 @@
 #include <PCH.h>
 #include "Window.h"
 
-#include "../Core/Time.h"
-#include "../Core/InputHandler.h"
+#include "Engine/Core/Time.h"
+#include "Engine/Core/InputHandler.h"
 
 namespace Quadbit {
 	Window::Window(HINSTANCE hInstance, int nCmdShow, WNDPROC windowProc) {

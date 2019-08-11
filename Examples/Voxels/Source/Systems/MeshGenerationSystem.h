@@ -4,9 +4,7 @@
 #include "../Data/Components.h"
 
 #include "Engine/Rendering/QbVkRenderer.h"
-#include "Engine/Rendering/RenderTypes.h"
 #include "Engine/Entities/EntityManager.h"
-#include "Engine/Entities/ComponentSystem.h"
 
 struct MeshGenerationSystem : Quadbit::ComponentSystem {
 	glm::int4x3 GetPointsForFaces(const VisibleFaces face) {

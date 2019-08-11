@@ -1,20 +1,18 @@
 #include <PCH.h>
+#include "MeshPipeline.h"
 
 #include <tinyobjloader/tiny_obj_loader.h>
 
-#include "MeshPipeline.h"
-
-#include "../../Core/Time.h"
-#include "../../Core/InputHandler.h"
-
-#include "../Common/QbVkUtils.h"
-
-#include "../../Entities/ComponentSystem.h"
-#include "../../Entities/SystemDispatch.h"
-
-#include "../Systems/NoClipCameraSystem.h"
-
-#include "../ShaderBytecode.h"
+#include "Engine/Core/Time.h"
+#include "Engine/Core/InputHandler.h"
+#include "Engine/Core/QbVulkanDefs.h"
+#include "Engine/Core/QbRenderDefs.h"
+#include "Engine/Entities/ComponentSystem.h"
+#include "Engine/Entities/SystemDispatch.h"
+#include "Engine/Entities/EntityManager.h"
+#include "Engine/Rendering/QbVulkanUtils.h"
+#include "Engine/Rendering/Systems/NoClipCameraSystem.h"
+#include "Engine/Rendering/ShaderBytecode.h"
 
 namespace Quadbit {
 	MeshPipeline::MeshPipeline(std::shared_ptr<QbVkContext> context) {
@@ -44,6 +42,9 @@ namespace Quadbit {
 		}
 		for(auto&& indexBuffer : meshBuffers_.indexBuffers_) {
 			context_->allocator->DestroyBuffer(indexBuffer);
+		}
+		for(auto&& instance : externalInstances_) {
+			DestroyInstance(instance);
 		}
 	}
 
@@ -607,15 +608,15 @@ namespace Quadbit {
 		return renderMeshInstance;
 	}
 
-	void MeshPipeline::DestroyInstance(QbVkRenderMeshInstance& instance) {
+	void MeshPipeline::DestroyInstance(std::shared_ptr<QbVkRenderMeshInstance> instance) {
 		// Destroy pipeline
-		vkDestroyPipelineLayout(context_->device, instance.pipelineLayout, nullptr);
-		vkDestroyPipeline(context_->device, instance.pipeline, nullptr);
+		vkDestroyPipelineLayout(context_->device, instance->pipelineLayout, nullptr);
+		vkDestroyPipeline(context_->device, instance->pipeline, nullptr);
 
 		// Destroy descriptors
-		vkFreeDescriptorSets(context_->device, instance.descriptorPool, static_cast<uint32_t>(instance.descriptorSets.size()), instance.descriptorSets.data());
-		vkDestroyDescriptorPool(context_->device, instance.descriptorPool, nullptr);
-		vkDestroyDescriptorSetLayout(context_->device, instance.descriptorSetLayout, nullptr);
+		vkFreeDescriptorSets(context_->device, instance->descriptorPool, static_cast<uint32_t>(instance->descriptorSets.size()), instance->descriptorSets.data());
+		vkDestroyDescriptorPool(context_->device, instance->descriptorPool, nullptr);
+		vkDestroyDescriptorSetLayout(context_->device, instance->descriptorSetLayout, nullptr);
 	}
 
 	Entity MeshPipeline::GetActiveCamera() {
@@ -631,7 +632,7 @@ namespace Quadbit {
 			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT, Quadbit::QbVkMemoryUsage::QBVK_MEMORY_USAGE_GPU_ONLY);
 
 		std::vector<Quadbit::QbVkRenderDescriptor> renderDescriptors {
-			Quadbit::VkUtils::CreateRenderDescriptor(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, environmentTexture_.descriptor, VK_SHADER_STAGE_FRAGMENT_BIT),
+			QbVkRenderDescriptor { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &environmentTexture_.descriptor, VK_SHADER_STAGE_FRAGMENT_BIT }
 		};
 
 		std::vector <Quadbit::QbVkVertexInputAttribute> vertexModel {
@@ -644,10 +645,11 @@ namespace Quadbit {
 
 		environmentMap_ = entityManager_->Create();
 
+		std::vector<uint32_t> indices{ 2, 1, 0, 5, 4, 3, 8, 7, 6, 11, 10, 9, 14, 13, 12, 17, 16, 15, 20, 19, 18, 23, 22, 21, 26, 25, 24, 29, 28, 27, 32, 31, 30, 35, 34, 33 };
 		QbVkModel model = VkUtils::LoadModel("Resources/Objects/cube.obj", vertexModel);
 		environmentMap_.AddComponent<Quadbit::RenderMeshComponent>({
 			CreateVertexBuffer(model.vertices.data(), model.vertexStride, static_cast<uint32_t>(model.vertices.size())),
-			CreateIndexBuffer(model.indices),
+			CreateIndexBuffer(indices),
 			static_cast<uint32_t>(model.indices.size()),
 			std::array<float, 32>(),
 			sizeof(EnvironmentMapPushConstants),

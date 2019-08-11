@@ -1,7 +1,6 @@
+#include "Water.h"
 #include <random>
 
-#include "Water.h"
-#include "Engine/Rendering/Common/QbVkUtils.h"
 #include "Engine/Global/ImGuiState.h"
 
 void Water::Init() {
@@ -38,10 +37,10 @@ void Water::Init() {
 	ubo->useNormalMap = 0;
 
 	std::vector<Quadbit::QbVkRenderDescriptor> renderDescriptors {
-		Quadbit::VkUtils::CreateRenderDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, displacementResources_.displacementMap.descriptor, VK_SHADER_STAGE_VERTEX_BIT),
-		Quadbit::VkUtils::CreateRenderDescriptor(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, displacementResources_.normalMap.descriptor, VK_SHADER_STAGE_FRAGMENT_BIT),
-		Quadbit::VkUtils::CreateRenderDescriptor(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, togglesUBO_.descriptor, VK_SHADER_STAGE_FRAGMENT_BIT),
-		Quadbit::VkUtils::CreateRenderDescriptor(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, renderer_->GetEnvironmentMapDescriptor(), VK_SHADER_STAGE_FRAGMENT_BIT)
+		renderer_->CreateRenderDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, displacementResources_.displacementMap.descriptor, VK_SHADER_STAGE_VERTEX_BIT),
+		renderer_->CreateRenderDescriptor(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, displacementResources_.normalMap.descriptor, VK_SHADER_STAGE_FRAGMENT_BIT),
+		renderer_->CreateRenderDescriptor(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, togglesUBO_.descriptor, VK_SHADER_STAGE_FRAGMENT_BIT),
+		renderer_->CreateRenderDescriptor(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, renderer_->GetEnvironmentMapDescriptor(), VK_SHADER_STAGE_FRAGMENT_BIT)
 	};
 
 	std::shared_ptr<Quadbit::QbVkRenderMeshInstance> rMeshInstance = renderer_->CreateRenderMeshInstance(renderDescriptors,
@@ -95,7 +94,7 @@ void Water::InitializeCompute() {
 // The barriers are there to make sure images are only written/read from when they are available
 void Water::RecordComputeCommands() {
 	// Global memory barrier used throughout
-	VkMemoryBarrier memoryBarrier = Quadbit::VkUtils::Init::MemoryBarrierVk(VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
+	VkMemoryBarrier memoryBarrier = renderer_->CreateMemoryBarrier(VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
 
 	renderer_->ComputeRecord(precalcInstance_, [&]() {
 		vkCmdBindPipeline(precalcInstance_->commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, precalcInstance_->pipeline);
@@ -198,10 +197,10 @@ void Water::InitPrecalcComputeInstance() {
 
 	// Setup precalc compute shader
 	std::vector<Quadbit::QbVkComputeDescriptor> computeDescriptors = {
-			Quadbit::VkUtils::CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, precalcResources_.ubo.descriptor),
-			Quadbit::VkUtils::CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, precalcResources_.h0Tilde.descriptor),
-			Quadbit::VkUtils::CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, precalcResources_.h0TildeConj.descriptor),
-			Quadbit::VkUtils::CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, precalcResources_.uniformRandomsStorageBuffer.descriptor)
+			renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, precalcResources_.ubo.descriptor),
+			renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, precalcResources_.h0Tilde.descriptor),
+			renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, precalcResources_.h0TildeConj.descriptor),
+			renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, precalcResources_.uniformRandomsStorageBuffer.descriptor)
 	};
 	precalcInstance_ = renderer_->CreateComputeInstance(computeDescriptors, "Resources/Shaders/Compiled/precalc_comp.spv", "main");
 }
@@ -228,14 +227,14 @@ void Water::InitWaveheightComputeInstance() {
 		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
 
 	std::vector<Quadbit::QbVkComputeDescriptor> computeDescriptors = {
-		Quadbit::VkUtils::CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, waveheightResources_.ubo.descriptor),
-		Quadbit::VkUtils::CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, precalcResources_.h0Tilde.descriptor),
-		Quadbit::VkUtils::CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, precalcResources_.h0TildeConj.descriptor),
-		Quadbit::VkUtils::CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, waveheightResources_.h0TildeTx.descriptor),
-		Quadbit::VkUtils::CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, waveheightResources_.h0TildeTy.descriptor),
-		Quadbit::VkUtils::CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, waveheightResources_.h0TildeTz.descriptor),
-		Quadbit::VkUtils::CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, waveheightResources_.h0TildeSlopeX.descriptor),
-		Quadbit::VkUtils::CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, waveheightResources_.h0TildeSlopeZ.descriptor)
+		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, waveheightResources_.ubo.descriptor),
+		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, precalcResources_.h0Tilde.descriptor),
+		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, precalcResources_.h0TildeConj.descriptor),
+		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, waveheightResources_.h0TildeTx.descriptor),
+		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, waveheightResources_.h0TildeTy.descriptor),
+		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, waveheightResources_.h0TildeTz.descriptor),
+		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, waveheightResources_.h0TildeSlopeX.descriptor),
+		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, waveheightResources_.h0TildeSlopeZ.descriptor)
 	};
 
 	waveheightInstance_ = renderer_->CreateComputeInstance(computeDescriptors, "Resources/Shaders/Compiled/waveheight_comp.spv", "main");
@@ -314,12 +313,12 @@ void Water::InitInverseFFTComputeInstances() {
 	};
 
 	std::vector<Quadbit::QbVkComputeDescriptor> horizontalComputeDesc = {
-		Quadbit::VkUtils::CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, waveheightImageArray),
-		Quadbit::VkUtils::CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, horizontalImageArray)
+		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, waveheightImageArray),
+		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, horizontalImageArray)
 	};
 	std::vector<Quadbit::QbVkComputeDescriptor> verticalComputeDesc = {
-		Quadbit::VkUtils::CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, horizontalImageArray),
-		Quadbit::VkUtils::CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, verticalImageArray)
+		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, horizontalImageArray),
+		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, verticalImageArray)
 	};
 	
 	horizontalIFFTInstance_ = renderer_->CreateComputeInstance(horizontalComputeDesc, "Resources/Shaders/Compiled/ifft_comp.spv", "main", &horizontalSpecInfo, sizeof(IFFTPushConstants));
@@ -327,26 +326,24 @@ void Water::InitInverseFFTComputeInstances() {
 }
 
 void Water::InitDisplacementInstance() {
-	VkSamplerCreateInfo samplerCreateInfo = Quadbit::VkUtils::Init::SamplerCreateInfo(VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT, 
-		VK_TRUE, 16.0f, VK_COMPARE_OP_ALWAYS, VK_SAMPLER_MIPMAP_MODE_LINEAR);
-
 	renderer_->CreateTexture(displacementResources_.displacementMap, WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT, VK_IMAGE_TILING_OPTIMAL, 
 		VK_IMAGE_USAGE_STORAGE_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 
 		VK_PIPELINE_STAGE_TRANSFER_BIT, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
 
 	renderer_->CreateTexture(displacementResources_.normalMap, WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT, VK_IMAGE_TILING_OPTIMAL, 
 		VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 
-		VK_PIPELINE_STAGE_TRANSFER_BIT, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY, &samplerCreateInfo);
+		VK_PIPELINE_STAGE_TRANSFER_BIT, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY, renderer_->CreateImageSampler(VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT,
+			VK_TRUE, 16.0f, VK_COMPARE_OP_ALWAYS, VK_SAMPLER_MIPMAP_MODE_LINEAR));
 
 	// Setup the displacement compute shader
 	std::vector<Quadbit::QbVkComputeDescriptor> computeDescriptors = {
-		Quadbit::VkUtils::CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, verticalIFFTResources_.dX.descriptor),
-		Quadbit::VkUtils::CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, verticalIFFTResources_.dY.descriptor),
-		Quadbit::VkUtils::CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, verticalIFFTResources_.dZ.descriptor),
-		Quadbit::VkUtils::CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, verticalIFFTResources_.dSlopeX.descriptor),
-		Quadbit::VkUtils::CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, verticalIFFTResources_.dSlopeZ.descriptor),
-		Quadbit::VkUtils::CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, displacementResources_.displacementMap.descriptor),
-		Quadbit::VkUtils::CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, displacementResources_.normalMap.descriptor)
+		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, verticalIFFTResources_.dX.descriptor),
+		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, verticalIFFTResources_.dY.descriptor),
+		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, verticalIFFTResources_.dZ.descriptor),
+		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, verticalIFFTResources_.dSlopeX.descriptor),
+		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, verticalIFFTResources_.dSlopeZ.descriptor),
+		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, displacementResources_.displacementMap.descriptor),
+		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, displacementResources_.normalMap.descriptor)
 	};
 
 	displacementInstance_ = renderer_->CreateComputeInstance(computeDescriptors, "Resources/Shaders/Compiled/displacement_comp.spv", "main");

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Common/QbVkDefines.h"
+#include "Engine/Core/QbVulkanDefs.h"
 
 namespace Quadbit {
 	class QbVkPool : public std::enable_shared_from_this<QbVkPool> {

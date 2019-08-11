@@ -17,34 +17,32 @@ if(!(x)) QB_LOG_WARN("VK: %s - %s\n", msg, #x); \
 }
 
 #ifdef QBDEBUG
-constexpr int VALIDATION_LAYER_COUNT = 1;
-constexpr const char* VALIDATION_LAYERS[VALIDATION_LAYER_COUNT]{
+inline constexpr int VALIDATION_LAYER_COUNT = 1;
+inline constexpr const char* VALIDATION_LAYERS[VALIDATION_LAYER_COUNT]{
 "VK_LAYER_LUNARG_standard_validation"
 };
 #endif
 
 // Add debug messenger callback extension for validation layer if in debug mode
 #ifdef QBDEBUG
-constexpr int INSTANCE_EXT_COUNT = 3;
-constexpr const char* INSTANCE_EXT_NAMES[INSTANCE_EXT_COUNT]{
+inline constexpr int INSTANCE_EXT_COUNT = 3;
+inline constexpr const char* INSTANCE_EXT_NAMES[INSTANCE_EXT_COUNT]{
 	VK_KHR_SURFACE_EXTENSION_NAME,
 	VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
 	VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
 };
 #else
-constexpr int INSTANCE_EXT_COUNT = 2;
-constexpr const char* INSTANCE_EXT_NAMES[INSTANCE_EXT_COUNT]{
+inline constexpr int INSTANCE_EXT_COUNT = 2;
+inline constexpr const char* INSTANCE_EXT_NAMES[INSTANCE_EXT_COUNT]{
 	VK_KHR_SURFACE_EXTENSION_NAME,
 	VK_KHR_WIN32_SURFACE_EXTENSION_NAME
 };
 #endif
 
-constexpr int DEVICE_EXT_COUNT = 1;
-constexpr const char* DEVICE_EXT_NAMES[DEVICE_EXT_COUNT]{
+inline constexpr int DEVICE_EXT_COUNT = 1;
+inline constexpr const char* DEVICE_EXT_NAMES[DEVICE_EXT_COUNT]{
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
-
-constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
 inline constexpr const char* VulkanErrorToString(VkResult vkResult) {
 	switch(vkResult) {
@@ -78,7 +76,10 @@ inline constexpr const char* VulkanErrorToString(VkResult vkResult) {
 	}
 }
 
+inline constexpr int MAX_FRAMES_IN_FLIGHT = 2;
+
 namespace Quadbit {
+	// VULKAN DEFINITIONS
 	using VertexBufHandle = uint16_t;
 	using IndexBufHandle = uint16_t;
 
@@ -88,15 +89,6 @@ namespace Quadbit {
 		QBVK_MEMORY_USAGE_GPU_ONLY,
 		QBVK_MEMORY_USAGE_CPU_TO_GPU,
 		QBVK_MEMORY_USAGE_GPU_TO_CPU
-	};
-
-	enum QbVkAllocationType {
-		QBVK_ALLOCATION_TYPE_UNKNOWN,
-		QBVK_ALLOCATION_TYPE_FREE,
-		QBVK_ALLOCATION_TYPE_BUFFER,
-		QBVK_ALLOCATION_TYPE_IMAGE_UNKNOWN,
-		QBVK_ALLOCATION_TYPE_IMAGE_LINEAR,
-		QBVK_ALLOCATION_TYPE_IMAGE_OPTIMAL,
 	};
 
 	enum QbVkVertexInputAttribute {
@@ -136,6 +128,46 @@ namespace Quadbit {
 		VkSampler sampler = VK_NULL_HANDLE;
 		VkDescriptorImageInfo descriptor;
 		VkFormat format = VK_FORMAT_UNDEFINED;
+	};
+
+	struct QbVkComputeDescriptor {
+		VkDescriptorType type;
+		uint32_t count;
+		void* data;
+	};
+
+	struct QbVkRenderDescriptor {
+		VkDescriptorType type;
+		uint32_t count;
+		void* data;
+		VkShaderStageFlagBits shaderStage;
+	};
+
+	struct QbVkModel {
+		std::vector<float> vertices;
+		uint32_t vertexStride;
+		std::vector<uint32_t> indices;
+	};
+
+	struct QbVkComputeInstance {
+		VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
+		VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
+		VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
+		VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
+		VkPipeline pipeline = VK_NULL_HANDLE;
+		VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
+		VkQueryPool queryPool = VK_NULL_HANDLE;
+
+		double msAvgTime = 0.0;
+	};
+
+	enum QbVkAllocationType {
+		QBVK_ALLOCATION_TYPE_UNKNOWN,
+		QBVK_ALLOCATION_TYPE_FREE,
+		QBVK_ALLOCATION_TYPE_BUFFER,
+		QBVK_ALLOCATION_TYPE_IMAGE_UNKNOWN,
+		QBVK_ALLOCATION_TYPE_IMAGE_LINEAR,
+		QBVK_ALLOCATION_TYPE_IMAGE_OPTIMAL,
 	};
 
 	struct GPU {
@@ -205,22 +237,12 @@ namespace Quadbit {
 		std::array<RenderingResources, MAX_FRAMES_IN_FLIGHT> renderingResources;
 	};
 
-	struct QbVkComputeDescriptor {
-		VkDescriptorType type;
-		uint32_t count;
-		void* data;
-	};
+	struct QbVkRenderMeshInstance {
+		VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
+		VkPipeline pipeline = VK_NULL_HANDLE;
 
-	struct QbVkRenderDescriptor {
-		VkDescriptorType type;
-		uint32_t count;
-		void* data;
-		VkShaderStageFlagBits shaderStage;
-	};
-
-	struct QbVkModel {
-		std::vector<float> vertices;
-		uint32_t vertexStride;
-		std::vector<uint32_t> indices;
+		VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
+		VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
+		std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> descriptorSets{};
 	};
 }

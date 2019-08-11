@@ -1,7 +1,8 @@
 #include <PCH.h>
-
 #include "ComputePipeline.h"
-#include "../Common/QbVkUtils.h"
+
+#include "Engine/Core/QbVulkanDefs.h"
+#include "Engine/Rendering/QbVulkanUtils.h"
 
 namespace Quadbit {
 	ComputePipeline::ComputePipeline(std::shared_ptr<QbVkContext> context) {

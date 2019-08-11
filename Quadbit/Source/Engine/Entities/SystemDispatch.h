@@ -2,10 +2,10 @@
 #include <vector>
 #include <ImGui/imgui.h>
 
-#include "EntityManager.h"
-#include "EntityDefines.h"
-#include "../Core/Sfinae.h"
-#include "ComponentSystem.h"
+#include "Engine/Core/QbEntityDefs.h"
+#include "Engine/Core/Sfinae.h"
+#include "Engine/Entities/ComponentSystem.h"
+#include "Engine/Entities/EntityManager.h"
 
 namespace Quadbit {
 	template <class S>

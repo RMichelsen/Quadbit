@@ -2,7 +2,7 @@
 #include <array>
 #include <windowsx.h>
 
-#include "Logging.h"
+#include "Engine/Core/Logging.h"
 
 namespace Quadbit::InputHandler {
 	struct MouseButtonStatus {

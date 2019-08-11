@@ -1,7 +1,8 @@
 #pragma once
 
+#include <glm/gtx/compatibility.hpp>
+
 #include "Engine/Rendering/QbVkRenderer.h"
-#include "Engine/Rendering/Common/QbVkDefines.h"
 #include "Engine/Entities/EntityManager.h"
 
 constexpr int WATER_RESOLUTION = 512;

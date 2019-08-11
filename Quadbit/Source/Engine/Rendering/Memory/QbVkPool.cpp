@@ -1,7 +1,7 @@
 #include <PCH.h>
 #include "QbVkPool.h"
 
-#include "../Common/QbVkUtils.h"
+#include "Engine/Rendering/QbVulkanUtils.h"
 
 namespace Quadbit {
 	QbVkPool::QbVkPool(VkDevice device, const int32_t memoryTypeIndex, const VkDeviceSize size, QbVkMemoryUsage usage) :
