@@ -5,10 +5,19 @@
 
 #include "QbVkRenderer.h"
 
-#include "Common/QbVkUtils.h"
-#include "../Core/InputHandler.h"
-#include "../Core/Time.h"
-#include "../Global/ImGuiState.h"
+#include "Engine/Core/InputHandler.h"
+#include "Engine/Core/Time.h"
+#include "Engine/Core/QbRenderDefs.h"
+#include "Engine/Core/QbVulkanDefs.h"
+#include "Engine/Global/ImGuiState.h"
+#include "Engine/Entities/EntityManager.h"
+#include "Engine/Entities/SystemDispatch.h"
+#include "Engine/Rendering/QbVulkanUtils.h"
+#include "Engine/Rendering/Memory/QbVkAllocator.h"
+#include "Engine/Rendering/Pipelines/ComputePipeline.h"
+#include "Engine/Rendering/Pipelines/MeshPipeline.h"
+#include "Engine/Rendering/Pipelines/ImGuiPipeline.h"
+
 
 namespace Quadbit {
 	QbVkRenderer::QbVkRenderer(HINSTANCE hInstance, HWND hwnd) : 
@@ -100,101 +109,6 @@ namespace Quadbit {
 		vkDestroyInstance(instance_, nullptr);
 	}
 
-	float QbVkRenderer::GetAspectRatio() {
-		return static_cast<float>(context_->swapchain.extent.width) / static_cast<float>(context_->swapchain.extent.height);
-	}
-
-	void QbVkRenderer::RegisterCamera(Entity entity) {
-		if(!entity.HasComponent<RenderCamera>()) {
-			QB_LOG_ERROR("Cannot register camera: Entity must have the Quadbit::RenderCamera component\n");
-			return;
-		}
-		meshPipeline_->userCamera_ = entity;
-	}
-
-	RenderMeshComponent QbVkRenderer::CreateMesh(const char* objPath, std::vector<QbVkVertexInputAttribute> vertexModel, std::shared_ptr<QbVkRenderMeshInstance> externalInstance,
-		int pushConstantStride) {
-		QbVkModel model = VkUtils::LoadModel(objPath, vertexModel);
-
-		return RenderMeshComponent{
-			meshPipeline_->CreateVertexBuffer(model.vertices.data(), model.vertexStride, static_cast<uint32_t>(model.vertices.size())),
-			meshPipeline_->CreateIndexBuffer(model.indices),
-			static_cast<uint32_t>(model.indices.size()),
-			std::array<float, 32>(),
-			pushConstantStride,
-			externalInstance
-		};
-	}
-
-	RenderTexturedObjectComponent QbVkRenderer::CreateObject(const char* objPath, const char* texturePath, VkFormat textureFormat) {
-		return meshPipeline_->CreateObject(objPath, texturePath, textureFormat);
-	}
-
-	void QbVkRenderer::LoadEnvironmentMap(const char* environmentTexture, VkFormat textureFormat) {
-		meshPipeline_->LoadEnvironmentMap(environmentTexture, textureFormat);
-	}
-
-	Entity QbVkRenderer::GetActiveCamera() {
-		return meshPipeline_->GetActiveCamera();
-	}
-
-	VkDescriptorImageInfo QbVkRenderer::GetEnvironmentMapDescriptor() {
-		return meshPipeline_->GetEnvironmentMapDescriptor();
-	}
-
-	QbVkTexture QbVkRenderer::LoadCubemap(const char* imagePath, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage, VkImageLayout imageLayout, VkImageAspectFlags imageAspectFlags, QbVkMemoryUsage memoryUsage) {
-		return VkUtils::LoadCubemap(context_, imagePath, imageFormat, imageTiling, imageUsage, imageLayout, imageAspectFlags, memoryUsage);
-	}
-
-	QbVkTexture QbVkRenderer::LoadTexture(const char* imagePath, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage, VkImageLayout imageLayout,
-		VkImageAspectFlags imageAspectFlags, QbVkMemoryUsage memoryUsage, VkSamplerCreateInfo* samplerCreateInfo, VkSampleCountFlagBits numSamples) {
-		return VkUtils::LoadTexture(context_, imagePath, imageFormat, imageTiling, imageUsage, imageLayout, imageAspectFlags, memoryUsage, samplerCreateInfo, numSamples);
-	}
-
-	void QbVkRenderer::CreateTexture(QbVkTexture& texture, uint32_t width, uint32_t height, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage, 
-		VkImageLayout imageLayout, VkImageAspectFlags imageAspectFlags, VkPipelineStageFlagBits srcStage, VkPipelineStageFlagBits dstStage, QbVkMemoryUsage memoryUsage, 
-		VkSamplerCreateInfo* samplerCreateInfo, VkSampleCountFlagBits numSamples) {
-		VkUtils::CreateTexture(context_, texture, width, height, imageFormat, imageTiling, imageUsage, imageLayout, imageAspectFlags, srcStage, dstStage, memoryUsage, samplerCreateInfo, numSamples);
-	}
-
-	void QbVkRenderer::CreateGPUBuffer(QbVkBuffer& buffer, VkDeviceSize size, VkBufferUsageFlags bufferUsage, QbVkMemoryUsage memoryUsage) {
-		VkUtils::CreateGPUBuffer(context_, buffer, size, bufferUsage, memoryUsage);
-	}
-
-	void QbVkRenderer::TransferDataToGPUBuffer(QbVkBuffer& buffer, VkDeviceSize size, const void* data) {
-		VkUtils::TransferDataToGPUBuffer(context_, buffer, size, data);
-	}
-
-	std::shared_ptr<QbVkComputeInstance> QbVkRenderer::CreateComputeInstance(std::vector<QbVkComputeDescriptor>& descriptors,
-		const char* shader, const char* shaderFunc, const VkSpecializationInfo* specInfo, uint32_t pushConstantRangeSize) {
-		return computePipeline_->CreateInstance(descriptors, shader, shaderFunc, specInfo, pushConstantRangeSize);
-	}
-
-	std::shared_ptr<QbVkRenderMeshInstance> QbVkRenderer::CreateRenderMeshInstance(std::vector<QbVkRenderDescriptor>& descriptors,
-		std::vector<QbVkVertexInputAttribute> vertexAttribs, const char* vertexShader, const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry,
-		int pushConstantStride, VkShaderStageFlags pushConstantShaderStage) {
-		return meshPipeline_->CreateInstance(descriptors, vertexAttribs, vertexShader, vertexEntry, fragmentShader, fragmentEntry, pushConstantStride, pushConstantShaderStage);
-	}
-
-	std::shared_ptr<QbVkRenderMeshInstance> QbVkRenderer::CreateRenderMeshInstance(std::vector<QbVkVertexInputAttribute> vertexAttribs, const char* vertexShader, 
-		const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry, int pushConstantStride, VkShaderStageFlags pushConstantShaderStage) {
-		std::vector<QbVkRenderDescriptor> empty{};
-		return meshPipeline_->CreateInstance(empty, vertexAttribs, vertexShader, vertexEntry, fragmentShader, fragmentEntry, pushConstantStride, pushConstantShaderStage);
-	}
-
-	void QbVkRenderer::ComputeDispatch(std::shared_ptr<QbVkComputeInstance> instance) {
-		computePipeline_->Dispatch(instance);
-	}
-
-	void QbVkRenderer::ComputeRecord(std::shared_ptr<QbVkComputeInstance> instance, std::function<void()> func) {
-		computePipeline_->RecordCommands(instance, func);
-	}
-
-	void QbVkRenderer::DestroyMesh(const RenderMeshComponent& mesh) {
-		meshPipeline_->DestroyVertexBuffer(mesh.vertexHandle);
-		meshPipeline_->DestroyIndexBuffer(mesh.indexHandle);
-	}
-
 	void QbVkRenderer::DrawFrame() {
 		// Return early if we cannot render (if swapchain is being recreated)
 		if(!canRender_) return;
@@ -261,6 +175,129 @@ namespace Quadbit {
 
 		// Increment (and mod) resource index to get the next resource
 		resourceIndex = (resourceIndex + 1) % MAX_FRAMES_IN_FLIGHT;
+	}
+
+	float QbVkRenderer::GetAspectRatio() {
+		return static_cast<float>(context_->swapchain.extent.width) / static_cast<float>(context_->swapchain.extent.height);
+	}
+
+	void QbVkRenderer::CreateGPUBuffer(QbVkBuffer& buffer, VkDeviceSize size, VkBufferUsageFlags bufferUsage, QbVkMemoryUsage memoryUsage) {
+		VkUtils::CreateGPUBuffer(context_, buffer, size, bufferUsage, memoryUsage);
+	}
+
+	void QbVkRenderer::TransferDataToGPUBuffer(QbVkBuffer& buffer, VkDeviceSize size, const void* data) {
+		VkUtils::TransferDataToGPUBuffer(context_, buffer, size, data);
+	}
+
+	VkMemoryBarrier QbVkRenderer::CreateMemoryBarrier(VkAccessFlags srcMask, VkAccessFlags dstMask) {
+		return VkUtils::Init::MemoryBarrierVk(srcMask, dstMask);
+	}
+
+	RenderTexturedObjectComponent QbVkRenderer::CreateObject(const char* objPath, const char* texturePath, VkFormat textureFormat) {
+		return meshPipeline_->CreateObject(objPath, texturePath, textureFormat);
+	}
+
+	void QbVkRenderer::LoadEnvironmentMap(const char* environmentTexture, VkFormat textureFormat) {
+		meshPipeline_->LoadEnvironmentMap(environmentTexture, textureFormat);
+	}
+
+	VkDescriptorImageInfo QbVkRenderer::GetEnvironmentMapDescriptor() {
+		return meshPipeline_->GetEnvironmentMapDescriptor();
+	}
+
+	QbVkTexture QbVkRenderer::LoadCubemap(const char* imagePath, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage, VkImageLayout imageLayout, VkImageAspectFlags imageAspectFlags, QbVkMemoryUsage memoryUsage) {
+		return VkUtils::LoadCubemap(context_, imagePath, imageFormat, imageTiling, imageUsage, imageLayout, imageAspectFlags, memoryUsage);
+	}
+
+	QbVkTexture QbVkRenderer::LoadTexture(const char* imagePath, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage, VkImageLayout imageLayout,
+		VkImageAspectFlags imageAspectFlags, QbVkMemoryUsage memoryUsage, VkSamplerCreateInfo* samplerCreateInfo, VkSampleCountFlagBits numSamples) {
+		return VkUtils::LoadTexture(context_, imagePath, imageFormat, imageTiling, imageUsage, imageLayout, imageAspectFlags, memoryUsage, samplerCreateInfo, numSamples);
+	}
+
+	void QbVkRenderer::CreateTexture(QbVkTexture& texture, uint32_t width, uint32_t height, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage, 
+		VkImageLayout imageLayout, VkImageAspectFlags imageAspectFlags, VkPipelineStageFlagBits srcStage, VkPipelineStageFlagBits dstStage, QbVkMemoryUsage memoryUsage, 
+		VkSampler sampler, VkSampleCountFlagBits numSamples) {
+		VkUtils::CreateTexture(context_, texture, width, height, imageFormat, imageTiling, imageUsage, imageLayout, imageAspectFlags, srcStage, dstStage, memoryUsage, sampler, numSamples);
+	}
+
+	VkSampler QbVkRenderer::CreateImageSampler(VkFilter samplerFilter, VkSamplerAddressMode addressMode, VkBool32 enableAnisotropy,
+		float maxAnisotropy, VkCompareOp compareOperation, VkSamplerMipmapMode samplerMipmapMode, float maxLod) {
+
+		VkSampler sampler;
+
+		auto createInfo = VkUtils::Init::SamplerCreateInfo(samplerFilter, addressMode, enableAnisotropy, maxAnisotropy, compareOperation, samplerMipmapMode, maxLod);
+		VK_CHECK(vkCreateSampler(context_->device, &createInfo, nullptr, &sampler));
+
+		return sampler;
+	}
+
+	std::shared_ptr<QbVkComputeInstance> QbVkRenderer::CreateComputeInstance(std::vector<QbVkComputeDescriptor>& descriptors,
+		const char* shader, const char* shaderFunc, const VkSpecializationInfo* specInfo, uint32_t pushConstantRangeSize) {
+		return computePipeline_->CreateInstance(descriptors, shader, shaderFunc, specInfo, pushConstantRangeSize);
+	}
+
+	void QbVkRenderer::ComputeDispatch(std::shared_ptr<QbVkComputeInstance> instance) {
+		computePipeline_->Dispatch(instance);
+	}
+
+	void QbVkRenderer::ComputeRecord(std::shared_ptr<QbVkComputeInstance> instance, std::function<void()> func) {
+		computePipeline_->RecordCommands(instance, func);
+	}
+
+	QbVkComputeDescriptor QbVkRenderer::CreateComputeDescriptor(VkDescriptorType type, std::variant<VkDescriptorImageInfo, VkDescriptorBufferInfo> data) {
+		return { type, 1, &data };
+	}
+
+	Entity QbVkRenderer::GetActiveCamera() {
+		return meshPipeline_->GetActiveCamera();
+	}
+
+	void QbVkRenderer::RegisterCamera(Entity entity) {
+		if(!entity.HasComponent<RenderCamera>()) {
+			QB_LOG_ERROR("Cannot register camera: Entity must have the Quadbit::RenderCamera component\n");
+			return;
+		}
+		meshPipeline_->userCamera_ = entity;
+	}
+
+	std::shared_ptr<QbVkRenderMeshInstance> QbVkRenderer::CreateRenderMeshInstance(std::vector<QbVkRenderDescriptor>& descriptors,
+		std::vector<QbVkVertexInputAttribute> vertexAttribs, const char* vertexShader, const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry,
+		int pushConstantStride, VkShaderStageFlags pushConstantShaderStage) {
+		return meshPipeline_->CreateInstance(descriptors, vertexAttribs, vertexShader, vertexEntry, fragmentShader, fragmentEntry, pushConstantStride, pushConstantShaderStage);
+	}
+
+	std::shared_ptr<QbVkRenderMeshInstance> QbVkRenderer::CreateRenderMeshInstance(std::vector<QbVkVertexInputAttribute> vertexAttribs, const char* vertexShader,
+		const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry, int pushConstantStride, VkShaderStageFlags pushConstantShaderStage) {
+		std::vector<QbVkRenderDescriptor> empty{};
+		return meshPipeline_->CreateInstance(empty, vertexAttribs, vertexShader, vertexEntry, fragmentShader, fragmentEntry, pushConstantStride, pushConstantShaderStage);
+	}
+
+	RenderMeshComponent QbVkRenderer::CreateMesh(const char* objPath, std::vector<QbVkVertexInputAttribute> vertexModel, std::shared_ptr<QbVkRenderMeshInstance> externalInstance,
+		int pushConstantStride) {
+		QbVkModel model = VkUtils::LoadModel(objPath, vertexModel);
+
+		return RenderMeshComponent{
+			meshPipeline_->CreateVertexBuffer(model.vertices.data(), model.vertexStride, static_cast<uint32_t>(model.vertices.size())),
+			meshPipeline_->CreateIndexBuffer(model.indices),
+			static_cast<uint32_t>(model.indices.size()),
+			std::array<float, 32>(),
+			pushConstantStride,
+			externalInstance
+		};
+	}
+
+	VertexBufHandle QbVkRenderer::CreateVertexBuffer(const void* vertices, uint32_t vertexStride, uint32_t vertexCount) {
+		return meshPipeline_->CreateVertexBuffer(vertices, vertexStride, vertexCount);
+	}
+
+	IndexBufHandle QbVkRenderer::CreateIndexBuffer(const std::vector<uint32_t>& indices)
+	{
+		return meshPipeline_->CreateIndexBuffer(indices);
+	}
+
+	QbVkRenderDescriptor QbVkRenderer::CreateRenderDescriptor(VkDescriptorType type, std::variant<VkDescriptorImageInfo, 
+		VkDescriptorBufferInfo> data, VkShaderStageFlagBits shaderStage) {
+		return { type, 1, &data, shaderStage };
 	}
 
 #ifdef QBDEBUG

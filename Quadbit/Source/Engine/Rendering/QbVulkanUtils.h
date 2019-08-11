@@ -9,9 +9,9 @@
 #include <glm/glm.hpp>
 #include <glm/gtx/compatibility.hpp>
 
-#include "QbVkDefines.h"
-#include "../Memory/QbVkAllocator.h"
-#include "../../Core/Logging.h"
+#include "Engine/Core/QbVulkanDefs.h"
+#include "Engine/Core/Logging.h"
+#include "Engine/Rendering/Memory/QbVkAllocator.h"
 
 namespace Quadbit::VkUtils {
 	// Wrappers around various Vulkan structs
@@ -1151,37 +1151,19 @@ namespace Quadbit::VkUtils {
 
 	inline void CreateTexture(const std::shared_ptr<QbVkContext>& context, QbVkTexture& texture, uint32_t width, uint32_t height, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage,
 		VkImageLayout imageLayout, VkImageAspectFlags imageAspectFlags, VkPipelineStageFlagBits srcStage, VkPipelineStageFlagBits dstStage, QbVkMemoryUsage memoryUsage,
-		VkSamplerCreateInfo* samplerCreateInfo, VkSampleCountFlagBits numSamples) {
+		VkSampler sampler, VkSampleCountFlagBits numSamples) {
 
 		auto imageCreateInfo = VkUtils::Init::ImageCreateInfo(width, height, imageFormat, imageTiling, imageUsage, numSamples);
 		context->allocator->CreateImage(texture.image, imageCreateInfo, memoryUsage);
 		texture.imageView = VkUtils::CreateImageView(context, texture.image.imgHandle, imageFormat, imageAspectFlags);
 		texture.imageLayout = imageLayout;
 		texture.format = imageFormat;
-		if (samplerCreateInfo != nullptr) VK_CHECK(vkCreateSampler(context->device, samplerCreateInfo, nullptr, &texture.sampler));
+		texture.sampler = sampler;
 		texture.descriptor = { texture.sampler, texture.imageView, imageLayout };
 
 
 		// Transition the image layout to the desired layout
 		TransitionImageLayout(context, texture.image.imgHandle, imageAspectFlags, VK_IMAGE_LAYOUT_UNDEFINED, imageLayout, srcStage, dstStage);
-	}
-
-	template<typename T>
-	inline QbVkComputeDescriptor CreateComputeDescriptor(VkDescriptorType type, std::vector<T>& data) {
-		return { type, static_cast<uint32_t>(data.size()), data.data() };
-	}
-
-	inline QbVkComputeDescriptor CreateComputeDescriptor(VkDescriptorType type, std::variant<VkDescriptorImageInfo, VkDescriptorBufferInfo> data) {
-		return { type, 1, &data };
-	}
-
-	template<typename T>
-	inline QbVkRenderDescriptor CreateRenderDescriptor(VkDescriptorType type, std::vector<T>& data, VkShaderStageFlagBits shaderStage) {
-		return { type, static_cast<uint32_t>(data.size()), data.data(), shaderStage };
-	}
-
-	inline QbVkRenderDescriptor CreateRenderDescriptor(VkDescriptorType type, std::variant<VkDescriptorImageInfo, VkDescriptorBufferInfo> data, VkShaderStageFlagBits shaderStage) {
-		return { type, 1, &data, shaderStage };
 	}
 
 	inline QbVkModel LoadModel(const char* objPath, std::vector<QbVkVertexInputAttribute> vertexModel) {
@@ -1261,11 +1243,9 @@ namespace Quadbit::VkUtils {
 						break;
 					}
 				}
-				//model.indices.push_back(static_cast<uint32_t>(model.indices.size()));
+				model.indices.push_back(static_cast<uint32_t>(model.indices.size()));
 			}
 		}
-
-		model.indices = { 2, 1, 0, 5, 4, 3, 8, 7, 6, 11, 10, 9, 14, 13, 12, 17, 16, 15, 20, 19, 18, 23, 22, 21, 26, 25, 24, 29, 28, 27, 32, 31, 30, 35, 34, 33 };
 		return model;
 	}
 }

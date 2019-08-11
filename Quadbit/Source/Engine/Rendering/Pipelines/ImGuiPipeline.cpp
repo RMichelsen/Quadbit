@@ -1,14 +1,13 @@
 #include <PCH.h>
 #include "ImGuiPipeline.h"
 
-#include "../Common/QbVkUtils.h"
-#include "../../Core/InputHandler.h"
-#include "../../Core/Time.h"
-#include "../../Global/ImGuiState.h"
-#include "../../Entities/EntityManager.h"
-#include "../ShaderBytecode.h"
-#include "ComputePipeline.h"
-
+#include "Engine/Core/InputHandler.h"
+#include "Engine/Core/Time.h"
+#include "Engine/Global/ImGuiState.h"
+#include "Engine/Entities/EntityManager.h"
+#include "Engine/Rendering/QbVulkanUtils.h"
+#include "Engine/Rendering/ShaderBytecode.h"
+#include "Engine/Rendering/Pipelines/ComputePipeline.h"
 
 namespace Quadbit {
 	ImGuiPipeline::ImGuiPipeline(std::shared_ptr<QbVkContext> context) : context_(context) {

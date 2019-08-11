@@ -1,53 +1,14 @@
 #pragma once
+#include <memory>
+#include <array>
+#include <vector>
 #include <deque>
 
-#include "../RenderTypes.h"
-#include "../Common/QbVkDefines.h"
-#include "../../Entities/EntityManager.h"
+#include "Engine/Core/QbRenderDefs.h"
+#include "Engine/Core/QbVulkanDefs.h"
+#include "Engine/Entities/EntityManager.h"
 
 namespace Quadbit {
-	constexpr int MAX_MESH_COUNT = 65536;
-	constexpr int MAX_TEXTURES = 50;
-
-	struct MeshBuffers {
-		VertexBufHandle vertexBufferIdx_;
-		IndexBufHandle indexBufferIdx_;
-		std::array<QbVkBuffer, MAX_MESH_COUNT> vertexBuffers_;
-		std::array<QbVkBuffer, MAX_MESH_COUNT> indexBuffers_;
-		std::deque<VertexBufHandle> vertexBufferFreeList_;
-		std::deque<IndexBufHandle> indexBufferFreeList_;
-
-		VertexBufHandle GetNextVertexHandle() {
-			VertexBufHandle next = vertexBufferIdx_;
-			if(vertexBufferFreeList_.empty()) {
-				vertexBufferIdx_++;
-				assert(next < MAX_MESH_COUNT && "Cannot get next vertex buffer handle for mesh, max number of handles in use!");
-				return next;
-			}
-			else {
-				next = vertexBufferFreeList_.front();
-				vertexBufferFreeList_.pop_front();
-				assert(next < MAX_MESH_COUNT && "Cannot get next index buffer handle for mesh, max number of handles in use!");
-				return next;
-			}
-		}
-
-		IndexBufHandle GetNextIndexHandle() {
-			IndexBufHandle next = indexBufferIdx_;
-			if(indexBufferFreeList_.empty()) {
-				indexBufferIdx_++;
-				assert(next < MAX_MESH_COUNT);
-				return next;
-			}
-			else {
-				next = indexBufferFreeList_.front();
-				indexBufferFreeList_.pop_front();
-				assert(next < MAX_MESH_COUNT);
-				return next;
-			}
-		}
-	};
-
 	class MeshPipeline {
 	public:
 		MeshPipeline(std::shared_ptr<QbVkContext> context);
@@ -90,12 +51,11 @@ namespace Quadbit {
 		std::shared_ptr<QbVkRenderMeshInstance> CreateInstance(std::vector<QbVkRenderDescriptor>& descriptors, std::vector<QbVkVertexInputAttribute> vertexAttribs, 
 			const char* vertexShader, const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry, int pushConstantStride = -1,
 			VkShaderStageFlags pushConstantShaderStage = VK_SHADER_STAGE_VERTEX_BIT, VkBool32 depthTestingEnabled = VK_TRUE);
-		void DestroyInstance(QbVkRenderMeshInstance& instance);
+		void DestroyInstance(std::shared_ptr<QbVkRenderMeshInstance> instance);
 
 		Entity GetActiveCamera();
 		VkDescriptorImageInfo GetEnvironmentMapDescriptor();
 		void LoadEnvironmentMap(const char* environmentTexture, VkFormat textureFormat);
-
 
 		RenderTexturedObjectComponent CreateObject(const char* objPath, const char* texturePath, VkFormat textureFormat);
 	};

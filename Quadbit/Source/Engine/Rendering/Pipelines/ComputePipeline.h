@@ -1,20 +1,9 @@
 #pragma once
 
-#include "../Common/QbVkUtils.h"
+#include "Engine/Core/QbRenderDefs.h"
+#include "Engine/Core/QbVulkanDefs.h"
 
 namespace Quadbit {
-	struct QbVkComputeInstance {
-		VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
-		VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
-		VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
-		VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
-		VkPipeline pipeline = VK_NULL_HANDLE;
-		VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
-		VkQueryPool queryPool = VK_NULL_HANDLE;
-
-		double msAvgTime = 0.0;
-	};
-
 	class ComputePipeline {
 	public:
 		ComputePipeline(std::shared_ptr<QbVkContext> context);

@@ -1,10 +1,9 @@
 #pragma once
 #include <deque>
 
-
-#include "EventTag.h"
-#include "ComponentPool.h"
-#include "SystemDispatch.h"
+#include "Engine/Core/QbEntityDefs.h"
+#include "Engine/Core/QbRenderDefs.h"
+#include "Engine/Entities/SystemDispatch.h"
 
 namespace Quadbit {
 	class EntityManager;
@@ -51,7 +50,7 @@ namespace Quadbit {
 	*/
 	class EntityManager {
 	public:
-		std::unique_ptr<SystemDispatch> systemDispatch_ = std::make_unique<SystemDispatch>();
+		std::unique_ptr<SystemDispatch> systemDispatch_;
 		std::array<std::shared_ptr<ComponentPool>, MAX_COMPONENTS> componentPools_;
 
 		static EntityManager* GetOrCreate();
@@ -164,9 +163,8 @@ namespace Quadbit {
 		// Holds free entity indices
 		std::deque<uint32_t> entityFreeList_;
 
-		// Use default constructor/destructor
-		EntityManager() = default;
-		~EntityManager() = default;
+		// Constructor
+		EntityManager();
 		// Delete copy constructor and assignment operator
 		EntityManager(const EntityManager&) = delete;
 		EntityManager& operator= (const EntityManager&) = delete;

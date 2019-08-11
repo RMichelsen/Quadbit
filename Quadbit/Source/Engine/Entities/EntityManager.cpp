@@ -1,9 +1,10 @@
 #include <PCH.h>
-#include "EntityManager.h"
+
+#include "Engine/Entities/EntityManager.h"
+#include "Engine/Entities/SystemDispatch.h"
 
 namespace Quadbit {
 	Entity::Entity() : manager_(EntityManager::GetOrCreate()), id_(0, 1) {}
-
 
 	void Entity::Destroy() {
 		manager_->Destroy(*this);
@@ -12,6 +13,10 @@ namespace Quadbit {
 	bool Entity::IsValid() {
 		if(manager_ == nullptr) return false;
 		return id_.version == manager_->GetEntityVersion(id_);
+	}
+
+	EntityManager::EntityManager() {
+		systemDispatch_ = std::make_unique<SystemDispatch>();
 	}
 
 	EntityManager* EntityManager::GetOrCreate() {

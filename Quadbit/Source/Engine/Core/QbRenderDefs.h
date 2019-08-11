@@ -1,25 +1,59 @@
 #pragma once
-#include <stdint.h>
 
-#include "../Entities/EventTag.h"
-#include "Common/QbVkDefines.h"
+#define VK_USE_PLATFORM_WIN32_KHR
+#include <vulkan/vulkan.h>
+#include <vector>
+#include <array>
+#include <deque>
 
-#include <glm/mat4x4.hpp>
-#include <glm/vec3.hpp>
+#include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
-#include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/quaternion.hpp>
 
-#include "../Core/Logging.h"
+#include "Engine/Core/QbVulkanDefs.h"
+#include "Engine/Core/Logging.h"
+
+inline constexpr int MAX_MESH_COUNT = 65536;
+inline constexpr int MAX_TEXTURES = 50;
 
 namespace Quadbit {
-	struct QbVkRenderMeshInstance {
-		VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
-		VkPipeline pipeline = VK_NULL_HANDLE;
+	struct MeshBuffers {
+		VertexBufHandle vertexBufferIdx_;
+		IndexBufHandle indexBufferIdx_;
+		std::array<QbVkBuffer, MAX_MESH_COUNT> vertexBuffers_;
+		std::array<QbVkBuffer, MAX_MESH_COUNT> indexBuffers_;
+		std::deque<VertexBufHandle> vertexBufferFreeList_;
+		std::deque<IndexBufHandle> indexBufferFreeList_;
 
-		VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
-		VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
-		std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> descriptorSets{};
+		VertexBufHandle GetNextVertexHandle() {
+			VertexBufHandle next = vertexBufferIdx_;
+			if(vertexBufferFreeList_.empty()) {
+				vertexBufferIdx_++;
+				assert(next < MAX_MESH_COUNT && "Cannot get next vertex buffer handle for mesh, max number of handles in use!");
+				return next;
+			}
+			else {
+				next = vertexBufferFreeList_.front();
+				vertexBufferFreeList_.pop_front();
+				assert(next < MAX_MESH_COUNT && "Cannot get next index buffer handle for mesh, max number of handles in use!");
+				return next;
+			}
+		}
+
+		IndexBufHandle GetNextIndexHandle() {
+			IndexBufHandle next = indexBufferIdx_;
+			if(indexBufferFreeList_.empty()) {
+				indexBufferIdx_++;
+				assert(next < MAX_MESH_COUNT);
+				return next;
+			}
+			else {
+				next = indexBufferFreeList_.front();
+				indexBufferFreeList_.pop_front();
+				assert(next < MAX_MESH_COUNT);
+				return next;
+			}
+		}
 	};
 
 	struct MeshVertex {
@@ -127,7 +161,7 @@ namespace Quadbit {
 
 		template<typename T>
 		T* GetSafePushConstPtr() {
-			if (sizeof(T) > 128) {
+			if(sizeof(T) > 128) {
 				QB_LOG_ERROR("Push Constants must have a max size of 128 bytes");
 				return nullptr;
 			}
@@ -145,7 +179,7 @@ namespace Quadbit {
 
 		template<typename T>
 		T* GetSafePushConstPtr() {
-			if (sizeof(T) > 128) {
+			if(sizeof(T) > 128) {
 				QB_LOG_ERROR("Push Constants must have a max size of 128 bytes");
 				return nullptr;
 			}
@@ -153,6 +187,8 @@ namespace Quadbit {
 		}
 	};
 
+	// Just a tag, the tag is automatically removed when an entity with the tag is iterated over
+	struct EventTagComponent {};
 	struct CameraUpdateAspectRatioTag : public EventTagComponent {};
 
 	struct RenderCamera {

@@ -4,10 +4,10 @@
 #include <glm/glm.hpp>
 #include <glm/vec3.hpp>
 
-#include "../../Core/InputHandler.h"
-#include "../../Entities/EntityManager.h"
-#include "../../Entities/ComponentSystem.h"
-#include "../../Rendering/RenderTypes.h"
+#include "Engine/Core/InputHandler.h"
+#include "Engine/Core/QbRenderDefs.h"
+#include "Engine/Entities/EntityManager.h"
+#include "Engine/Entities/ComponentSystem.h"
 
 namespace Quadbit {
 	struct NoClipCameraSystem : ComponentSystem {
