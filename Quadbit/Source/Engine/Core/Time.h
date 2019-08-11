@@ -1,5 +1,7 @@
 #pragma once
 
+#include <chrono>
+
 namespace Quadbit::Time {
 	using clock = std::chrono::high_resolution_clock;
 

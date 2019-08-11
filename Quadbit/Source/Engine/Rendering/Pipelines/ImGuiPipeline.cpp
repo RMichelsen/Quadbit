@@ -6,6 +6,7 @@
 #include "../../Core/Time.h"
 #include "../../Global/ImGuiState.h"
 #include "../../Entities/EntityManager.h"
+#include "../ShaderBytecode.h"
 #include "ComputePipeline.h"
 
 
@@ -237,10 +238,8 @@ namespace Quadbit {
 		VK_CHECK(vkCreatePipelineCache(context_->device, &pipelineCacheInfo, nullptr, &pipelineCache_));
 
 		// We start off by reading the shader bytecode from disk and creating the modules subsequently
-		std::vector<char> vertexShaderBytecode = VkUtils::ReadShader("Resources/Shaders/Compiled/imgui_vert.spv");
-		std::vector<char> fragmentShaderBytecode = VkUtils::ReadShader("Resources/Shaders/Compiled/imgui_frag.spv");
-		VkShaderModule vertShaderModule = VkUtils::CreateShaderModule(vertexShaderBytecode, context_->device);
-		VkShaderModule fragShaderModule = VkUtils::CreateShaderModule(fragmentShaderBytecode, context_->device);
+		VkShaderModule vertShaderModule = VkUtils::CreateShaderModule(imguiVert.data(), static_cast<uint32_t>(imguiVert.size()), context_->device);
+		VkShaderModule fragShaderModule = VkUtils::CreateShaderModule(imguiFrag.data(), static_cast<uint32_t>(imguiFrag.size()), context_->device);
 
 		// This part specifies the two shader types used in the pipeline
 		VkPipelineShaderStageCreateInfo shaderStageInfo[2] = {

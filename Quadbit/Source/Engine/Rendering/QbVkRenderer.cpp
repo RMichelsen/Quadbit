@@ -176,6 +176,12 @@ namespace Quadbit {
 		return meshPipeline_->CreateInstance(descriptors, vertexAttribs, vertexShader, vertexEntry, fragmentShader, fragmentEntry, pushConstantStride, pushConstantShaderStage);
 	}
 
+	std::shared_ptr<QbVkRenderMeshInstance> QbVkRenderer::CreateRenderMeshInstance(std::vector<QbVkVertexInputAttribute> vertexAttribs, const char* vertexShader, 
+		const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry, int pushConstantStride, VkShaderStageFlags pushConstantShaderStage) {
+		std::vector<QbVkRenderDescriptor> empty{};
+		return meshPipeline_->CreateInstance(empty, vertexAttribs, vertexShader, vertexEntry, fragmentShader, fragmentEntry, pushConstantStride, pushConstantShaderStage);
+	}
+
 	void QbVkRenderer::ComputeDispatch(std::shared_ptr<QbVkComputeInstance> instance) {
 		computePipeline_->Dispatch(instance);
 	}

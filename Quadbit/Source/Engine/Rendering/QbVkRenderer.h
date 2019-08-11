@@ -6,6 +6,7 @@
 #include "Pipelines/ComputePipeline.h"
 #include "Memory/QbVkAllocator.h"
 #include "../Entities/EntityManager.h"
+#include "../Core/Logging.h"
 
 namespace Quadbit {
 	class QbVkRenderer {
@@ -53,6 +54,8 @@ namespace Quadbit {
 		std::shared_ptr<QbVkRenderMeshInstance> CreateRenderMeshInstance(std::vector<QbVkRenderDescriptor>& descriptors,
 			std::vector<QbVkVertexInputAttribute> vertexAttribs, const char* vertexShader, const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry,
 			int pushConstantStride = -1, VkShaderStageFlags pushConstantShaderStage = VK_SHADER_STAGE_VERTEX_BIT);
+		std::shared_ptr<QbVkRenderMeshInstance> CreateRenderMeshInstance(std::vector<QbVkVertexInputAttribute> vertexAttribs, const char* vertexShader, const char* vertexEntry, 
+			const char* fragmentShader, const char* fragmentEntry, int pushConstantStride = -1, VkShaderStageFlags pushConstantShaderStage = VK_SHADER_STAGE_VERTEX_BIT);
 		void ComputeDispatch(std::shared_ptr<QbVkComputeInstance> instance);
 		void ComputeRecord(std::shared_ptr<QbVkComputeInstance> instance, std::function<void()> func);
 		void DestroyMesh(const RenderMeshComponent& mesh);

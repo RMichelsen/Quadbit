@@ -1,9 +1,8 @@
 #pragma once
 
-#include "../Engine/Rendering/QbVkRenderer.h"
-#include "../Engine/Rendering/Common/QbVkDefines.h"
-#include "../Engine/Entities/EntityManager.h"
-
+#include "Engine/Rendering/QbVkRenderer.h"
+#include "Engine/Rendering/Common/QbVkDefines.h"
+#include "Engine/Entities/EntityManager.h"
 
 constexpr int WATER_RESOLUTION = 512;
 constexpr VkFormat IMAGE_FORMAT = VK_FORMAT_R32G32B32A32_SFLOAT;

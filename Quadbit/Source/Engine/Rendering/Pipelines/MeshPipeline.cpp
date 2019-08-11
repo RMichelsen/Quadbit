@@ -14,6 +14,8 @@
 
 #include "../Systems/NoClipCameraSystem.h"
 
+#include "../ShaderBytecode.h"
+
 namespace Quadbit {
 	MeshPipeline::MeshPipeline(std::shared_ptr<QbVkContext> context) {
 		this->context_ = context;
@@ -146,7 +148,9 @@ namespace Quadbit {
 			vkCmdBindVertexBuffers(commandbuffer, 0, 1, &meshBuffers_.vertexBuffers_[mesh.vertexHandle].buf, offsets);
 			vkCmdBindIndexBuffer(commandbuffer, meshBuffers_.indexBuffers_[mesh.indexHandle].buf, 0, VK_INDEX_TYPE_UINT32);
 
-			vkCmdBindDescriptorSets(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh.instance->pipelineLayout, 0, 1, &mesh.instance->descriptorSets[resourceIndex], 0, nullptr);
+			if(mesh.instance->descriptorSetLayout != VK_NULL_HANDLE) {
+				vkCmdBindDescriptorSets(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh.instance->pipelineLayout, 0, 1, &mesh.instance->descriptorSets[resourceIndex], 0, nullptr);
+			}
 			vkCmdDrawIndexed(commandbuffer, mesh.indexCount, 1, 0, 0, 0);
 		});
 	}
@@ -175,10 +179,8 @@ namespace Quadbit {
 
 	void MeshPipeline::CreatePipeline() {
 		// We start off by reading the shader bytecode from disk and creating the modules subsequently
-		std::vector<char> vertexShaderBytecode = VkUtils::ReadShader("Resources/Shaders/Compiled/default_vert.spv");
-		std::vector<char> fragmentShaderBytecode = VkUtils::ReadShader("Resources/Shaders/Compiled/default_frag.spv");
-		VkShaderModule vertShaderModule = VkUtils::CreateShaderModule(vertexShaderBytecode, context_->device);
-		VkShaderModule fragShaderModule = VkUtils::CreateShaderModule(fragmentShaderBytecode, context_->device);
+		VkShaderModule vertShaderModule = VkUtils::CreateShaderModule(defaultVert.data(), static_cast<uint32_t>(defaultVert.size()), context_->device);
+		VkShaderModule fragShaderModule = VkUtils::CreateShaderModule(defaultFrag.data(), static_cast<uint32_t>(defaultFrag.size()), context_->device);
 
 		// This part specifies the two shader types used in the pipeline
 		VkPipelineShaderStageCreateInfo shaderStageInfo[2] = {
@@ -390,55 +392,57 @@ namespace Quadbit {
 
 		auto renderMeshInstance = std::make_shared<QbVkRenderMeshInstance>();
 
-		std::vector<VkDescriptorPoolSize> poolSizes;
-		for (auto i = 0; i < descriptors.size(); i++) {
-			poolSizes.push_back(VkUtils::Init::DescriptorPoolSize(descriptors[i].type, descriptors[i].count));
-		}
-
-		VkDescriptorPoolCreateInfo poolInfo{};
-		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
-		poolInfo.pPoolSizes = poolSizes.data();
-		poolInfo.maxSets = MAX_FRAMES_IN_FLIGHT;
-
-		VK_CHECK(vkCreateDescriptorPool(context_->device, &poolInfo, nullptr, &renderMeshInstance->descriptorPool));
-
-
-		std::vector<VkDescriptorSetLayoutBinding> descSetLayoutBindings;
-		for (auto i = 0; i < descriptors.size(); i++) {
-			descSetLayoutBindings.push_back(VkUtils::Init::DescriptorSetLayoutBinding(i, descriptors[i].type, descriptors[i].shaderStage, descriptors[i].count));
-		}
-
-		VkDescriptorSetLayoutCreateInfo descSetLayoutCreateInfo = VkUtils::Init::DescriptorSetLayoutCreateInfo();
-		descSetLayoutCreateInfo.pBindings = descSetLayoutBindings.data();
-		descSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(descSetLayoutBindings.size());
-
-		VK_CHECK(vkCreateDescriptorSetLayout(context_->device, &descSetLayoutCreateInfo, nullptr, &renderMeshInstance->descriptorSetLayout));
-
-
-		std::vector<VkDescriptorSetLayout> layouts(context_->swapchain.images.size(), renderMeshInstance->descriptorSetLayout);
-		VkDescriptorSetAllocateInfo descSetallocInfo = VkUtils::Init::DescriptorSetAllocateInfo();
-		descSetallocInfo.descriptorPool = renderMeshInstance->descriptorPool;
-		descSetallocInfo.descriptorSetCount = MAX_FRAMES_IN_FLIGHT;
-		descSetallocInfo.pSetLayouts = layouts.data();
-
-		VK_CHECK(vkAllocateDescriptorSets(context_->device, &descSetallocInfo, renderMeshInstance->descriptorSets.data()));
-
-		for (auto i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-			std::vector<VkWriteDescriptorSet> writeDescSets;
-			for (auto j = 0; j < descriptors.size(); j++) {
-				if (descriptors[j].type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER || descriptors[j].type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) {
-					writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(renderMeshInstance->descriptorSets[i], descriptors[j].type, j,
-						static_cast<VkDescriptorBufferInfo*>(descriptors[j].data), descriptors[j].count));
-				
-				}
-				else if (descriptors[j].type == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE || descriptors[j].type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) {
-					writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(renderMeshInstance->descriptorSets[i], descriptors[j].type, j,
-						static_cast<VkDescriptorImageInfo*>(descriptors[j].data), descriptors[j].count));
-				}
+		if(!descriptors.empty()) {
+			std::vector<VkDescriptorPoolSize> poolSizes;
+			for (auto i = 0; i < descriptors.size(); i++) {
+				poolSizes.push_back(VkUtils::Init::DescriptorPoolSize(descriptors[i].type, descriptors[i].count));
 			}
 
-			vkUpdateDescriptorSets(context_->device, static_cast<uint32_t>(writeDescSets.size()), writeDescSets.data(), 0, nullptr);
+			VkDescriptorPoolCreateInfo poolInfo{};
+			poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+			poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+			poolInfo.pPoolSizes = poolSizes.data();
+			poolInfo.maxSets = MAX_FRAMES_IN_FLIGHT;
+
+			VK_CHECK(vkCreateDescriptorPool(context_->device, &poolInfo, nullptr, &renderMeshInstance->descriptorPool));
+
+
+			std::vector<VkDescriptorSetLayoutBinding> descSetLayoutBindings;
+			for (auto i = 0; i < descriptors.size(); i++) {
+				descSetLayoutBindings.push_back(VkUtils::Init::DescriptorSetLayoutBinding(i, descriptors[i].type, descriptors[i].shaderStage, descriptors[i].count));
+			}
+
+			VkDescriptorSetLayoutCreateInfo descSetLayoutCreateInfo = VkUtils::Init::DescriptorSetLayoutCreateInfo();
+			descSetLayoutCreateInfo.pBindings = descSetLayoutBindings.data();
+			descSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(descSetLayoutBindings.size());
+
+			VK_CHECK(vkCreateDescriptorSetLayout(context_->device, &descSetLayoutCreateInfo, nullptr, &renderMeshInstance->descriptorSetLayout));
+
+
+			std::vector<VkDescriptorSetLayout> layouts(context_->swapchain.images.size(), renderMeshInstance->descriptorSetLayout);
+			VkDescriptorSetAllocateInfo descSetallocInfo = VkUtils::Init::DescriptorSetAllocateInfo();
+			descSetallocInfo.descriptorPool = renderMeshInstance->descriptorPool;
+			descSetallocInfo.descriptorSetCount = MAX_FRAMES_IN_FLIGHT;
+			descSetallocInfo.pSetLayouts = layouts.data();
+
+			VK_CHECK(vkAllocateDescriptorSets(context_->device, &descSetallocInfo, renderMeshInstance->descriptorSets.data()));
+
+			for (auto i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+				std::vector<VkWriteDescriptorSet> writeDescSets;
+				for (auto j = 0; j < descriptors.size(); j++) {
+					if (descriptors[j].type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER || descriptors[j].type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) {
+						writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(renderMeshInstance->descriptorSets[i], descriptors[j].type, j,
+							static_cast<VkDescriptorBufferInfo*>(descriptors[j].data), descriptors[j].count));
+				
+					}
+					else if (descriptors[j].type == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE || descriptors[j].type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) {
+						writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(renderMeshInstance->descriptorSets[i], descriptors[j].type, j,
+							static_cast<VkDescriptorImageInfo*>(descriptors[j].data), descriptors[j].count));
+					}
+				}
+
+				vkUpdateDescriptorSets(context_->device, static_cast<uint32_t>(writeDescSets.size()), writeDescSets.data(), 0, nullptr);
+			}
 		}
 
 		// We start off by reading the shader bytecode from disk and creating the modules subsequently
