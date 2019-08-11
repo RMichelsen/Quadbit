@@ -20,8 +20,8 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
-    <ProjectGuid>{6D4EC1BE-0057-49A6-B4DD-7B0ACDB00C11}</ProjectGuid>
-    <RootNamespace>Water</RootNamespace>
+    <ProjectGuid>{2A0E3A3B-8831-4915-9F0A-7DFE5FCD9D26}</ProjectGuid>
+    <RootNamespace>Voxels</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -77,21 +77,24 @@
     <OutDir>$(SolutionDir)Bin\$(Configuration)\$(Platform)\</OutDir>
     <IntDir>$(SolutionDir)Bin\$(Configuration)\$(Platform)-$(ProjectName)-int\</IntDir>
   </PropertyGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
-      <Optimization>Disabled</Optimization>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(VULKAN_SDK)\Include;$(SolutionDir)Quadbit\Source;$(SolutionDir)Quadbit\Extern</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalIncludeDirectories>$(VULKAN_SDK)\Include;$(SolutionDir)Quadbit\Source;$(SolutionDir)Quadbit\Extern</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <AdditionalDependencies>vulkan-1.lib;Quadbit.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
       <AdditionalLibraryDirectories>$(VULKAN_SDK)\Lib;$(SolutionDir)BinLib\$(Configuration)\$(Platform)\</AdditionalLibraryDirectories>
+      <AdditionalDependencies>vulkan-1.lib;Quadbit.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -103,6 +106,22 @@
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <SDLCheck>true</SDLCheck>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalIncludeDirectories>$(VULKAN_SDK)\Include;$(SolutionDir)Quadbit\Source;$(SolutionDir)Quadbit\Extern</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <AdditionalLibraryDirectories>$(VULKAN_SDK)\Lib;$(SolutionDir)BinLib\$(Configuration)\$(Platform)\</AdditionalLibraryDirectories>
+      <AdditionalDependencies>vulkan-1.lib;Quadbit.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -120,44 +139,61 @@
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
-      <Optimization>MaxSpeed</Optimization>
-      <FunctionLevelLinking>true</FunctionLevelLinking>
-      <IntrinsicFunctions>true</IntrinsicFunctions>
-      <SDLCheck>true</SDLCheck>
-      <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(VULKAN_SDK)\Include;$(SolutionDir)Quadbit\Source;$(SolutionDir)Quadbit\Extern</AdditionalIncludeDirectories>
-      <LanguageStandard>stdcpp17</LanguageStandard>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+  <ItemGroup>
+    <ClCompile Include="Source\Extern\FastNoiseSIMD\FastNoiseSIMD.cpp">
+      <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">MultiThreadedDebug</RuntimeLibrary>
+      <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Release|x64'">MultiThreaded</RuntimeLibrary>
     </ClCompile>
-    <Link>
-      <SubSystem>Windows</SubSystem>
-      <EnableCOMDATFolding>true</EnableCOMDATFolding>
-      <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>vulkan-1.lib;Quadbit.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(VULKAN_SDK)\Lib;$(SolutionDir)BinLib\$(Configuration)\$(Platform)\</AdditionalLibraryDirectories>
-    </Link>
-  </ItemDefinitionGroup>
-  <ItemGroup>
-    <ClInclude Include="Source\Water.h" />
+    <ClCompile Include="Source\Extern\FastNoiseSIMD\FastNoiseSIMD_avx2.cpp">
+      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|x64'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+      <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">MultiThreadedDebug</RuntimeLibrary>
+      <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Release|x64'">MultiThreaded</RuntimeLibrary>
+    </ClCompile>
+    <ClCompile Include="Source\Extern\FastNoiseSIMD\FastNoiseSIMD_avx512.cpp">
+      <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">MultiThreadedDebug</RuntimeLibrary>
+      <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Release|x64'">MultiThreaded</RuntimeLibrary>
+    </ClCompile>
+    <ClCompile Include="Source\Extern\FastNoiseSIMD\FastNoiseSIMD_internal.cpp">
+      <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">MultiThreadedDebug</RuntimeLibrary>
+      <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Release|x64'">MultiThreaded</RuntimeLibrary>
+    </ClCompile>
+    <ClCompile Include="Source\Extern\FastNoiseSIMD\FastNoiseSIMD_neon.cpp">
+      <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">MultiThreadedDebug</RuntimeLibrary>
+      <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Release|x64'">MultiThreaded</RuntimeLibrary>
+    </ClCompile>
+    <ClCompile Include="Source\Extern\FastNoiseSIMD\FastNoiseSIMD_sse2.cpp">
+      <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">MultiThreadedDebug</RuntimeLibrary>
+      <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Release|x64'">MultiThreaded</RuntimeLibrary>
+    </ClCompile>
+    <ClCompile Include="Source\Extern\FastNoiseSIMD\FastNoiseSIMD_sse41.cpp">
+      <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">MultiThreadedDebug</RuntimeLibrary>
+      <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Release|x64'">MultiThreaded</RuntimeLibrary>
+    </ClCompile>
+    <ClCompile Include="Source\Infinitum.cpp">
+      <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Release|x64'">MultiThreaded</RuntimeLibrary>
+      <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">MultiThreadedDebug</RuntimeLibrary>
+    </ClCompile>
+    <ClCompile Include="Source\Main.cpp">
+      <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Release|x64'">MultiThreaded</RuntimeLibrary>
+      <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">MultiThreadedDebug</RuntimeLibrary>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Source\Main.cpp" />
-    <ClCompile Include="Source\Water.cpp" />
+    <ClInclude Include="Source\Data\Components.h" />
+    <ClInclude Include="Source\Data\Defines.h" />
+    <ClInclude Include="Source\Extern\FastNoiseSIMD\FastNoiseSIMD.h" />
+    <ClInclude Include="Source\Extern\FastNoiseSIMD\FastNoiseSIMD_internal.h" />
+    <ClInclude Include="Source\Infinitum.h" />
+    <ClInclude Include="Source\Systems\MeshGenerationSystem.h" />
+    <ClInclude Include="Source\Systems\PlayerMovementSystem.h" />
+    <ClInclude Include="Source\Systems\ThirdPersonCameraSystem.h" />
+    <ClInclude Include="Source\Systems\VoxelGenerationSystem.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Resources\Shaders\compileshaders.bat" />
-    <None Include="Resources\Shaders\displacement_comp.glsl" />
-    <None Include="Resources\Shaders\ifft_comp.glsl" />
-    <None Include="Resources\Shaders\precalc_comp.glsl" />
-    <None Include="Resources\Shaders\skybox_frag.glsl" />
-    <None Include="Resources\Shaders\skybox_vert.glsl" />
-    <None Include="Resources\Shaders\water_frag.glsl" />
-    <None Include="Resources\Shaders\water_vert.glsl" />
-    <None Include="Resources\Shaders\waveheight_comp.glsl" />
+    <None Include="Source\Resources\Shaders\compileshaders.bat" />
+    <None Include="Source\Resources\Shaders\voxel_frag.glsl" />
+    <None Include="Source\Resources\Shaders\voxel_vert.glsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

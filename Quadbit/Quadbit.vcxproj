@@ -494,6 +494,7 @@
     <ClInclude Include="Source\Engine\Rendering\Pipelines\MeshPipeline.h" />
     <ClInclude Include="Source\Engine\Rendering\QbVkRenderer.h" />
     <ClInclude Include="Source\Engine\Rendering\RenderTypes.h" />
+    <ClInclude Include="Source\Engine\Rendering\ShaderBytecode.h" />
     <ClInclude Include="Source\Engine\Rendering\Systems\NoClipCameraSystem.h" />
     <ClInclude Include="Source\PCH\PCH.h" />
   </ItemGroup>
@@ -676,6 +677,10 @@
     <None Include="Extern\glm\gtx\vector_angle.inl" />
     <None Include="Extern\glm\gtx\vector_query.inl" />
     <None Include="Extern\glm\gtx\wrap.inl" />
+    <None Include="Resources\default_frag.glsl" />
+    <None Include="Resources\default_vert.glsl" />
+    <None Include="Resources\imgui_frag.glsl" />
+    <None Include="Resources\imgui_vert.glsl" />
     <None Include="Resources\Shaders\compileshaders.bat" />
     <None Include="Resources\Shaders\ifft_comp.glsl" />
     <None Include="Resources\Shaders\imgui_frag.glsl" />

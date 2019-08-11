@@ -7,6 +7,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Quadbit", "Quadbit\Quadbit.
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Water", "Examples\Water\Water.vcxproj", "{6D4EC1BE-0057-49A6-B4DD-7B0ACDB00C11}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Voxels", "Examples\Voxels\Voxels.vcxproj", "{2A0E3A3B-8831-4915-9F0A-7DFE5FCD9D26}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -31,6 +33,14 @@ Global
 		{6D4EC1BE-0057-49A6-B4DD-7B0ACDB00C11}.Release|x64.Build.0 = Release|x64
 		{6D4EC1BE-0057-49A6-B4DD-7B0ACDB00C11}.Release|x86.ActiveCfg = Release|Win32
 		{6D4EC1BE-0057-49A6-B4DD-7B0ACDB00C11}.Release|x86.Build.0 = Release|Win32
+		{2A0E3A3B-8831-4915-9F0A-7DFE5FCD9D26}.Debug|x64.ActiveCfg = Debug|x64
+		{2A0E3A3B-8831-4915-9F0A-7DFE5FCD9D26}.Debug|x64.Build.0 = Debug|x64
+		{2A0E3A3B-8831-4915-9F0A-7DFE5FCD9D26}.Debug|x86.ActiveCfg = Debug|Win32
+		{2A0E3A3B-8831-4915-9F0A-7DFE5FCD9D26}.Debug|x86.Build.0 = Debug|Win32
+		{2A0E3A3B-8831-4915-9F0A-7DFE5FCD9D26}.Release|x64.ActiveCfg = Release|x64
+		{2A0E3A3B-8831-4915-9F0A-7DFE5FCD9D26}.Release|x64.Build.0 = Release|x64
+		{2A0E3A3B-8831-4915-9F0A-7DFE5FCD9D26}.Release|x86.ActiveCfg = Release|Win32
+		{2A0E3A3B-8831-4915-9F0A-7DFE5FCD9D26}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

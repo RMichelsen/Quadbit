@@ -387,47 +387,39 @@ namespace Quadbit::VkUtils {
 		if(gpu.deviceProps.deviceType != GPUType) return false;
 
 		// Get device queues
-		{
-			uint32_t queueCount = 0;
-			vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueCount, nullptr);
-			if(queueCount == 0) return false;
+		uint32_t queueCount = 0;
+		vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueCount, nullptr);
+		if(queueCount == 0) return false;
 
-			gpu.queueProps.resize(queueCount);
-			vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueCount, gpu.queueProps.data());
-		}
+		gpu.queueProps.resize(queueCount);
+		vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueCount, gpu.queueProps.data());
 
 		// Get device extensions
-		{
-			uint32_t extensionCount = 0;
-			VK_CHECK(vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extensionCount, nullptr));
-			if(extensionCount == 0) return false;
+		uint32_t extensionCount = 0;
+		VK_CHECK(vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extensionCount, nullptr));
+		if(extensionCount == 0) return false;
 
-			gpu.extensionProps.resize(extensionCount);
-			VK_CHECK(vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extensionCount, gpu.extensionProps.data()));
-		}
+		gpu.extensionProps.resize(extensionCount);
+		VK_CHECK(vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extensionCount, gpu.extensionProps.data()));
 
 		// Get surface capabilities
 		VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, context->surface, &gpu.surfaceCapabilities));
 
 		// Get supported surface formats
-		{
-			uint32_t formatCount = 0;
-			VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, context->surface, &formatCount, nullptr));
-			if(formatCount == 0) return false;
+		uint32_t formatCount = 0;
+		VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, context->surface, &formatCount, nullptr));
+		if(formatCount == 0) return false;
 
-			gpu.surfaceFormats.resize(formatCount);
-			VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, context->surface, &formatCount, gpu.surfaceFormats.data()));
-		}
+		gpu.surfaceFormats.resize(formatCount);
+		VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, context->surface, &formatCount, gpu.surfaceFormats.data()));
 
 		// Get supported present modes
-		{
-			uint32_t presentModeCount = 0;
-			VK_CHECK(vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, context->surface, &presentModeCount, nullptr));
-			if(presentModeCount == 0) return false;
+		uint32_t presentModeCount = 0;
+		VK_CHECK(vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, context->surface, &presentModeCount, nullptr));
+		if(presentModeCount == 0) return false;
 
-			gpu.presentModes.resize(presentModeCount);
-			VK_CHECK(vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, context->surface, &presentModeCount, gpu.presentModes.data()));
-		}
+		gpu.presentModes.resize(presentModeCount);
+		VK_CHECK(vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, context->surface, &presentModeCount, gpu.presentModes.data()));
 
 		// Get device supported memory types
 		vkGetPhysicalDeviceMemoryProperties(physicalDevice, &gpu.memoryProps);
@@ -622,6 +614,19 @@ namespace Quadbit::VkUtils {
 		shaderModuleInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 		shaderModuleInfo.codeSize = bytecode.size();
 		shaderModuleInfo.pCode = reinterpret_cast<const uint32_t*>(bytecode.data());
+
+		VkShaderModule shaderModule;
+		VK_CHECK(vkCreateShaderModule(device, &shaderModuleInfo, nullptr, &shaderModule));
+
+		return shaderModule;
+	}
+
+	inline VkShaderModule CreateShaderModule(const uint32_t* data, const uint32_t size, VkDevice& device) {
+		// Creates the shader module using raw bytecode
+		VkShaderModuleCreateInfo shaderModuleInfo{};
+		shaderModuleInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+		shaderModuleInfo.codeSize = size * sizeof(uint32_t);
+		shaderModuleInfo.pCode = data;
 
 		VkShaderModule shaderModule;
 		VK_CHECK(vkCreateShaderModule(device, &shaderModuleInfo, nullptr, &shaderModule));

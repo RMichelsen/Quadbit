@@ -996,6 +996,9 @@
     <ClInclude Include="Extern\gli\view.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Engine\Rendering\ShaderBytecode.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="Extern\glm\detail\func_common.inl">
@@ -1547,6 +1550,10 @@
     </None>
     <None Include="Resources\Shaders\skybox_frag.glsl" />
     <None Include="Resources\Shaders\skybox_vert.glsl" />
+    <None Include="Resources\default_frag.glsl" />
+    <None Include="Resources\default_vert.glsl" />
+    <None Include="Resources\imgui_frag.glsl" />
+    <None Include="Resources\imgui_vert.glsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Extern\glm\detail\glm.cpp">

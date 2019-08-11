@@ -46,7 +46,7 @@ constexpr const char* DEVICE_EXT_NAMES[DEVICE_EXT_COUNT]{
 
 constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
-constexpr const char* VulkanErrorToString(VkResult vkResult) {
+inline constexpr const char* VulkanErrorToString(VkResult vkResult) {
 	switch(vkResult) {
 		VK_ERROR_STRING(VK_SUCCESS);
 		VK_ERROR_STRING(VK_NOT_READY);

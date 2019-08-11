@@ -27,4 +27,17 @@
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\Shaders\compileshaders.bat">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="Resources\Shaders\displacement_comp.glsl" />
+    <None Include="Resources\Shaders\ifft_comp.glsl" />
+    <None Include="Resources\Shaders\precalc_comp.glsl" />
+    <None Include="Resources\Shaders\skybox_frag.glsl" />
+    <None Include="Resources\Shaders\skybox_vert.glsl" />
+    <None Include="Resources\Shaders\water_frag.glsl" />
+    <None Include="Resources\Shaders\water_vert.glsl" />
+    <None Include="Resources\Shaders\waveheight_comp.glsl" />
+  </ItemGroup>
 </Project>
