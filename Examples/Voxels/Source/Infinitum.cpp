@@ -12,7 +12,7 @@
 void Infinitum::Init() {
 	// Setup entities
 	auto entityManager = Quadbit::EntityManager::GetOrCreate();
-	entityManager->RegisterComponents<VoxelBlockComponent, VoxelBlockUpdateTag, MeshGenerationUpdateTag, PlayerTag>();
+	entityManager->RegisterComponents<VoxelBlockComponent, VoxelBlockUpdateTag, MeshGenerationUpdateTag, MeshReadyTag, PlayerTag>();
 
 	//camera_ = entityManager->Create();
 	//camera_.AddComponent<Quadbit::RenderCamera>(Quadbit::RenderCamera(0.0f, 0.0f, glm::vec3(), renderer_->GetAspectRatio(), 10000.0f));
@@ -44,8 +44,14 @@ void Infinitum::Simulate(float deltaTime) {
 	static int i = 1;
 	auto entityManager = Quadbit::EntityManager::GetOrCreate();
 
+	auto t1 = std::chrono::high_resolution_clock::now();
 	entityManager->systemDispatch_->RunSystem<VoxelGenerationSystem>(deltaTime, fastnoise_);
 	entityManager->systemDispatch_->RunSystem<MeshGenerationSystem>(deltaTime, renderer_.get(), renderMeshInstance_);
+	auto t2 = std::chrono::high_resolution_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
+	if(duration > 100) {
+		printf("Generated voxels in %I64i microseconds\n", duration);
+	}
 
 	if(Quadbit::InputHandler::KeyPressed(0x50)) {
 		auto entity = entityManager->Create();

@@ -88,6 +88,9 @@
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalIncludeDirectories>$(VULKAN_SDK)\Include;$(SolutionDir)Quadbit\Source;$(SolutionDir)Quadbit\Extern</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <FloatingPointModel>Fast</FloatingPointModel>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -191,6 +194,9 @@
     <ClInclude Include="Source\Systems\VoxelGenerationSystem.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Resources\Shaders\compileshaders.bat" />
+    <None Include="Resources\Shaders\voxel_frag.glsl" />
+    <None Include="Resources\Shaders\voxel_vert.glsl" />
     <None Include="Source\Resources\Shaders\compileshaders.bat" />
     <None Include="Source\Resources\Shaders\voxel_frag.glsl" />
     <None Include="Source\Resources\Shaders\voxel_vert.glsl" />
