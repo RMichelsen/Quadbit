@@ -2,6 +2,7 @@
 
 #include "../Data/Defines.h"
 #include "../Data/Components.h"
+#include "../Utils/TerrainTools.h"
 
 #include "Engine/Rendering/QbVkRenderer.h"
 #include "Engine/Entities/EntityManager.h"
@@ -140,11 +141,11 @@ struct MeshGenerationSystem : Quadbit::ComponentSystem {
 		static const glm::float4 OCCLUSION_CURVE = glm::float4{ 0.55f, 0.7f, 0.85f, 1.0f };
 
 		const bool ocSide1 = (sides[0].x < VOXEL_BLOCK_WIDTH && sides[0].x >= 0 && sides[0].y < VOXEL_BLOCK_WIDTH && sides[0].y >= 0 && sides[0].z < VOXEL_BLOCK_WIDTH && sides[0].z >= 0)
-			? (voxels[ConvertIndex(sides[0])].fillType == Solid) : false;
+			? (voxels[ConvertIndex(sides[0])].fillType == FillType::Solid) : false;
 		const bool ocSide2 = (sides[1].x < VOXEL_BLOCK_WIDTH && sides[1].x >= 0 && sides[1].y < VOXEL_BLOCK_WIDTH && sides[1].y >= 0 && sides[1].z < VOXEL_BLOCK_WIDTH && sides[1].z >= 0)
-			? (voxels[ConvertIndex(sides[1])].fillType == Solid) : false;
+			? (voxels[ConvertIndex(sides[1])].fillType == FillType::Solid) : false;
 		const bool ocCorner = (sides[2].x < VOXEL_BLOCK_WIDTH && sides[2].x >= 0 && sides[2].y < VOXEL_BLOCK_WIDTH && sides[2].y >= 0 && sides[2].z < VOXEL_BLOCK_WIDTH && sides[2].z >= 0)
-			? (voxels[ConvertIndex(sides[2])].fillType == Solid) : false;
+			? (voxels[ConvertIndex(sides[2])].fillType == FillType::Solid) : false;
 
 		if(ocSide1 && ocSide2) {
 			return OCCLUSION_CURVE[0];
@@ -213,16 +214,21 @@ struct MeshGenerationSystem : Quadbit::ComponentSystem {
 		return axisVectors;
 	}
 
-	void GreedyMeshGeneration(Quadbit::QbVkRenderer* renderer, std::shared_ptr<Quadbit::QbVkRenderMeshInstance> rMeshInstance) {
-		auto entityManager = Quadbit::EntityManager::GetOrCreate();
+	void GreedyMeshGeneration(Quadbit::QbVkRenderer* renderer, std::shared_ptr<Quadbit::QbVkRenderMeshInstance> rMeshInstance, FastNoiseSIMD* colourGenerator) {
+		auto& entityManager = Quadbit::EntityManager::Instance();
 
-		entityManager->ParForEach<Quadbit::RenderTransformComponent, VoxelBlockComponent, MeshGenerationUpdateTag>
+		entityManager.ParForEachAddTag<Quadbit::RenderTransformComponent, VoxelBlockComponent, MeshGenerationUpdateTag>
 			([&](Quadbit::Entity entity, Quadbit::RenderTransformComponent& transform, VoxelBlockComponent& block, auto& tag) {
 
 			block.vertices.clear();
 			block.indices.clear();
 			std::vector<bool> visited;
 			visited.resize(VOXEL_BLOCK_SIZE);
+
+			float* colourNoise = colourGenerator->GetCellularSet(
+				static_cast<int>(transform.position.z), 0, static_cast<int>(transform.position.x),
+				VOXEL_BLOCK_WIDTH, 1, VOXEL_BLOCK_WIDTH, 1.0f
+			);
 
 			for(uint32_t face = static_cast<uint32_t>(VisibleFaces::North); face <= static_cast<uint32_t>(VisibleFaces::Bottom); face *= 2) {
 				visited.assign(VOXEL_BLOCK_SIZE, false);
@@ -244,6 +250,9 @@ struct MeshGenerationSystem : Quadbit::ComponentSystem {
 							// Calculate ambient occlusion
 							glm::float4 ao = CalculateFaceAmbientOcclusion(static_cast<VisibleFaces>(face), idx3D, block.voxels);
 
+							// Calculate colour
+							glm::vec3 colour = TerrainTools::GetColour(block.voxels[idx1D].region, y, colourNoise[(z * VOXEL_BLOCK_WIDTH) + x]);
+
 							// Get axis endpoints
 							glm::int2x3 axesEnds = GetAxisEndpoints(dirVectors, idx3D);
 
@@ -255,7 +264,8 @@ struct MeshGenerationSystem : Quadbit::ComponentSystem {
 								// Make sure the voxel is visible and filled, and not visited previously, and that the AO values are the same as the current voxel
 								if(static_cast<uint32_t>(block.voxels[idx].visibleFaces & static_cast<VisibleFaces>(face)) == 0 ||
 									block.voxels[idx].fillType == FillType::Empty || visited[idx] ||
-									(ao != CalculateFaceAmbientOcclusion(static_cast<VisibleFaces>(face), firstDest, block.voxels))) {
+									ao != CalculateFaceAmbientOcclusion(static_cast<VisibleFaces>(face), firstDest, block.voxels) ||
+									colour != TerrainTools::GetColour(block.voxels[idx].region, y, colourNoise[(firstDest.z * VOXEL_BLOCK_WIDTH) + firstDest.x])) {
 									break;
 								}
 								visited[idx] = true;
@@ -273,7 +283,8 @@ struct MeshGenerationSystem : Quadbit::ComponentSystem {
 									// Make sure the voxel is visible and filled, and not visited previously, and that the AO values are the same as the current voxel
 									if(static_cast<uint32_t>(block.voxels[idx].visibleFaces & static_cast<VisibleFaces>(face)) == 0 ||
 										block.voxels[idx].fillType == FillType::Empty || visited[idx] ||
-										(ao != CalculateFaceAmbientOcclusion(static_cast<VisibleFaces>(face), firstDirSubRun, block.voxels))) {
+										ao != CalculateFaceAmbientOcclusion(static_cast<VisibleFaces>(face), firstDirSubRun, block.voxels) ||
+										colour != TerrainTools::GetColour(block.voxels[idx].region, y, colourNoise[(firstDirSubRun.z * VOXEL_BLOCK_WIDTH) + firstDirSubRun.x])) {
 										break;
 									}
 								}
@@ -288,25 +299,26 @@ struct MeshGenerationSystem : Quadbit::ComponentSystem {
 								}
 							}
 
-							const float heightCoeff = static_cast<float>(y) / VOXEL_BLOCK_WIDTH;
-							glm::vec3 colour = glm::vec3(0.4f + (heightCoeff * 0.4f), 0.7f - (heightCoeff * 0.2f), 0.1f);
+							//glm::vec3 colour = glm::vec3(0.4f + (heightCoeff * 0.4f), 0.7f - (heightCoeff * 0.2f), 0.1f);
 							AddQuad(static_cast<VisibleFaces>(face), { idx3D, firstDest, secondDest, combinedDest }, colour, ao, block.vertices, block.indices);
 						}
 					}
 				}
 			}
+
+			colourGenerator->FreeNoiseSet(colourNoise);
 		}, MeshReadyTag{});
 
-		entityManager->ForEach<VoxelBlockComponent, MeshReadyTag>
+		entityManager.ForEach<VoxelBlockComponent, MeshReadyTag>
 			([&](Quadbit::Entity entity, VoxelBlockComponent& block, auto& tag) {
 			entity.AddComponent<Quadbit::RenderMeshComponent>(renderer->CreateMesh(block.vertices, sizeof(VoxelVertex), block.indices, rMeshInstance));
 		});
 	}
 
 	void CulledMeshGeneration(Quadbit::QbVkRenderer* renderer, std::shared_ptr<Quadbit::QbVkRenderMeshInstance> rMeshInstance) {
-		auto entityManager = Quadbit::EntityManager::GetOrCreate();
+		auto& entityManager = Quadbit::EntityManager::Instance();
 
-		entityManager->ParForEach<Quadbit::RenderTransformComponent, VoxelBlockComponent, MeshGenerationUpdateTag>
+		entityManager.ParForEachAddTag<Quadbit::RenderTransformComponent, VoxelBlockComponent, MeshGenerationUpdateTag>
 			([&](Quadbit::Entity entity, Quadbit::RenderTransformComponent& transform, VoxelBlockComponent& block, auto& tag) {
 
 			block.vertices.clear();
@@ -337,14 +349,14 @@ struct MeshGenerationSystem : Quadbit::ComponentSystem {
 			}
 		}, MeshReadyTag{});
 
-		entityManager->ForEach<VoxelBlockComponent, MeshReadyTag>
+		entityManager.ForEach<VoxelBlockComponent, MeshReadyTag>
 			([&](Quadbit::Entity entity, VoxelBlockComponent& block, auto& tag) {
 			entity.AddComponent<Quadbit::RenderMeshComponent>(renderer->CreateMesh(block.vertices, sizeof(VoxelVertex), block.indices, rMeshInstance));
 		});
 
 	}
 
-	void Update(float dt, Quadbit::QbVkRenderer* renderer, std::shared_ptr<Quadbit::QbVkRenderMeshInstance> rMeshInstance) {
-		GreedyMeshGeneration(renderer, rMeshInstance);
+	void Update(float dt, Quadbit::QbVkRenderer* renderer, std::shared_ptr<Quadbit::QbVkRenderMeshInstance> rMeshInstance, FastNoiseSIMD* colourGenerator) {
+		GreedyMeshGeneration(renderer, rMeshInstance, colourGenerator);
 	}
 };

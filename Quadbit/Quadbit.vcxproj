@@ -477,6 +477,7 @@
     <ClInclude Include="Source\Engine\Application\Window.h" />
     <ClInclude Include="Source\Engine\Core\QbEntityDefs.h" />
     <ClInclude Include="Source\Engine\Core\QbRenderDefs.h" />
+    <ClInclude Include="Source\Engine\Core\QbVulkanInternalDefs.h" />
     <ClInclude Include="Source\Engine\Entities\EntityManager.h" />
     <ClInclude Include="Source\Engine\Core\Sfinae.h" />
     <ClInclude Include="Source\Engine\Entities\ComponentSystem.h" />

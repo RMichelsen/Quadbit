@@ -50,7 +50,7 @@ void Water::Init() {
 		"Resources/Shaders/Compiled/water_vert.spv", "main", "Resources/Shaders/Compiled/water_frag.spv", "main"
 	);
 
-	auto entityManager = Quadbit::EntityManager::GetOrCreate();
+	auto entityManager = Quadbit::EntityManager::Instance();
 
 	for(auto i = 0; i < WATER_RESOLUTION * 2; i += WATER_RESOLUTION) {
 		for(auto j = 0; j < WATER_RESOLUTION * 2; j += WATER_RESOLUTION) {

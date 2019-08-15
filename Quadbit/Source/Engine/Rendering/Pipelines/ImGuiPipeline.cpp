@@ -231,11 +231,6 @@ namespace Quadbit {
 		pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout_;
 		VK_CHECK(vkCreatePipelineLayout(context_->device, &pipelineLayoutInfo, nullptr, &pipelineLayout_));
 
-
-		// Create pipeline cache
-		VkPipelineCacheCreateInfo pipelineCacheInfo = VkUtils::Init::PipelineCacheCreateInfo();
-		VK_CHECK(vkCreatePipelineCache(context_->device, &pipelineCacheInfo, nullptr, &pipelineCache_));
-
 		// We start off by reading the shader bytecode from disk and creating the modules subsequently
 		VkShaderModule vertShaderModule = VkUtils::CreateShaderModule(imguiVert.data(), static_cast<uint32_t>(imguiVert.size()), context_->device);
 		VkShaderModule fragShaderModule = VkUtils::CreateShaderModule(imguiFrag.data(), static_cast<uint32_t>(imguiFrag.size()), context_->device);
@@ -338,7 +333,7 @@ namespace Quadbit {
 		pipelineInfo.layout = pipelineLayout_;
 		pipelineInfo.renderPass = context_->mainRenderPass;
 
-		VK_CHECK(vkCreateGraphicsPipelines(context_->device, pipelineCache_, 1, &pipelineInfo, nullptr, &pipeline_));
+		VK_CHECK(vkCreateGraphicsPipelines(context_->device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline_));
 
 		vkDestroyShaderModule(context_->device, vertShaderModule, nullptr);
 		vkDestroyShaderModule(context_->device, fragShaderModule, nullptr);

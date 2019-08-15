@@ -76,6 +76,7 @@ namespace Quadbit {
 		}
 		RenderMeshComponent CreateMesh(const char* objPath, std::vector<QbVkVertexInputAttribute> vertexModel, std::shared_ptr<QbVkRenderMeshInstance> externalInstance,
 			int pushConstantStride = -1);
+		void DestroyMesh(RenderMeshComponent& renderMeshComponent);
 		VertexBufHandle CreateVertexBuffer(const void* vertices, uint32_t vertexStride, uint32_t vertexCount);
 		IndexBufHandle CreateIndexBuffer(const std::vector<uint32_t>& indices);
 		template<typename T>
@@ -91,7 +92,7 @@ namespace Quadbit {
 		HINSTANCE localHandle_ = NULL;
 		HWND windowHandle_ = NULL;
 
-		EntityManager* entityManager_;
+		EntityManager& entityManager_;
 
 		VkInstance instance_ = VK_NULL_HANDLE;
 		std::shared_ptr<QbVkContext> context_ = std::make_shared<QbVkContext>();

@@ -10,6 +10,7 @@
 #include <glm/gtx/compatibility.hpp>
 
 #include "Engine/Core/QbVulkanDefs.h"
+#include "Engine/Core/QbVulkanInternalDefs.h"
 #include "Engine/Core/Logging.h"
 #include "Engine/Rendering/Memory/QbVkAllocator.h"
 
@@ -754,6 +755,58 @@ namespace Quadbit::VkUtils {
 
 		vkFreeCommandBuffers(context->device, context->commandPool, 1, &commandBuffer);
 		vkDestroyFence(context->device, fence, nullptr);
+	}
+
+	inline bool QueryAsyncBuffer(const std::shared_ptr<QbVkContext>& context, QbVkAsyncBuffer& buffer) {
+		if(!buffer.ready) {
+			VkResult result = vkGetFenceStatus(context->device, buffer.fence);
+			if(result == VK_SUCCESS) {
+				// Destroy the staging buffer 
+				// (we don't need to hang on to these resources on the CPU after they've been copied and the buffer is ready)
+				context->allocator->DestroyBuffer(buffer.stagingBuffer);
+				buffer.ready = true;
+			}
+		}
+		return buffer.ready;
+	}
+
+	inline void AsyncBufferIssueCopy(const std::shared_ptr<QbVkContext>& context, QbVkAsyncBuffer& buffer, VkDeviceSize bufferSize) {
+		// Begin recording
+		VkCommandBufferBeginInfo cmdBeginInfo = Init::CommandBufferBeginInfo();
+		cmdBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+		VK_CHECK(vkBeginCommandBuffer(buffer.copyCommandBuffer, &cmdBeginInfo));
+
+		// Issue copy command
+		VkBufferCopy copyRegion{};
+		copyRegion.srcOffset = 0;
+		copyRegion.dstOffset = 0;
+		copyRegion.size = bufferSize;
+		vkCmdCopyBuffer(buffer.copyCommandBuffer, buffer.stagingBuffer.buf, buffer.buf, 1, &copyRegion);
+
+		// End recording
+		VK_CHECK(vkEndCommandBuffer(buffer.copyCommandBuffer));
+
+		VkSubmitInfo submitInfo = Init::SubmitInfo();
+		submitInfo.commandBufferCount = 1;
+		submitInfo.pCommandBuffers = &buffer.copyCommandBuffer;
+
+		// Submit to queue
+		VK_CHECK(vkQueueSubmit(context->graphicsQueue, 1, &submitInfo, buffer.fence));
+	}
+
+	inline void CreateAsyncBuffer(const std::shared_ptr<QbVkContext>& context, QbVkAsyncBuffer& buffer, VkDeviceSize bufferSize, const void* data, VkBufferUsageFlags bufferUsage) {
+		context->allocator->CreateStagingBuffer(buffer.stagingBuffer, bufferSize, data);
+
+		VkBufferCreateInfo bufferInfo = VkUtils::Init::BufferCreateInfo(bufferSize, bufferUsage);
+		context->allocator->CreateBuffer(buffer, bufferInfo, QBVK_MEMORY_USAGE_GPU_ONLY);
+
+		// Allocate and create commandbuffer and fence for the mesh vertex buffer
+		VkCommandBufferAllocateInfo allocInfo = VkUtils::Init::CommandBufferAllocateInfo(context->commandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
+		VK_CHECK(vkAllocateCommandBuffers(context->device, &allocInfo, &buffer.copyCommandBuffer));
+		VkFenceCreateInfo fenceCreateInfo = VkUtils::Init::FenceCreateInfo();
+		VK_CHECK(vkCreateFence(context->device, &fenceCreateInfo, nullptr, &buffer.fence));
+
+		VkUtils::AsyncBufferIssueCopy(context, buffer, bufferSize);
 	}
 
 	inline void CopyBuffer(const std::shared_ptr<QbVkContext>& context, VkBuffer src, VkBuffer dst, VkDeviceSize size) {

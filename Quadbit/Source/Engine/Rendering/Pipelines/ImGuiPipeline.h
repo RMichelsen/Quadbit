@@ -35,7 +35,6 @@ namespace Quadbit {
 
 		VkPipelineLayout pipelineLayout_ = VK_NULL_HANDLE;
 		VkPipeline pipeline_ = VK_NULL_HANDLE;
-		VkPipelineCache pipelineCache_ = VK_NULL_HANDLE;
 		PushConstBlock pushConstBlock_{};
 
 		std::array<QbVkBuffer, MAX_FRAMES_IN_FLIGHT> vertexBuffer_;

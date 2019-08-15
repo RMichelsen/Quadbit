@@ -35,15 +35,19 @@ inline VisibleFaces operator ~ (const VisibleFaces a) {
 	return static_cast<VisibleFaces>(~static_cast<type>(a));
 }
 
-enum FillType {
+enum class FillType {
 	Empty,
 	Solid
+};
+
+enum class Region {
+	Forest
 };
 
 struct Voxel {
 	FillType fillType;
 	VisibleFaces visibleFaces;
-	glm::float4 ambientOcclusion;
+	Region region;
 };
 
 struct VoxelBlockUpdateTag : Quadbit::EventTagComponent {};

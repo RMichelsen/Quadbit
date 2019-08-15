@@ -20,8 +20,8 @@ namespace Quadbit {
 	struct MeshBuffers {
 		VertexBufHandle vertexBufferIdx_;
 		IndexBufHandle indexBufferIdx_;
-		std::array<QbVkBuffer, MAX_MESH_COUNT> vertexBuffers_;
-		std::array<QbVkBuffer, MAX_MESH_COUNT> indexBuffers_;
+		std::array<QbVkAsyncBuffer, MAX_MESH_COUNT> vertexBuffers_;
+		std::array<QbVkAsyncBuffer, MAX_MESH_COUNT> indexBuffers_;
 		std::deque<VertexBufHandle> vertexBufferFreeList_;
 		std::deque<IndexBufHandle> indexBufferFreeList_;
 
@@ -185,6 +185,12 @@ namespace Quadbit {
 			}
 			return reinterpret_cast<T*>(pushConstants.data());
 		}
+	};
+
+	struct RenderMeshDeleteComponent {
+		VertexBufHandle vertexHandle;
+		IndexBufHandle indexHandle;
+		uint32_t count;
 	};
 
 	// Just a tag, the tag is automatically removed when an entity with the tag is iterated over

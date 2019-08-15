@@ -3,6 +3,9 @@
 #include "Engine/Entities/EntityManager.h"
 #include "Engine/Entities/ComponentSystem.h"
 
+#include "../Extern/FastNoiseSIMD/FastNoiseSIMD.h"
+
+#include "../Utils/TerrainTools.h"
 #include "../Data/Defines.h"
 #include "../Data/Components.h"
 
@@ -12,17 +15,22 @@ struct VoxelGenerationSystem : Quadbit::ComponentSystem {
 		return x + VOXEL_BLOCK_WIDTH * (y + VOXEL_BLOCK_WIDTH * z);
 	}
 
-	void Update(float dt, FastNoiseSIMD* fastnoise) {
-		auto entityManager = Quadbit::EntityManager::GetOrCreate();
+	void Update(float dt, FastNoiseSIMD* fastnoiseTerrain, FastNoiseSIMD* fastnoiseRegion) {
+		auto& entityManager = Quadbit::EntityManager::Instance();
 
-		entityManager->ParForEach<Quadbit::RenderTransformComponent, VoxelBlockComponent, VoxelBlockUpdateTag>
+		entityManager.ParForEachAddTag<Quadbit::RenderTransformComponent, VoxelBlockComponent, VoxelBlockUpdateTag>
 			([&](Quadbit::Entity entity, Quadbit::RenderTransformComponent& transform, VoxelBlockComponent& block, auto& tag) {
 			auto& voxels = block.voxels;
 
 			// This perlin set generates noise roughly in the region of -0.8f to 0.8f
-			float* noise = fastnoise->GetPerlinSet(
+			float* terrainNoise = fastnoiseTerrain->GetNoiseSet(
 				static_cast<int>(transform.position.z), 0, static_cast<int>(transform.position.x), 
 				VOXEL_BLOCK_WIDTH, 1, VOXEL_BLOCK_WIDTH, 0.25f
+			);
+
+			float* regionNoise = fastnoiseRegion->GetCellularSet(
+				static_cast<int>(transform.position.z), 0, static_cast<int>(transform.position.x),
+				VOXEL_BLOCK_WIDTH, 1, VOXEL_BLOCK_WIDTH, 1.0f
 			);
 
 			for(auto z = 0; z < VOXEL_BLOCK_WIDTH; z++) {
@@ -30,8 +38,10 @@ struct VoxelGenerationSystem : Quadbit::ComponentSystem {
 					for(auto x = 0; x < VOXEL_BLOCK_WIDTH; x++) {
 						auto& voxel = voxels[ConvertIndex(x, y, z)];
 
-						const bool belowCutoff = (y + transform.position.y) < (VOXEL_BLOCK_WIDTH * ((noise[(z * VOXEL_BLOCK_WIDTH) + x] + 0.8f) / 1.6f ));
+						const bool belowCutoff = (y + transform.position.y) < (VOXEL_BLOCK_WIDTH * ((terrainNoise[(z * VOXEL_BLOCK_WIDTH) + x] + 0.8f) / 1.6f ));
 						belowCutoff ? voxel.fillType = FillType::Solid : voxel.fillType = FillType::Empty;
+
+						voxel.region = TerrainTools::GetRegion(regionNoise[(z * VOXEL_BLOCK_WIDTH) + x]);
 					}
 				}
 			}
@@ -65,7 +75,8 @@ struct VoxelGenerationSystem : Quadbit::ComponentSystem {
 					}
 				}
 			}
-			fastnoise->FreeNoiseSet(noise);
+			fastnoiseTerrain->FreeNoiseSet(terrainNoise);
+			fastnoiseRegion->FreeNoiseSet(regionNoise);
 
 		}, MeshGenerationUpdateTag{});
 	}
