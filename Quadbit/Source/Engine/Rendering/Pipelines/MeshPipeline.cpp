@@ -365,7 +365,7 @@ namespace Quadbit {
 
 	void MeshPipeline::DestroyMesh(RenderMeshComponent& renderMeshComponent) {
 		auto entity = entityManager_.Create();
-		entity.AddComponent<RenderMeshDeleteComponent>({ renderMeshComponent.vertexHandle, renderMeshComponent.indexHandle, 2 });
+		entity.AddComponent<RenderMeshDeleteComponent>({ renderMeshComponent.vertexHandle, renderMeshComponent.indexHandle, MAX_FRAMES_IN_FLIGHT });
 	}
 
 	void MeshPipeline::DestroyVertexBuffer(VertexBufHandle handle) {
@@ -743,7 +743,7 @@ namespace Quadbit {
 			static_cast<uint32_t>(indices.size()),
 			textureCount++,
 			std::array<float, 32>(),
-			0,
+			-1
 		};
 	}
 }

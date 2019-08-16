@@ -32,6 +32,7 @@ public:
 	inline static FastNoiseSettings terrainSettings_;
 	inline static FastNoiseSettings colourSettings_;
 
+	void Test();
 	void Init();
 	void Simulate(float deltaTime);
 	void DrawFrame();

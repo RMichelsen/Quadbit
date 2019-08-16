@@ -198,10 +198,6 @@ namespace Quadbit {
 		return VkUtils::Init::MemoryBarrierVk(srcMask, dstMask);
 	}
 
-	RenderTexturedObjectComponent QbVkRenderer::CreateObject(const char* objPath, const char* texturePath, VkFormat textureFormat) {
-		return meshPipeline_->CreateObject(objPath, texturePath, textureFormat);
-	}
-
 	void QbVkRenderer::LoadEnvironmentMap(const char* environmentTexture, VkFormat textureFormat) {
 		meshPipeline_->LoadEnvironmentMap(environmentTexture, textureFormat);
 	}
@@ -275,6 +271,10 @@ namespace Quadbit {
 		const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry, int pushConstantStride, VkShaderStageFlags pushConstantShaderStage) {
 		std::vector<QbVkRenderDescriptor> empty{};
 		return meshPipeline_->CreateInstance(empty, vertexAttribs, vertexShader, vertexEntry, fragmentShader, fragmentEntry, pushConstantStride, pushConstantShaderStage);
+	}
+
+	RenderTexturedObjectComponent QbVkRenderer::CreateObject(const char* objPath, const char* texturePath, VkFormat textureFormat) {
+		return meshPipeline_->CreateObject(objPath, texturePath, textureFormat);
 	}
 
 	RenderMeshComponent QbVkRenderer::CreateMesh(const char* objPath, std::vector<QbVkVertexInputAttribute> vertexModel, std::shared_ptr<QbVkRenderMeshInstance> externalInstance,

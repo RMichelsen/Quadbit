@@ -42,6 +42,9 @@
     <ClCompile Include="Source\Extern\FastNoiseSIMD\FastNoiseSIMD_sse41.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Utils\VoxImporter.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Infinitum.h">
@@ -72,6 +75,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Source\Utils\TerrainTools.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Utils\VoxImporter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

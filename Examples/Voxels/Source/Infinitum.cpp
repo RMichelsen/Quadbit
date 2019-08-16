@@ -12,6 +12,26 @@
 #include "Systems/ThirdPersonCameraSystem.h"
 #include "Systems/PlayerMovementSystem.h"
 
+#include "Utils/VoxImporter.h"
+
+void Infinitum::Test() {
+	auto& entityManager = EntityManager::Instance();
+
+	renderMeshInstance_ = renderer_->CreateRenderMeshInstance({
+		Quadbit::QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_POSITION,
+		Quadbit::QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_COLOUR
+		},
+		"Resources/Shaders/Compiled/voxel_vert.spv", "main", "Resources/Shaders/Compiled/voxel_frag.spv", "main"
+	);
+
+	VoxImporter::MagicaVoxelModel model = VoxImporter::LoadVoxModel("Resources/Models/Castle.vox");
+	VoxImporter::MagicaVoxelMesh mesh = VoxImporter::VoxelModelMeshify(model);
+
+	auto tree = entityManager.Create();
+	tree.AddComponent<Quadbit::RenderTransformComponent>(Quadbit::RenderTransformComponent(1.0f, glm::vec3(0.0f, 0.0f, 0.0f), glm::quat()));
+	tree.AddComponent<Quadbit::RenderMeshComponent>(renderer_->CreateMesh(mesh.vertices, sizeof(VoxelVertex), mesh.indices, renderMeshInstance_));
+}
+
 void Infinitum::Init() {
 	// Setup entities
 	auto& entityManager = EntityManager::Instance();
@@ -37,11 +57,16 @@ void Infinitum::Init() {
 
 	// Initialize the noise generator 
 	fastnoiseTerrain_ = FastNoiseSIMD::NewFastNoiseSIMD(globalSeed);
-	fastnoiseTerrain_->SetFrequency(0.032f);
+	fastnoiseTerrain_->SetNoiseType(FastNoiseSIMD::SimplexFractal);
+	fastnoiseTerrain_->SetFrequency(0.025f);
+	fastnoiseTerrain_->SetFractalType(FastNoiseSIMD::FractalType::FBM);
+	fastnoiseTerrain_->SetFractalOctaves(2);
+	fastnoiseTerrain_->SetFractalLacunarity(2.33f);
+	fastnoiseTerrain_->SetFractalGain(0.366f);
 
 	// Initialize the colour generator
 	fastnoiseColours_ = FastNoiseSIMD::NewFastNoiseSIMD(globalSeed);
-	fastnoiseColours_->SetNoiseType(FastNoiseSIMD::NoiseType::Perlin);
+	fastnoiseColours_->SetNoiseType(FastNoiseSIMD::NoiseType::Simplex);
 	fastnoiseColours_->SetFrequency(0.002f);
 
 	// "Simulate voronoi noise"
