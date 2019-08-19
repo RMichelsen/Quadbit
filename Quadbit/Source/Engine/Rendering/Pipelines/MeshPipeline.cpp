@@ -24,7 +24,7 @@ namespace Quadbit {
 			RenderMeshDeleteComponent, RenderCamera, CameraUpdateAspectRatioTag>();
 
 		fallbackCamera_ = entityManager_.Create();
-		fallbackCamera_.AddComponent<RenderCamera>(Quadbit::RenderCamera(145.0f, -42.0f, glm::vec3(266.0f, 387.0f, 50.0f), 16.0f / 9.0f, 10000.0f));
+		fallbackCamera_.AddComponent<RenderCamera>(Quadbit::RenderCamera(145.0f, -42.0f, glm::vec3(130.0f, 190.0f, 25.0f), 16.0f / 9.0f, 10000.0f));
 
 		CreateDescriptorPoolAndLayout();
 		CreatePipeline();

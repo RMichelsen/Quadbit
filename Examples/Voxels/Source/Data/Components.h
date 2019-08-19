@@ -41,6 +41,7 @@ enum class FillType {
 };
 
 enum class Region {
+	MagicaVoxel,
 	Forest
 };
 
@@ -48,6 +49,7 @@ struct Voxel {
 	FillType fillType;
 	VisibleFaces visibleFaces;
 	Region region;
+	glm::float3 colour;
 };
 
 struct VoxelBlockUpdateTag : Quadbit::EventTagComponent {};

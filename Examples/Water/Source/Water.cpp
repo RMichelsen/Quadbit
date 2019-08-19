@@ -50,11 +50,11 @@ void Water::Init() {
 		"Resources/Shaders/Compiled/water_vert.spv", "main", "Resources/Shaders/Compiled/water_frag.spv", "main"
 	);
 
-	auto entityManager = Quadbit::EntityManager::Instance();
+	auto& entityManager = Quadbit::EntityManager::Instance();
 
 	for(auto i = 0; i < WATER_RESOLUTION * 2; i += WATER_RESOLUTION) {
 		for(auto j = 0; j < WATER_RESOLUTION * 2; j += WATER_RESOLUTION) {
-			auto entity = entityManager->Create();
+			auto entity = entityManager.Create();
 			entity.AddComponent<Quadbit::RenderMeshComponent>(renderer_->CreateMesh(waterVertices_, sizeof(glm::float3), waterIndices_, rMeshInstance));
 			entity.AddComponent<Quadbit::RenderTransformComponent>(Quadbit::RenderTransformComponent(1.0f, { i, 0.0f, j }, { 0, 0, 0, 1 }));
 		}

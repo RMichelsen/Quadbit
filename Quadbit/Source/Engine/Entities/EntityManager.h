@@ -256,8 +256,6 @@ namespace Quadbit {
 				}
 				});
 
-
-
 			std::for_each(std::execution::par, smallest.begin(), smallest.end(), [&](auto entityIndex) {
 				const bool allValid = ((std::get<sparseSetPtr<Components>>(pools)->sparse_[entityIndex] != 0xFFFF'FFFF) && ...);
 				if(!allValid) return;
@@ -337,7 +335,6 @@ namespace Quadbit {
 		constexpr F ForEachTupleImpl(Tuple&& t, F&& f, std::index_sequence<I...>) {
 			return (void)std::initializer_list<int>{(std::forward<F>(f)(std::get<I>(std::forward<Tuple>(t))), 0)...}, f;
 		}
-
 		template<typename Tuple, typename F>
 		constexpr F ForEachTuple(Tuple&& t, F&& f) {
 			return ForEachTupleImpl(std::forward<Tuple>(t), std::forward<F>(f),

@@ -184,7 +184,6 @@
       <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Release|x64'">MultiThreaded</RuntimeLibrary>
       <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
-    <ClCompile Include="Source\Utils\VoxImporter.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Data\Components.h" />
@@ -196,8 +195,10 @@
     <ClInclude Include="Source\Systems\PlayerMovementSystem.h" />
     <ClInclude Include="Source\Systems\ThirdPersonCameraSystem.h" />
     <ClInclude Include="Source\Systems\VoxelGenerationSystem.h" />
+    <ClInclude Include="Source\Utils\CommonUtils.h" />
     <ClInclude Include="Source\Utils\TerrainTools.h" />
-    <ClInclude Include="Source\Utils\VoxImporter.h" />
+    <ClInclude Include="Source\Utils\MagicaVoxImporter.h" />
+    <ClInclude Include="Source\Utils\VoxelMesher.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\Shaders\compileshaders.bat" />

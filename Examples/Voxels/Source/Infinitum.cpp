@@ -12,7 +12,7 @@
 #include "Systems/ThirdPersonCameraSystem.h"
 #include "Systems/PlayerMovementSystem.h"
 
-#include "Utils/VoxImporter.h"
+#include "Utils/VoxelMesher.h"
 
 void Infinitum::Test() {
 	auto& entityManager = EntityManager::Instance();
@@ -24,11 +24,10 @@ void Infinitum::Test() {
 		"Resources/Shaders/Compiled/voxel_vert.spv", "main", "Resources/Shaders/Compiled/voxel_frag.spv", "main"
 	);
 
-	VoxImporter::MagicaVoxelModel model = VoxImporter::LoadVoxModel("Resources/Models/Castle.vox");
-	VoxImporter::MagicaVoxelMesh mesh = VoxImporter::VoxelModelMeshify(model);
+	VoxelMesher::VoxelMesh mesh = MagicaVoxImporter::CreateVoxelMesh("Resources/Models/Tree.vox");
 
 	auto tree = entityManager.Create();
-	tree.AddComponent<Quadbit::RenderTransformComponent>(Quadbit::RenderTransformComponent(1.0f, glm::vec3(0.0f, 0.0f, 0.0f), glm::quat()));
+	tree.AddComponent<Quadbit::RenderTransformComponent>(Quadbit::RenderTransformComponent(1.0f, glm::vec3(16.0f, 30.0f, 16.0f), glm::quat()));
 	tree.AddComponent<Quadbit::RenderMeshComponent>(renderer_->CreateMesh(mesh.vertices, sizeof(VoxelVertex), mesh.indices, renderMeshInstance_));
 }
 
@@ -125,8 +124,8 @@ void Infinitum::Init() {
 void Infinitum::Simulate(float deltaTime) {
 	auto& entityManager = EntityManager::Instance();
 
-	entityManager.systemDispatch_->RunSystem<VoxelGenerationSystem>(deltaTime, fastnoiseTerrain_, fastnoiseRegions_);
-	entityManager.systemDispatch_->RunSystem<MeshGenerationSystem>(deltaTime, renderer_.get(), renderMeshInstance_, fastnoiseColours_);
+	entityManager.systemDispatch_->RunSystem<VoxelGenerationSystem>(deltaTime, fastnoiseTerrain_, fastnoiseRegions_, fastnoiseColours_);
+	entityManager.systemDispatch_->RunSystem<MeshGenerationSystem>(deltaTime, renderer_.get(), renderMeshInstance_);
 
 	if(Quadbit::InputHandler::KeyPressed(0x47)) {
 		for(auto&& entity : chunks_) {
