@@ -49,6 +49,24 @@ namespace Quadbit {
 		buffer.descriptor.range = bufferInfo.size;
 	}
 
+	void QbVkAllocator::CreateBuffer(QbVkAsyncBuffer& buffer, VkBufferCreateInfo& bufferInfo, QbVkMemoryUsage memoryUsage) {
+		VK_CHECK(vkCreateBuffer(device_, &bufferInfo, nullptr, &buffer.buf));
+
+		// This part finds the required memory properties for the buffer allocation
+		VkMemoryRequirements memoryRequirements;
+		vkGetBufferMemoryRequirements(device_, buffer.buf, &memoryRequirements);
+
+		buffer.alloc = Allocate(memoryRequirements.size, memoryRequirements.alignment,
+			memoryRequirements.memoryTypeBits, memoryUsage, QBVK_ALLOCATION_TYPE_BUFFER);
+
+		VK_CHECK(vkBindBufferMemory(device_, buffer.buf, buffer.alloc.deviceMemory, buffer.alloc.offset));
+
+		// Fill out the descriptor
+		buffer.descriptor.buffer = buffer.buf;
+		buffer.descriptor.offset = 0;
+		buffer.descriptor.range = bufferInfo.size;
+	}
+
 	void QbVkAllocator::CreateImage(QbVkImage& image, VkImageCreateInfo& imageInfo, QbVkMemoryUsage memoryUsage) {
 		VK_CHECK(vkCreateImage(device_, &imageInfo, nullptr, &image.imgHandle));
 
@@ -65,9 +83,21 @@ namespace Quadbit {
 		VK_CHECK(vkBindImageMemory(device_, image.imgHandle, image.alloc.deviceMemory, image.alloc.offset));
 	}
 
+	void QbVkAllocator::DestroyBuffer(QbVkAsyncBuffer& buffer, VkCommandPool commandPool) {
+		if(buffer.buf != VK_NULL_HANDLE) vkDestroyBuffer(device_, buffer.buf, nullptr);
+		if(buffer.alloc.deviceMemory != VK_NULL_HANDLE) Free(buffer.alloc);
+		if(buffer.fence != VK_NULL_HANDLE) vkDestroyFence(device_, buffer.fence, nullptr);
+		if(buffer.copyCommandBuffer != VK_NULL_HANDLE) vkFreeCommandBuffers(device_, commandPool, 1, &buffer.copyCommandBuffer);
+		if(buffer.stagingBuffer.buf != VK_NULL_HANDLE) DestroyBuffer(buffer.stagingBuffer);
+
+		buffer = QbVkAsyncBuffer{};
+	}
+
 	void QbVkAllocator::DestroyBuffer(QbVkBuffer& buffer) {
 		if(buffer.buf != VK_NULL_HANDLE) vkDestroyBuffer(device_, buffer.buf, nullptr);
 		if(buffer.alloc.deviceMemory != VK_NULL_HANDLE) Free(buffer.alloc);
+
+		buffer = QbVkBuffer{};
 	}
 
 	void QbVkAllocator::DestroyImage(QbVkImage& image) {

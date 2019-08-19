@@ -35,19 +35,31 @@ inline VisibleFaces operator ~ (const VisibleFaces a) {
 	return static_cast<VisibleFaces>(~static_cast<type>(a));
 }
 
-enum FillType {
+enum class FillType {
 	Empty,
 	Solid
+};
+
+enum class Region {
+	MagicaVoxel,
+	Forest
 };
 
 struct Voxel {
 	FillType fillType;
 	VisibleFaces visibleFaces;
-	glm::float4 ambientOcclusion;
+	Region region;
+	glm::float3 colour;
 };
 
 struct VoxelBlockUpdateTag : Quadbit::EventTagComponent {};
 struct MeshGenerationUpdateTag : Quadbit::EventTagComponent {};
+struct MeshReadyTag : Quadbit::EventTagComponent {};
+
+struct VoxelVertex {
+	glm::vec3 pos;
+	glm::vec3 col;
+};
 
 struct VoxelBlockComponent {
 	// Could be stored in a std::array but might overflow stack size
@@ -56,13 +68,10 @@ struct VoxelBlockComponent {
 		voxels.resize(VOXEL_BLOCK_SIZE);
 	}
 	std::vector<Voxel> voxels;
-};
 
-struct PlayerTag {};
-
-struct VoxelVertex {
-	glm::vec3 pos;
-	glm::vec3 col;
+	// Vectors necessary for mesh generation
+	std::vector<VoxelVertex> vertices;
+	std::vector<uint32_t> indices;
 };
 
 const std::vector<VoxelVertex> cubeVertices = {
@@ -91,3 +100,5 @@ const std::vector<uint32_t> cubeIndices = {
 	3, 2, 6,
 	6, 7, 3
 };
+
+struct PlayerTag {};

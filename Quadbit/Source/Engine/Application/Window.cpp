@@ -11,7 +11,6 @@ namespace Quadbit {
 		// No Windows bitmap-stretching
 		SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_SYSTEM_AWARE);
 
-
 		if(!SetupWindow(nCmdShow, windowProc)) {
 			QB_LOG_ERROR("Failed to setup win32 Window\n");
 			return;

@@ -21,7 +21,7 @@ namespace Quadbit {
 		friend class QbVkRenderer;
 
 		std::shared_ptr<QbVkContext> context_ = nullptr;
-		EntityManager* entityManager_ = nullptr;
+		EntityManager& entityManager_;
 
 		VkPipelineLayout pipelineLayout_ = VK_NULL_HANDLE;
 		VkPipeline pipeline_ = VK_NULL_HANDLE;
@@ -40,9 +40,13 @@ namespace Quadbit {
 		QbVkTexture environmentTexture_{};
 		Entity environmentMap_ = NULL_ENTITY;
 
+		std::vector<VertexBufHandle> vertexHandleDeleteQueue_;
+		std::vector<IndexBufHandle> indexHandleDeleteQueue_;
+
 		void CreateDescriptorPoolAndLayout();
 		void CreatePipeline();
 
+		void DestroyMesh(RenderMeshComponent& renderMeshComponent);
 		void DestroyVertexBuffer(VertexBufHandle handle);
 		void DestroyIndexBuffer(IndexBufHandle handle);
 		VertexBufHandle CreateVertexBuffer(const void* vertices, uint32_t vertexStride, uint32_t vertexCount);

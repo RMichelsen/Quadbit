@@ -15,15 +15,16 @@
 #include "Engine/Rendering/ShaderBytecode.h"
 
 namespace Quadbit {
-	MeshPipeline::MeshPipeline(std::shared_ptr<QbVkContext> context) {
-		this->context_ = context;
-		this->entityManager_ = EntityManager::GetOrCreate();
-		 
-		// Register the mesh component to be used by the ECS
-		entityManager_->RegisterComponents<RenderMeshComponent, RenderTexturedObjectComponent, RenderTransformComponent, RenderCamera, CameraUpdateAspectRatioTag>();
+	MeshPipeline::MeshPipeline(std::shared_ptr<QbVkContext> context) :
+		context_(context),
+		entityManager_(EntityManager::Instance()) {
 
-		fallbackCamera_ = entityManager_->Create();
-		fallbackCamera_.AddComponent<RenderCamera>(Quadbit::RenderCamera(145.0f, -42.0f, glm::vec3(266.0f, 387.0f, 50.0f), 16.0f / 9.0f, 10000.0f));
+		// Register the mesh component to be used by the ECS
+		entityManager_.RegisterComponents<RenderMeshComponent, RenderTexturedObjectComponent, RenderTransformComponent, 
+			RenderMeshDeleteComponent, RenderCamera, CameraUpdateAspectRatioTag>();
+
+		fallbackCamera_ = entityManager_.Create();
+		fallbackCamera_.AddComponent<RenderCamera>(Quadbit::RenderCamera(145.0f, -42.0f, glm::vec3(130.0f, 190.0f, 25.0f), 16.0f / 9.0f, 10000.0f));
 
 		CreateDescriptorPoolAndLayout();
 		CreatePipeline();
@@ -37,11 +38,15 @@ namespace Quadbit {
 		vkDestroyDescriptorPool(context_->device, descriptorPool_, nullptr);
 		vkDestroyDescriptorSetLayout(context_->device, descriptorSetLayout_, nullptr);
 
-		for(auto&& vertexBuffer : meshBuffers_.vertexBuffers_) {
-			context_->allocator->DestroyBuffer(vertexBuffer);
+		for(auto i = 0; i < meshBuffers_.vertexBufferIdx_; i++) {
+			if(std::find(meshBuffers_.vertexBufferFreeList_.begin(), meshBuffers_.vertexBufferFreeList_.end(), i) == meshBuffers_.vertexBufferFreeList_.end()) {
+				DestroyVertexBuffer(i);
+			}
 		}
-		for(auto&& indexBuffer : meshBuffers_.indexBuffers_) {
-			context_->allocator->DestroyBuffer(indexBuffer);
+		for(auto i = 0; i < meshBuffers_.indexBufferIdx_; i++) {
+			if(std::find(meshBuffers_.indexBufferFreeList_.begin(), meshBuffers_.indexBufferFreeList_.end(), i) == meshBuffers_.indexBufferFreeList_.end()) {
+				DestroyIndexBuffer(i);
+			}
 		}
 		for(auto&& instance : externalInstances_) {
 			DestroyInstance(instance);
@@ -61,14 +66,26 @@ namespace Quadbit {
 	}
 
 	void MeshPipeline::DrawFrame(uint32_t resourceIndex, VkCommandBuffer commandbuffer) {
-		entityManager_->ForEach<RenderCamera, CameraUpdateAspectRatioTag>([&](Entity entity, auto& camera, auto& tag) noexcept {
+		// Here we clean up meshes that are due for removal
+		entityManager_.ForEachWithCommandBuffer<RenderMeshDeleteComponent>([&](Entity entity, EntityCommandBuffer* cmdBuf, RenderMeshDeleteComponent& mesh) noexcept {
+			if(mesh.count == 0) {
+				DestroyVertexBuffer(mesh.vertexHandle);
+				DestroyIndexBuffer(mesh.indexHandle);
+				cmdBuf->DestroyEntity(entity);
+			}
+			else {
+				mesh.count--;
+			}
+		});
+
+		entityManager_.ForEach<RenderCamera, CameraUpdateAspectRatioTag>([&](Entity entity, auto& camera, auto& tag) noexcept {
 			camera.perspective =
 				glm::perspective(glm::radians(45.0f), static_cast<float>(context_->swapchain.extent.width) / static_cast<float>(context_->swapchain.extent.height), 0.1f, camera.viewDistance);
 			camera.perspective[1][1] *= -1;
 		});
 
 		if(userCamera_ == NULL_ENTITY || !userCamera_.IsValid()) {
-			entityManager_->systemDispatch_->RunSystem<NoClipCameraSystem>(Time::deltaTime);
+			entityManager_.systemDispatch_->RunSystem<NoClipCameraSystem>(Time::deltaTime);
 		}
 
 		Quadbit::RenderCamera* camera;
@@ -99,7 +116,10 @@ namespace Quadbit {
 
 		VkDeviceSize offsets[]{ 0 };
 
-		entityManager_->ForEach<RenderTexturedObjectComponent, RenderTransformComponent>([&](Entity entity, RenderTexturedObjectComponent& obj, RenderTransformComponent& transform) noexcept {
+		entityManager_.ForEach<RenderTexturedObjectComponent, RenderTransformComponent>([&](Entity entity, RenderTexturedObjectComponent& obj, RenderTransformComponent& transform) noexcept {
+			if(!VkUtils::QueryAsyncBuffer(context_, meshBuffers_.vertexBuffers_[obj.vertexHandle]) ||
+				!VkUtils::QueryAsyncBuffer(context_, meshBuffers_.indexBuffers_[obj.indexHandle])) return;
+
 			vkCmdBindPipeline(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
 
 			if(obj.pushConstantStride == -1) {
@@ -119,9 +139,11 @@ namespace Quadbit {
 			vkCmdDrawIndexed(commandbuffer, obj.indexCount, 1, 0, 0, 0);
 		});
 
-		entityManager_->ForEach<RenderMeshComponent, RenderTransformComponent>([&](Entity entity, RenderMeshComponent& mesh, RenderTransformComponent& transform) noexcept {
-			vkCmdBindPipeline(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh.instance->pipeline);
+		entityManager_.ForEach<RenderMeshComponent, RenderTransformComponent>([&](Entity entity, RenderMeshComponent& mesh, RenderTransformComponent& transform) noexcept {
+			if(!VkUtils::QueryAsyncBuffer(context_, meshBuffers_.vertexBuffers_[mesh.vertexHandle]) ||
+				!VkUtils::QueryAsyncBuffer(context_, meshBuffers_.indexBuffers_[mesh.indexHandle])) return;
 
+			vkCmdBindPipeline(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh.instance->pipeline);
 			// Dynamic update viewport and scissor for user-defined pipelines (also doesn't necessitate rebuilding the pipeline on window resize)
 			VkViewport viewport{};
 			VkRect2D scissor{};
@@ -341,48 +363,37 @@ namespace Quadbit {
 		vkDestroyShaderModule(context_->device, fragShaderModule, nullptr);
 	}
 
+	void MeshPipeline::DestroyMesh(RenderMeshComponent& renderMeshComponent) {
+		auto entity = entityManager_.Create();
+		entity.AddComponent<RenderMeshDeleteComponent>({ renderMeshComponent.vertexHandle, renderMeshComponent.indexHandle, MAX_FRAMES_IN_FLIGHT });
+	}
+
 	void MeshPipeline::DestroyVertexBuffer(VertexBufHandle handle) {
-		context_->allocator->DestroyBuffer(meshBuffers_.vertexBuffers_[handle]);
+		context_->allocator->DestroyBuffer(meshBuffers_.vertexBuffers_[handle], context_->commandPool);
+		meshBuffers_.vertexBuffers_[handle] = QbVkAsyncBuffer{};
 		meshBuffers_.vertexBufferFreeList_.push_front(handle);
 	}
 
 	void MeshPipeline::DestroyIndexBuffer(IndexBufHandle handle) {
-		context_->allocator->DestroyBuffer(meshBuffers_.indexBuffers_[handle]);
+		context_->allocator->DestroyBuffer(meshBuffers_.indexBuffers_[handle], context_->commandPool);
+		meshBuffers_.indexBuffers_[handle] = QbVkAsyncBuffer{};
 		meshBuffers_.indexBufferFreeList_.push_front(handle);
 	}
 
 	VertexBufHandle MeshPipeline::CreateVertexBuffer(const void* vertices, uint32_t vertexStride, uint32_t vertexCount) {
 		VertexBufHandle handle = meshBuffers_.GetNextVertexHandle();
-
 		VkDeviceSize bufferSize = static_cast<uint64_t>(vertexCount) * vertexStride;
 
-		QbVkBuffer stagingBuffer;
-		context_->allocator->CreateStagingBuffer(stagingBuffer, bufferSize, vertices);
-
-		VkBufferCreateInfo bufferInfo = VkUtils::Init::BufferCreateInfo(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-		context_->allocator->CreateBuffer(meshBuffers_.vertexBuffers_[handle], bufferInfo, QBVK_MEMORY_USAGE_GPU_ONLY);
-
-		VkUtils::CopyBuffer(context_, stagingBuffer.buf, meshBuffers_.vertexBuffers_[handle].buf, bufferSize);
-
-		context_->allocator->DestroyBuffer(stagingBuffer);
+		VkUtils::CreateAsyncBuffer(context_, meshBuffers_.vertexBuffers_[handle], bufferSize, vertices, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
 		return handle;
 	}
 
 	IndexBufHandle MeshPipeline::CreateIndexBuffer(const std::vector<uint32_t>& indices) {
 		IndexBufHandle handle = meshBuffers_.GetNextIndexHandle();
-
 		VkDeviceSize bufferSize = static_cast<uint32_t>(indices.size()) * sizeof(uint32_t);
 
-		QbVkBuffer stagingBuffer;
-		context_->allocator->CreateStagingBuffer(stagingBuffer, bufferSize, indices.data());
-
-		VkBufferCreateInfo bufferInfo = VkUtils::Init::BufferCreateInfo(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-		context_->allocator->CreateBuffer(meshBuffers_.indexBuffers_[handle], bufferInfo, QBVK_MEMORY_USAGE_GPU_ONLY);
-
-		VkUtils::CopyBuffer(context_, stagingBuffer.buf, meshBuffers_.indexBuffers_[handle].buf, bufferSize);
-
-		context_->allocator->DestroyBuffer(stagingBuffer);
+		VkUtils::CreateAsyncBuffer(context_, meshBuffers_.indexBuffers_[handle], bufferSize, indices.data(), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 
 		return handle;
 	}
@@ -614,9 +625,9 @@ namespace Quadbit {
 		vkDestroyPipeline(context_->device, instance->pipeline, nullptr);
 
 		// Destroy descriptors
-		vkFreeDescriptorSets(context_->device, instance->descriptorPool, static_cast<uint32_t>(instance->descriptorSets.size()), instance->descriptorSets.data());
-		vkDestroyDescriptorPool(context_->device, instance->descriptorPool, nullptr);
-		vkDestroyDescriptorSetLayout(context_->device, instance->descriptorSetLayout, nullptr);
+		if(instance->descriptorPool != VK_NULL_HANDLE)vkFreeDescriptorSets(context_->device, instance->descriptorPool, static_cast<uint32_t>(instance->descriptorSets.size()), instance->descriptorSets.data());
+		if(instance->descriptorPool != VK_NULL_HANDLE) vkDestroyDescriptorPool(context_->device, instance->descriptorPool, nullptr);
+		if(instance->descriptorSetLayout != VK_NULL_HANDLE) vkDestroyDescriptorSetLayout(context_->device, instance->descriptorSetLayout, nullptr);
 	}
 
 	Entity MeshPipeline::GetActiveCamera() {
@@ -643,7 +654,7 @@ namespace Quadbit {
 			"Resources/Shaders/Compiled/skybox_vert.spv", "main", "Resources/Shaders/Compiled/skybox_frag.spv", "main", 
 			sizeof(EnvironmentMapPushConstants), VK_SHADER_STAGE_VERTEX_BIT, VK_FALSE);
 
-		environmentMap_ = entityManager_->Create();
+		environmentMap_ = EntityManager::Instance().Create();
 
 		std::vector<uint32_t> indices{ 2, 1, 0, 5, 4, 3, 8, 7, 6, 11, 10, 9, 14, 13, 12, 17, 16, 15, 20, 19, 18, 23, 22, 21, 26, 25, 24, 29, 28, 27, 32, 31, 30, 35, 34, 33 };
 		QbVkModel model = VkUtils::LoadModel("Resources/Objects/cube.obj", vertexModel);
@@ -732,7 +743,7 @@ namespace Quadbit {
 			static_cast<uint32_t>(indices.size()),
 			textureCount++,
 			std::array<float, 32>(),
-			0,
+			-1
 		};
 	}
 }

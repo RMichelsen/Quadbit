@@ -26,7 +26,6 @@ namespace Quadbit {
 		VkMemoryBarrier CreateMemoryBarrier(VkAccessFlags srcMask, VkAccessFlags dstMask);
 
 		// Objects and Textures
-		RenderTexturedObjectComponent CreateObject(const char* objPath, const char* texturePath, VkFormat textureFormat);
 		void LoadEnvironmentMap(const char* environmentTexture, VkFormat textureFormat);
 		VkDescriptorImageInfo GetEnvironmentMapDescriptor();
 		QbVkTexture LoadCubemap(const char* imagePath, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage, VkImageLayout imageLayout,
@@ -61,6 +60,7 @@ namespace Quadbit {
 			int pushConstantStride = -1, VkShaderStageFlags pushConstantShaderStage = VK_SHADER_STAGE_VERTEX_BIT);
 		std::shared_ptr<QbVkRenderMeshInstance> CreateRenderMeshInstance(std::vector<QbVkVertexInputAttribute> vertexAttribs, const char* vertexShader, const char* vertexEntry,
 			const char* fragmentShader, const char* fragmentEntry, int pushConstantStride = -1, VkShaderStageFlags pushConstantShaderStage = VK_SHADER_STAGE_VERTEX_BIT);
+		RenderTexturedObjectComponent CreateObject(const char* objPath, const char* texturePath, VkFormat textureFormat);
 		template<typename T>
 		RenderMeshComponent CreateMesh(std::vector<T> vertices, uint32_t vertexStride, const std::vector<uint32_t>& indices, std::shared_ptr<QbVkRenderMeshInstance> externalInstance,
 			int pushConstantStride = -1) {
@@ -76,6 +76,7 @@ namespace Quadbit {
 		}
 		RenderMeshComponent CreateMesh(const char* objPath, std::vector<QbVkVertexInputAttribute> vertexModel, std::shared_ptr<QbVkRenderMeshInstance> externalInstance,
 			int pushConstantStride = -1);
+		void DestroyMesh(RenderMeshComponent& renderMeshComponent);
 		VertexBufHandle CreateVertexBuffer(const void* vertices, uint32_t vertexStride, uint32_t vertexCount);
 		IndexBufHandle CreateIndexBuffer(const std::vector<uint32_t>& indices);
 		template<typename T>
@@ -91,7 +92,7 @@ namespace Quadbit {
 		HINSTANCE localHandle_ = NULL;
 		HWND windowHandle_ = NULL;
 
-		EntityManager* entityManager_;
+		EntityManager& entityManager_;
 
 		VkInstance instance_ = VK_NULL_HANDLE;
 		std::shared_ptr<QbVkContext> context_ = std::make_shared<QbVkContext>();

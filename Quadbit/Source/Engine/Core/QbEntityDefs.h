@@ -80,6 +80,7 @@ namespace Quadbit {
 			entityFromComponentIndices_.push_back(id.index);
 		}
 
+		//using has_cleanup = decltype(std::declval<T>().Cleanup());
 		void Remove(EntityID id) {
 			assert(id.index < sparse_.size());
 			assert(sparse_[id.index] != 0xFFFF'FFFF && "Failed to remove component: Component is not part of the entity");
@@ -91,6 +92,11 @@ namespace Quadbit {
 			sparse_[lastIndex] = sparse_[id.index];
 			// id.index is now FREE to be used (add to free list)
 			sparse_[id.index] = 0xFFFFFFFF;
+
+			//if constexpr(SFINAE::is_detected_v<has_cleanup, T>) {
+			//	dense_.back()->Cleanup();
+			//}
+
 			dense_.pop_back();
 			entityFromComponentIndices_.pop_back();
 		}
@@ -106,6 +112,11 @@ namespace Quadbit {
 			sparse_[lastIndex] = sparse_[id.index];
 			// id.index is now FREE to be used (add to free list)
 			sparse_[id.index] = 0xFFFFFFFF;
+
+			//if constexpr(SFINAE::is_detected_v<has_cleanup, T>) {
+			//	dense_.back()->Cleanup();
+			//}
+
 			dense_.pop_back();
 			entityFromComponentIndices_.pop_back();
 		}

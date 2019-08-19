@@ -2,6 +2,7 @@
 #include "ComputePipeline.h"
 
 #include "Engine/Core/QbVulkanDefs.h"
+#include "Engine/Core/QbVulkanInternalDefs.h"
 #include "Engine/Rendering/QbVulkanUtils.h"
 
 namespace Quadbit {

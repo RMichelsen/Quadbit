@@ -4,30 +4,29 @@
 #include "Engine/Entities/SystemDispatch.h"
 
 namespace Quadbit {
-	Entity::Entity() : manager_(EntityManager::GetOrCreate()), id_(0, 1) {}
+	Entity::Entity() : id_(0, 1) {}
 
 	void Entity::Destroy() {
-		manager_->Destroy(*this);
+		EntityManager::Instance().Destroy(*this);
 	}
 
 	bool Entity::IsValid() {
-		if(manager_ == nullptr) return false;
-		return id_.version == manager_->GetEntityVersion(id_);
+		return id_.version == EntityManager::Instance().GetEntityVersion(id_);
 	}
 
 	EntityManager::EntityManager() {
 		systemDispatch_ = std::make_unique<SystemDispatch>();
 	}
 
-	EntityManager* EntityManager::GetOrCreate() {
-		static EntityManager* instance = new EntityManager();
+	EntityManager& EntityManager::Instance() {
+		static EntityManager instance;
 		return instance;
 	}
 
 	Entity EntityManager::Create() {
 		// If the freelist is empty, just add a new entity with version 1
 		if(entityFreeList_.empty()) {
-			auto entity = Entity(this, EntityID(nextEntityId_, entityVersions_[nextEntityId_]));
+			auto entity = Entity(EntityID(nextEntityId_, entityVersions_[nextEntityId_]));
 			sparse_[entity.id_.index] = static_cast<uint32_t>(entities_.size());
 			entities_.push_back(entity);
 
@@ -39,7 +38,7 @@ namespace Quadbit {
 			auto index = entityFreeList_.front();
 			entityFreeList_.pop_front();
 
-			auto entity = Entity(this, EntityID(index, entityVersions_[index]));
+			auto entity = Entity(EntityID(index, entityVersions_[index]));
 			sparse_[index] = static_cast<uint32_t>(entities_.size());
 			entities_.push_back(entity);
 			return entity;

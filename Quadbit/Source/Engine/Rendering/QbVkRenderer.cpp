@@ -8,7 +8,7 @@
 #include "Engine/Core/InputHandler.h"
 #include "Engine/Core/Time.h"
 #include "Engine/Core/QbRenderDefs.h"
-#include "Engine/Core/QbVulkanDefs.h"
+#include "Engine/Core/QbVulkanInternalDefs.h"
 #include "Engine/Global/ImGuiState.h"
 #include "Engine/Entities/EntityManager.h"
 #include "Engine/Entities/SystemDispatch.h"
@@ -23,7 +23,7 @@ namespace Quadbit {
 	QbVkRenderer::QbVkRenderer(HINSTANCE hInstance, HWND hwnd) : 
 		localHandle_(hInstance), 
 		windowHandle_(hwnd),
-		entityManager_(EntityManager::GetOrCreate()) {
+		entityManager_(EntityManager::Instance()) {
 		// REMEMBER: Order matters as some functions depend on member variables being initialized.
 		CreateInstance();
 #ifdef QBDEBUG
@@ -65,6 +65,11 @@ namespace Quadbit {
 		destroyDebugUtilsMessengerEXT(instance_, debugMessenger_, nullptr);
 #endif
 
+		// Destroy pipelines
+		meshPipeline_.reset();
+		imGuiPipeline_.reset();
+		computePipeline_.reset();
+
 		// Destroy rendering resources
 		for(const auto& renderingResource : context_->renderingResources) {
 			if(renderingResource.framebuffer != VK_NULL_HANDLE) {
@@ -82,7 +87,10 @@ namespace Quadbit {
 		context_->allocator->DestroyImage(context_->depthResources.depthImage);
 		vkDestroyImageView(context_->device, context_->depthResources.imageView, nullptr);
 
-		// Destroy swapchain
+		// Destroy swapchain and its imageviews
+		for(auto&& imageView : context_->swapchain.imageViews) {
+			vkDestroyImageView(context_->device, imageView, nullptr);
+		}
 		vkDestroySwapchainKHR(context_->device, context_->swapchain.swapchain, nullptr);
 
 		// Destroy command pool
@@ -90,11 +98,6 @@ namespace Quadbit {
 
 		// Destroy render passes
 		vkDestroyRenderPass(context_->device, context_->mainRenderPass, nullptr);
-
-		// Destroy pipelines
-		meshPipeline_.reset();
-		imGuiPipeline_.reset();
-		computePipeline_.reset();
 
 		// Destroy allocator
 		context_->allocator.reset();
@@ -107,6 +110,8 @@ namespace Quadbit {
 
 		// Destroy instance
 		vkDestroyInstance(instance_, nullptr);
+
+		entityManager_.Shutdown();
 	}
 
 	void QbVkRenderer::DrawFrame() {
@@ -193,10 +198,6 @@ namespace Quadbit {
 		return VkUtils::Init::MemoryBarrierVk(srcMask, dstMask);
 	}
 
-	RenderTexturedObjectComponent QbVkRenderer::CreateObject(const char* objPath, const char* texturePath, VkFormat textureFormat) {
-		return meshPipeline_->CreateObject(objPath, texturePath, textureFormat);
-	}
-
 	void QbVkRenderer::LoadEnvironmentMap(const char* environmentTexture, VkFormat textureFormat) {
 		meshPipeline_->LoadEnvironmentMap(environmentTexture, textureFormat);
 	}
@@ -272,6 +273,10 @@ namespace Quadbit {
 		return meshPipeline_->CreateInstance(empty, vertexAttribs, vertexShader, vertexEntry, fragmentShader, fragmentEntry, pushConstantStride, pushConstantShaderStage);
 	}
 
+	RenderTexturedObjectComponent QbVkRenderer::CreateObject(const char* objPath, const char* texturePath, VkFormat textureFormat) {
+		return meshPipeline_->CreateObject(objPath, texturePath, textureFormat);
+	}
+
 	RenderMeshComponent QbVkRenderer::CreateMesh(const char* objPath, std::vector<QbVkVertexInputAttribute> vertexModel, std::shared_ptr<QbVkRenderMeshInstance> externalInstance,
 		int pushConstantStride) {
 		QbVkModel model = VkUtils::LoadModel(objPath, vertexModel);
@@ -284,6 +289,10 @@ namespace Quadbit {
 			pushConstantStride,
 			externalInstance
 		};
+	}
+
+	void QbVkRenderer::DestroyMesh(RenderMeshComponent& renderMeshComponent) {
+		meshPipeline_->DestroyMesh(renderMeshComponent);
 	}
 
 	VertexBufHandle QbVkRenderer::CreateVertexBuffer(const void* vertices, uint32_t vertexStride, uint32_t vertexCount) {
@@ -338,10 +347,8 @@ namespace Quadbit {
 		VkInstanceCreateInfo instanceInfo = VkUtils::Init::InstanceCreateInfo();
 		instanceInfo.pApplicationInfo = &appInfo;
 
-#ifdef QBDEBUG
 		instanceInfo.enabledLayerCount = VALIDATION_LAYER_COUNT;
 		instanceInfo.ppEnabledLayerNames = VALIDATION_LAYERS;
-#endif
 
 		instanceInfo.enabledExtensionCount = INSTANCE_EXT_COUNT;
 		instanceInfo.ppEnabledExtensionNames = INSTANCE_EXT_NAMES;
@@ -414,10 +421,8 @@ namespace Quadbit {
 		deviceInfo.pQueueCreateInfos = deviceQueueInfo.data();
 		deviceInfo.pEnabledFeatures = &deviceFeatures;
 
-#ifdef QBDEBUG
 		deviceInfo.enabledLayerCount = VALIDATION_LAYER_COUNT;
 		deviceInfo.ppEnabledLayerNames = VALIDATION_LAYERS;
-#endif
 
 		deviceInfo.enabledExtensionCount = DEVICE_EXT_COUNT;
 		deviceInfo.ppEnabledExtensionNames = DEVICE_EXT_NAMES;
@@ -727,7 +732,7 @@ namespace Quadbit {
 		ImGui::NewFrame();
 
 		imGuiPipeline_->ImGuiDrawState();
-		EntityManager::GetOrCreate()->systemDispatch_->ImGuiDrawState();
+		EntityManager::Instance().systemDispatch_->ImGuiDrawState();
 		context_->allocator->ImGuiDrawState();
 		computePipeline_->ImGuiDrawState();
 

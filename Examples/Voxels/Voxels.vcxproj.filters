@@ -71,6 +71,18 @@
     <ClInclude Include="Source\Extern\FastNoiseSIMD\FastNoiseSIMD_internal.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Utils\TerrainTools.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Utils\MagicaVoxImporter.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Utils\VoxelMesher.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Utils\CommonUtils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="Source\Resources\Shaders\compileshaders.bat">
@@ -78,5 +90,10 @@
     </None>
     <None Include="Source\Resources\Shaders\voxel_frag.glsl" />
     <None Include="Source\Resources\Shaders\voxel_vert.glsl" />
+    <None Include="Resources\Shaders\compileshaders.bat">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="Resources\Shaders\voxel_vert.glsl" />
+    <None Include="Resources\Shaders\voxel_frag.glsl" />
   </ItemGroup>
 </Project>

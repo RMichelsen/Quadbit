@@ -12,7 +12,7 @@
 namespace Quadbit {
 	struct NoClipCameraSystem : ComponentSystem {
 		void Init() {
-			EntityManager::GetOrCreate()->ForEach<RenderCamera>([&](Entity entity, RenderCamera& camera) {
+			EntityManager::Instance().ForEach<RenderCamera>([&](Entity entity, RenderCamera& camera) {
 				camera.front.x = cos(glm::radians(camera.yaw)) * cos(glm::radians(camera.pitch));
 				camera.front.y = sin(glm::radians(camera.pitch));
 				camera.front.z = sin(glm::radians(camera.yaw)) * cos(glm::radians(camera.pitch));
@@ -22,7 +22,7 @@ namespace Quadbit {
 		}
 		
 		void Update(float deltaTime) {
-			EntityManager::GetOrCreate()->ForEach<RenderCamera>([&](Entity entity, RenderCamera& camera) {
+			EntityManager::Instance().ForEach<RenderCamera>([&](Entity entity, RenderCamera& camera) {
 				if(InputHandler::rightMouseDragging && !camera.dragActive) {
 					camera.dragActive = true;
 					ShowCursor(false);

@@ -16,6 +16,12 @@ namespace Quadbit {
 		std::size_t systemCount_ = 0;
 		std::array<std::shared_ptr<ComponentSystem>, MAX_SYSTEMS> systems_;
 
+		void Shutdown() {
+			for(auto&& system : systems_) {
+				system.reset();
+			}
+		}
+
 		template<typename S>
 		void RegisterSystem() {
 			static_assert(std::is_base_of_v<ComponentSystem, S>, "All systems must inherit from ComponentSystem");
