@@ -17,7 +17,7 @@ namespace Quadbit {
 		std::array<std::shared_ptr<ComponentSystem>, MAX_SYSTEMS> systems_;
 
 		void Shutdown() {
-			for(auto&& system : systems_) {
+			for (auto&& system : systems_) {
 				system.reset();
 			}
 		}
@@ -28,7 +28,7 @@ namespace Quadbit {
 			size_t systemID = SystemID::GetUnique<S>();
 			systems_[systemID] = std::make_shared<S>();
 			systems_[systemID]->name = typeid(S).name();
-			if constexpr(SFINAE::is_detected_v<has_init, S>) {
+			if constexpr (SFINAE::is_detected_v<has_init, S>) {
 				std::static_pointer_cast<S>(systems_[systemID])->Init();
 			}
 			systemCount_++;
@@ -37,7 +37,7 @@ namespace Quadbit {
 		template<typename S, typename... Args>
 		void RunSystem(float deltaTime = 0.0f, Args... args) {
 			size_t systemID = SystemID::GetUnique<S>();
-			if(systems_[systemID] == nullptr) {
+			if (systems_[systemID] == nullptr) {
 				RegisterSystem<S>();
 			}
 			auto ptr = std::static_pointer_cast<S>(systems_[systemID]);
@@ -50,7 +50,7 @@ namespace Quadbit {
 			ImGui::SetNextWindowSize(ImVec2(500, 200), ImGuiCond_FirstUseEver);
 			ImGui::Begin("ECS System Status", nullptr);
 
-			for(auto i = 0; i < systemCount_; i++) {
+			for (auto i = 0; i < systemCount_; i++) {
 				ImGui::Text("%s %.5fms", systems_[i]->name, systems_[i]->deltaTime);
 			}
 

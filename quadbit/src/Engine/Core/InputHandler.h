@@ -43,72 +43,72 @@ namespace Quadbit::InputHandler {
 		keypressed.fill(false);
 
 		// Handle keyboard input
-		if(rawinput->header.dwType == RIM_TYPEKEYBOARD) {
+		if (rawinput->header.dwType == RIM_TYPEKEYBOARD) {
 			// If key down.
-			if(rawinput->data.keyboard.Flags == RI_KEY_MAKE) {
+			if (rawinput->data.keyboard.Flags == RI_KEY_MAKE) {
 				keycodes[rawinput->data.keyboard.VKey] = true;
 			}
 			// If key up.
-			else if(rawinput->data.keyboard.Flags == RI_KEY_BREAK) {
-				if(keycodes[rawinput->data.keyboard.VKey]) keypressed[rawinput->data.keyboard.VKey] = true;
+			else if (rawinput->data.keyboard.Flags == RI_KEY_BREAK) {
+				if (keycodes[rawinput->data.keyboard.VKey]) keypressed[rawinput->data.keyboard.VKey] = true;
 				keycodes[rawinput->data.keyboard.VKey] = false;
 			}
 		}
 
 		// Handle mouse input
-		if(rawinput->header.dwType == RIM_TYPEMOUSE) {
+		if (rawinput->header.dwType == RIM_TYPEMOUSE) {
 			// Update mousebutton status
-			if(rawinput->data.mouse.usButtonFlags & RI_MOUSE_LEFT_BUTTON_DOWN)		mouseButtonStatus.left = true;
-			if(rawinput->data.mouse.usButtonFlags & RI_MOUSE_RIGHT_BUTTON_DOWN)		mouseButtonStatus.right = true;
-			if(rawinput->data.mouse.usButtonFlags & RI_MOUSE_MIDDLE_BUTTON_DOWN)	mouseButtonStatus.middle = true;
-			if(rawinput->data.mouse.usButtonFlags & RI_MOUSE_BUTTON_4_DOWN)			mouseButtonStatus.xbutton1 = true;
-			if(rawinput->data.mouse.usButtonFlags & RI_MOUSE_BUTTON_5_DOWN)			mouseButtonStatus.xbutton2 = true;
+			if (rawinput->data.mouse.usButtonFlags & RI_MOUSE_LEFT_BUTTON_DOWN)		mouseButtonStatus.left = true;
+			if (rawinput->data.mouse.usButtonFlags & RI_MOUSE_RIGHT_BUTTON_DOWN)		mouseButtonStatus.right = true;
+			if (rawinput->data.mouse.usButtonFlags & RI_MOUSE_MIDDLE_BUTTON_DOWN)	mouseButtonStatus.middle = true;
+			if (rawinput->data.mouse.usButtonFlags & RI_MOUSE_BUTTON_4_DOWN)			mouseButtonStatus.xbutton1 = true;
+			if (rawinput->data.mouse.usButtonFlags & RI_MOUSE_BUTTON_5_DOWN)			mouseButtonStatus.xbutton2 = true;
 			// Finish dragging if active on either left or right mousebutton
-			if(rawinput->data.mouse.usButtonFlags & RI_MOUSE_LEFT_BUTTON_UP) {
+			if (rawinput->data.mouse.usButtonFlags & RI_MOUSE_LEFT_BUTTON_UP) {
 				mouseButtonStatus.left = false;
-				if(leftMouseDragging) {
+				if (leftMouseDragging) {
 					leftMouseDragging = false;
 					leftClickFrameDuration = 0;
 				}
 			}
-			if(rawinput->data.mouse.usButtonFlags & RI_MOUSE_RIGHT_BUTTON_UP) {
+			if (rawinput->data.mouse.usButtonFlags & RI_MOUSE_RIGHT_BUTTON_UP) {
 				mouseButtonStatus.right = false;
-				if(rightMouseDragging) {
+				if (rightMouseDragging) {
 					rightMouseDragging = false;
 					rightClickFrameDuration = 0;
 				}
 			}
-			if(rawinput->data.mouse.usButtonFlags & RI_MOUSE_MIDDLE_BUTTON_UP)		mouseButtonStatus.middle = false;
-			if(rawinput->data.mouse.usButtonFlags & RI_MOUSE_BUTTON_4_UP)			mouseButtonStatus.xbutton1 = false;
-			if(rawinput->data.mouse.usButtonFlags & RI_MOUSE_BUTTON_5_UP)			mouseButtonStatus.xbutton2 = false;
+			if (rawinput->data.mouse.usButtonFlags & RI_MOUSE_MIDDLE_BUTTON_UP)		mouseButtonStatus.middle = false;
+			if (rawinput->data.mouse.usButtonFlags & RI_MOUSE_BUTTON_4_UP)			mouseButtonStatus.xbutton1 = false;
+			if (rawinput->data.mouse.usButtonFlags & RI_MOUSE_BUTTON_5_UP)			mouseButtonStatus.xbutton2 = false;
 
-			if(mouseButtonStatus.left && !leftMouseDragging) leftClickFrameDuration++;
-			if(mouseButtonStatus.right && !rightMouseDragging) rightClickFrameDuration++;
+			if (mouseButtonStatus.left && !leftMouseDragging) leftClickFrameDuration++;
+			if (mouseButtonStatus.right && !rightMouseDragging) rightClickFrameDuration++;
 
 			// If any mousebutton has been held for 5 frames, we're "dragging"
 			// Once the drag starts we cache the current mouse position if the camera or 
 			// anything else wants to use it later. 
-			if(rightClickFrameDuration > 5 && !rightMouseDragging) {
+			if (rightClickFrameDuration > 5 && !rightMouseDragging) {
 				rightMouseDragging = true;
 				rightDragCachedPos = clientMousePos;
 				ClientToScreen(hwnd, &rightDragCachedPos);
 			}
-			if(leftClickFrameDuration > 5 && !leftMouseDragging) {
+			if (leftClickFrameDuration > 5 && !leftMouseDragging) {
 				leftMouseDragging = true;
 				leftDragCachedPos = clientMousePos;
 				ClientToScreen(hwnd, &leftDragCachedPos);
 			}
 
 			// Update deltamovement if we are dragging
-			if(leftMouseDragging || rightMouseDragging) {
-				if(deltaMouseMovement[0] == 0) deltaMouseMovement[0] = rawinput->data.mouse.lLastX;
-				if(deltaMouseMovement[1] == 0) deltaMouseMovement[1] = rawinput->data.mouse.lLastY;
+			if (leftMouseDragging || rightMouseDragging) {
+				if (deltaMouseMovement[0] == 0) deltaMouseMovement[0] = rawinput->data.mouse.lLastX;
+				if (deltaMouseMovement[1] == 0) deltaMouseMovement[1] = rawinput->data.mouse.lLastY;
 			}
 		}
 	}
 
 	inline bool KeyPressed(const uint16_t vKey) {
-		if(keypressed[vKey]) {
+		if (keypressed[vKey]) {
 			keypressed[vKey] = false;
 			return true;
 		}
@@ -122,7 +122,7 @@ namespace Quadbit::InputHandler {
 	}
 
 	inline LRESULT WindowCallback(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-		switch(uMsg) {
+		switch (uMsg) {
 		case WM_DESTROY:
 			PostQuitMessage(0);
 			break;
@@ -130,7 +130,7 @@ namespace Quadbit::InputHandler {
 			uint32_t inputSize = 0;
 			GetRawInputData((HRAWINPUT)lParam, RID_INPUT, nullptr, &inputSize, sizeof(RAWINPUTHEADER));
 			LPBYTE rawInput = new BYTE[inputSize];
-			if(GetRawInputData((HRAWINPUT)lParam, RID_INPUT, rawInput, &inputSize, sizeof(RAWINPUTHEADER)) != inputSize) {
+			if (GetRawInputData((HRAWINPUT)lParam, RID_INPUT, rawInput, &inputSize, sizeof(RAWINPUTHEADER)) != inputSize) {
 				QB_LOG_ERROR("GetRawInputData didn't return correct size!\n");
 			}
 			else {

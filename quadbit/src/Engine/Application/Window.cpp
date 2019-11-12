@@ -10,15 +10,15 @@ namespace Quadbit {
 		// No Windows bitmap-stretching
 		SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_SYSTEM_AWARE);
 
-		if(!SetupWindow(nCmdShow, windowProc)) {
+		if (!SetupWindow(nCmdShow, windowProc)) {
 			QB_LOG_ERROR("Failed to setup win32 Window\n");
 			return;
 		}
-		if(!InputHandler::Initialize()) {
+		if (!InputHandler::Initialize()) {
 			QB_LOG_ERROR("Failed to setup the input handler\n");
 			return;
 		}
-		if(!SetupConsole()) {
+		if (!SetupConsole()) {
 			QB_LOG_ERROR("Failed to setup the console\n");
 			return;
 		}
@@ -33,10 +33,10 @@ namespace Quadbit {
 		Time::UpdateTimer();
 		InputHandler::Update();
 		MSG msg;
-		while(PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+		while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
-			if(msg.message == WM_QUIT) {
+			if (msg.message == WM_QUIT) {
 				return false;
 			}
 		}
@@ -59,7 +59,7 @@ namespace Quadbit {
 		windowClass.hCursor = LoadCursor(NULL, IDC_ARROW);
 
 		// Register window class
-		if(!RegisterClassEx(&windowClass)) {
+		if (!RegisterClassEx(&windowClass)) {
 			return false;
 		}
 
@@ -77,17 +77,17 @@ namespace Quadbit {
 			instance_,
 			NULL
 		);
-		if(hwnd_ == NULL) return false;
+		if (hwnd_ == NULL) return false;
 		ShowWindow(hwnd_, nCmdShow);
 
 		return true;
 	}
 
 	bool Window::SetupConsole() {
-		if(!AllocConsole()) return false;
-		if(!freopen("CONIN$", "r", stdin)) return false;
-		if(!freopen("CONOUT$", "w", stdout)) return false;
-		if(!freopen("CONOUT$", "w", stderr)) return false;
+		if (!AllocConsole()) return false;
+		if (!freopen("CONIN$", "r", stdin)) return false;
+		if (!freopen("CONOUT$", "w", stdout)) return false;
+		if (!freopen("CONOUT$", "w", stderr)) return false;
 		return true;
 	}
 }

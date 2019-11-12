@@ -23,7 +23,7 @@ namespace Quadbit {
 
 	Entity EntityManager::Create() {
 		// If the freelist is empty, just add a new entity with version 1
-		if(entityFreeList_.empty()) {
+		if (entityFreeList_.empty()) {
 			auto entity = Entity(EntityID(nextEntityId_, entityVersions_[nextEntityId_]));
 			sparse_[entity.id_.index] = static_cast<uint32_t>(entities_.size());
 			entities_.push_back(entity);
@@ -44,8 +44,8 @@ namespace Quadbit {
 	}
 
 	void EntityManager::Destroy(const Entity& entity) {
-		for(auto&& pool : componentPools_) {
-			if(pool == nullptr) break;
+		for (auto&& pool : componentPools_) {
+			if (pool == nullptr) break;
 			pool->RemoveIfExists(entity.id_);
 		}
 

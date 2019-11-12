@@ -59,8 +59,8 @@ namespace Quadbit {
 		double computeEnd = double(timestamps[1]) * context_.gpu->deviceProps.limits.timestampPeriod * 1e-6;
 		computeInstance->msAvgTime = computeInstance->msAvgTime * 0.95 + (computeEnd - computeStart) * 0.05;
 	}
-	
-	std::shared_ptr<QbVkComputeInstance> ComputePipeline::CreateInstance(std::vector<QbVkComputeDescriptor>& descriptors,  const char* shader, 
+
+	std::shared_ptr<QbVkComputeInstance> ComputePipeline::CreateInstance(std::vector<QbVkComputeDescriptor>& descriptors, const char* shader,
 		const char* shaderFunc, const VkSpecializationInfo* specInfo, const uint32_t pushConstantRangeSize) {
 		auto computeInstance = std::make_shared<QbVkComputeInstance>();
 

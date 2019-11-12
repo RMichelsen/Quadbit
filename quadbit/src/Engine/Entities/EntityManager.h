@@ -62,7 +62,7 @@ namespace Quadbit {
 		}
 
 		void PlayCommands() {
-			for(auto&& cmd : destroyBuffer_) {
+			for (auto&& cmd : destroyBuffer_) {
 				cmd.Play();
 			}
 		}
@@ -88,7 +88,7 @@ namespace Quadbit {
 		void Shutdown() {
 			systemDispatch_->Shutdown();
 			systemDispatch_.reset();
-			for(auto&& component : componentPools_) {
+			for (auto&& component : componentPools_) {
 				component.reset();
 			}
 		}
@@ -147,14 +147,14 @@ namespace Quadbit {
 			// Get the smallest pool to iterate from as a base
 			std::vector<uint32_t> smallest = std::get<0>(pools)->entityFromComponentIndices_;
 			ForEachTuple(pools, [&](auto&& value) {
-				if(value->entityFromComponentIndices_.size() < smallest.size()) {
+				if (value->entityFromComponentIndices_.size() < smallest.size()) {
 					smallest = value->entityFromComponentIndices_;
 				}
-			});
+				});
 
-			for(auto entityIndex : smallest) {
+			for (auto entityIndex : smallest) {
 				const bool allValid = ((std::get<sparseSetPtr<Components>>(pools)->sparse_[entityIndex] != 0xFFFF'FFFF) && ...);
-				if(!allValid) continue;
+				if (!allValid) continue;
 
 				fun(entities_[sparse_[entityIndex]], std::get<sparseSetPtr<Components>>(pools)->dense_[std::get<sparseSetPtr<Components>>(pools)->sparse_[entityIndex]]...);
 
@@ -169,7 +169,7 @@ namespace Quadbit {
 			// Get the smallest pool to iterate from as a base
 			std::vector<uint32_t> smallest = std::get<0>(pools)->entityFromComponentIndices_;
 			ForEachTuple(pools, [&](auto&& value) {
-				if(value->entityFromComponentIndices_.size() < smallest.size()) {
+				if (value->entityFromComponentIndices_.size() < smallest.size()) {
 					smallest = value->entityFromComponentIndices_;
 				}
 				});
@@ -177,9 +177,9 @@ namespace Quadbit {
 			// Command buffer passed to the lambda, for recording commands that has to run after the for loop
 			EntityCommandBuffer commandBuffer;
 
-			for(auto entityIndex : smallest) {
+			for (auto entityIndex : smallest) {
 				const bool allValid = ((std::get<sparseSetPtr<Components>>(pools)->sparse_[entityIndex] != 0xFFFF'FFFF) && ...);
-				if(!allValid) continue;
+				if (!allValid) continue;
 
 				fun(entities_[sparse_[entityIndex]], &commandBuffer, std::get<sparseSetPtr<Components>>(pools)->dense_[std::get<sparseSetPtr<Components>>(pools)->sparse_[entityIndex]]...);
 
@@ -197,14 +197,14 @@ namespace Quadbit {
 			// Get the smallest pool to iterate from as a base
 			std::vector<uint32_t> smallest = std::get<0>(pools)->entityFromComponentIndices_;
 			ForEachTuple(pools, [&](auto&& value) {
-				if(value->entityFromComponentIndices_.size() < smallest.size()) {
+				if (value->entityFromComponentIndices_.size() < smallest.size()) {
 					smallest = value->entityFromComponentIndices_;
 				}
-			});
+				});
 
-			for(auto entityIndex : smallest) {
+			for (auto entityIndex : smallest) {
 				const bool allValid = ((std::get<sparseSetPtr<Components>>(pools)->sparse_[entityIndex] != 0xFFFF'FFFF) && ...);
-				if(!allValid) continue;
+				if (!allValid) continue;
 
 				fun(entities_[sparse_[entityIndex]], std::get<sparseSetPtr<Components>>(pools)->dense_[std::get<sparseSetPtr<Components>>(pools)->sparse_[entityIndex]]...);
 
@@ -220,26 +220,26 @@ namespace Quadbit {
 			// Get the smallest pool to iterate from as a base
 			std::vector<uint32_t> smallest = std::get<0>(pools)->entityFromComponentIndices_;
 			ForEachTuple(pools, [&](auto&& value) {
-				if(value->entityFromComponentIndices_.size() < smallest.size()) {
+				if (value->entityFromComponentIndices_.size() < smallest.size()) {
 					smallest = value->entityFromComponentIndices_;
 				}
-			});
+				});
 
 			// Command buffer passed to the lambda, for recording commands that has to run after the for loop
 			EntityCommandBuffer commandBuffer;
 
 			std::for_each(std::execution::par, smallest.begin(), smallest.end(), [&](auto entityIndex) {
 				const bool allValid = ((std::get<sparseSetPtr<Components>>(pools)->sparse_[entityIndex] != 0xFFFF'FFFF) && ...);
-				if(!allValid) return;
+				if (!allValid) return;
 
 				fun(entities_[sparse_[entityIndex]], &commandBuffer, std::get<sparseSetPtr<Components>>(pools)->dense_[std::get<sparseSetPtr<Components>>(pools)->sparse_[entityIndex]]...);
-			});
+				});
 
 			// Remove tags, NOT SAFE IN PARRALEL
 			std::for_each(std::execution::seq, smallest.begin(), smallest.end(), [&](auto entityIndex) {
 				(RemoveTag<Components>(entities_[sparse_[entityIndex]]), ...);
-			});
-			
+				});
+
 			// Play back commands
 			commandBuffer.PlayCommands();
 		}
@@ -251,22 +251,22 @@ namespace Quadbit {
 			// Get the smallest pool to iterate from as a base
 			std::vector<uint32_t> smallest = std::get<0>(pools)->entityFromComponentIndices_;
 			ForEachTuple(pools, [&](auto&& value) {
-				if(value->entityFromComponentIndices_.size() < smallest.size()) {
+				if (value->entityFromComponentIndices_.size() < smallest.size()) {
 					smallest = value->entityFromComponentIndices_;
 				}
 				});
 
 			std::for_each(std::execution::par, smallest.begin(), smallest.end(), [&](auto entityIndex) {
 				const bool allValid = ((std::get<sparseSetPtr<Components>>(pools)->sparse_[entityIndex] != 0xFFFF'FFFF) && ...);
-				if(!allValid) return;
+				if (!allValid) return;
 
 				fun(entities_[sparse_[entityIndex]], std::get<sparseSetPtr<Components>>(pools)->dense_[std::get<sparseSetPtr<Components>>(pools)->sparse_[entityIndex]]...);
-			});
+				});
 
 			// Remove tags, NOT SAFE IN PARRALEL
 			std::for_each(std::execution::seq, smallest.begin(), smallest.end(), [&](auto entityIndex) {
 				(RemoveTag<Components>(entities_[sparse_[entityIndex]]), ...);
-			});
+				});
 		}
 
 		template<typename... Components, typename F, typename T>
@@ -276,23 +276,23 @@ namespace Quadbit {
 			// Get the smallest pool to iterate from as a base
 			std::vector<uint32_t> smallest = std::get<0>(pools)->entityFromComponentIndices_;
 			ForEachTuple(pools, [&](auto&& value) {
-				if(value->entityFromComponentIndices_.size() < smallest.size()) {
+				if (value->entityFromComponentIndices_.size() < smallest.size()) {
 					smallest = value->entityFromComponentIndices_;
 				}
-			});
+				});
 
 			std::for_each(std::execution::par, smallest.begin(), smallest.end(), [&](auto entityIndex) {
 				const bool allValid = ((std::get<sparseSetPtr<Components>>(pools)->sparse_[entityIndex] != 0xFFFF'FFFF) && ...);
-				if(!allValid) return;
+				if (!allValid) return;
 
 				fun(entities_[sparse_[entityIndex]], std::get<sparseSetPtr<Components>>(pools)->dense_[std::get<sparseSetPtr<Components>>(pools)->sparse_[entityIndex]]...);
-			});
+				});
 
 			// Remove tags, NOT SAFE IN PARRALEL
 			std::for_each(std::execution::seq, smallest.begin(), smallest.end(), [&](auto entityIndex) {
 				(RemoveTag<Components>(entities_[sparse_[entityIndex]]), ...);
 				AddTag<T>(entities_[sparse_[entityIndex]]);
-			});
+				});
 		}
 
 		uint32_t GetEntityVersion(const EntityID id) {
@@ -343,14 +343,14 @@ namespace Quadbit {
 
 		template<typename C>
 		void RemoveTag(Entity entity) {
-			if constexpr(std::is_base_of_v<EventTagComponent, C>) {
+			if constexpr (std::is_base_of_v<EventTagComponent, C>) {
 				entity.RemoveComponent<C>();
 			}
 		}
 
 		template<typename C>
 		void AddTag(Entity entity) {
-			if constexpr(std::is_base_of_v<EventTagComponent, C>) {
+			if constexpr (std::is_base_of_v<EventTagComponent, C>) {
 				entity.AddComponent<C>();
 			}
 		}

@@ -34,7 +34,7 @@ namespace Quadbit {
 			VkImageAspectFlags imageAspectFlags, QbVkMemoryUsage memoryUsage, VkSamplerCreateInfo* samplerCreateInfo = nullptr,
 			VkSampleCountFlagBits numSamples = VK_SAMPLE_COUNT_1_BIT);
 		void CreateTexture(QbVkTexture& texture, uint32_t width, uint32_t height, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage, VkImageLayout imageLayout,
-			VkImageAspectFlags imageAspectFlags, VkPipelineStageFlagBits srcStage, VkPipelineStageFlagBits dstStage, QbVkMemoryUsage memoryUsage, 
+			VkImageAspectFlags imageAspectFlags, VkPipelineStageFlagBits srcStage, VkPipelineStageFlagBits dstStage, QbVkMemoryUsage memoryUsage,
 			VkSampler sampler = VK_NULL_HANDLE, VkSampleCountFlagBits numSamples = VK_SAMPLE_COUNT_1_BIT);
 		VkSampler CreateImageSampler(VkFilter samplerFilter, VkSamplerAddressMode addressMode, VkBool32 enableAnisotropy,
 			float maxAnisotropy, VkCompareOp compareOperation, VkSamplerMipmapMode samplerMipmapMode, float maxLod = 0.0f);
@@ -84,7 +84,7 @@ namespace Quadbit {
 			return { type, static_cast<uint32_t>(data.size()), data.data(), shaderStage };
 		}
 		QbVkRenderDescriptor CreateRenderDescriptor(VkDescriptorType type, std::variant<VkDescriptorImageInfo, VkDescriptorBufferInfo> data, VkShaderStageFlagBits shaderStage);
-		
+
 
 	private:
 		bool canRender_ = false;

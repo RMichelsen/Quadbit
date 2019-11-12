@@ -19,8 +19,8 @@
 
 
 namespace Quadbit {
-	QbVkRenderer::QbVkRenderer(HINSTANCE hInstance, HWND hwnd) : 
-		localHandle_(hInstance), 
+	QbVkRenderer::QbVkRenderer(HINSTANCE hInstance, HWND hwnd) :
+		localHandle_(hInstance),
 		windowHandle_(hwnd),
 		entityManager_(EntityManager::Instance()) {
 		// REMEMBER: Order matters as some functions depend on member variables being initialized.
@@ -70,8 +70,8 @@ namespace Quadbit {
 		computePipeline_.reset();
 
 		// Destroy rendering resources
-		for(const auto& renderingResource : context_->renderingResources) {
-			if(renderingResource.framebuffer != VK_NULL_HANDLE) {
+		for (const auto& renderingResource : context_->renderingResources) {
+			if (renderingResource.framebuffer != VK_NULL_HANDLE) {
 				vkDestroyFramebuffer(context_->device, renderingResource.framebuffer, nullptr);
 			}
 			vkFreeCommandBuffers(context_->device, context_->commandPool, 1, &renderingResource.commandbuffer);
@@ -87,7 +87,7 @@ namespace Quadbit {
 		vkDestroyImageView(context_->device, context_->depthResources.imageView, nullptr);
 
 		// Destroy swapchain and its imageviews
-		for(auto&& imageView : context_->swapchain.imageViews) {
+		for (auto&& imageView : context_->swapchain.imageViews) {
 			vkDestroyImageView(context_->device, imageView, nullptr);
 		}
 		vkDestroySwapchainKHR(context_->device, context_->swapchain.swapchain, nullptr);
@@ -115,7 +115,7 @@ namespace Quadbit {
 
 	void QbVkRenderer::DrawFrame() {
 		// Return early if we cannot render (if swapchain is being recreated)
-		if(!canRender_) return;
+		if (!canRender_) return;
 
 		static uint32_t resourceIndex = 0;
 		RenderingResources& currentRenderingResources = context_->renderingResources[resourceIndex];
@@ -127,7 +127,7 @@ namespace Quadbit {
 		uint32_t imageIndex;
 		VkResult result = vkAcquireNextImageKHR(context_->device, context_->swapchain.swapchain, UINT64_MAX,
 			currentRenderingResources.imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
-		if(result == VK_ERROR_OUT_OF_DATE_KHR) {
+		if (result == VK_ERROR_OUT_OF_DATE_KHR) {
 			RecreateSwapchain();
 			return;
 		}
@@ -169,8 +169,8 @@ namespace Quadbit {
 		presentInfo.pImageIndices = &imageIndex;
 
 		result = vkQueuePresentKHR(context_->presentQueue, &presentInfo);
-		if(!((result == VK_SUCCESS) || (result == VK_SUBOPTIMAL_KHR))) {
-			if(result == VK_ERROR_OUT_OF_DATE_KHR) {
+		if (!((result == VK_SUCCESS) || (result == VK_SUBOPTIMAL_KHR))) {
+			if (result == VK_ERROR_OUT_OF_DATE_KHR) {
 				RecreateSwapchain();
 				return;
 			}
@@ -214,8 +214,8 @@ namespace Quadbit {
 		return VkUtils::LoadTexture(*context_, imagePath, imageFormat, imageTiling, imageUsage, imageLayout, imageAspectFlags, memoryUsage, samplerCreateInfo, numSamples);
 	}
 
-	void QbVkRenderer::CreateTexture(QbVkTexture& texture, uint32_t width, uint32_t height, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage, 
-		VkImageLayout imageLayout, VkImageAspectFlags imageAspectFlags, VkPipelineStageFlagBits srcStage, VkPipelineStageFlagBits dstStage, QbVkMemoryUsage memoryUsage, 
+	void QbVkRenderer::CreateTexture(QbVkTexture& texture, uint32_t width, uint32_t height, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage,
+		VkImageLayout imageLayout, VkImageAspectFlags imageAspectFlags, VkPipelineStageFlagBits srcStage, VkPipelineStageFlagBits dstStage, QbVkMemoryUsage memoryUsage,
 		VkSampler sampler, VkSampleCountFlagBits numSamples) {
 		VkUtils::CreateTexture(*context_, texture, width, height, imageFormat, imageTiling, imageUsage, imageLayout, imageAspectFlags, srcStage, dstStage, memoryUsage, sampler, numSamples);
 	}
@@ -253,7 +253,7 @@ namespace Quadbit {
 	}
 
 	void QbVkRenderer::RegisterCamera(Entity entity) {
-		if(!entity.HasComponent<RenderCamera>()) {
+		if (!entity.HasComponent<RenderCamera>()) {
 			QB_LOG_ERROR("Cannot register camera: Entity must have the Quadbit::RenderCamera component\n");
 			return;
 		}
@@ -303,7 +303,7 @@ namespace Quadbit {
 		return meshPipeline_->CreateIndexBuffer(indices);
 	}
 
-	QbVkRenderDescriptor QbVkRenderer::CreateRenderDescriptor(VkDescriptorType type, std::variant<VkDescriptorImageInfo, 
+	QbVkRenderDescriptor QbVkRenderer::CreateRenderDescriptor(VkDescriptorType type, std::variant<VkDescriptorImageInfo,
 		VkDescriptorBufferInfo> data, VkShaderStageFlagBits shaderStage) {
 		return { type, 1, &data, shaderStage };
 	}
@@ -328,7 +328,7 @@ namespace Quadbit {
 
 		// Because we are using an extension function we need to load it ourselves.
 		auto debugUtilsMessengerCreateFunc = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance_, "vkCreateDebugUtilsMessengerEXT");
-		if(debugUtilsMessengerCreateFunc != nullptr) {
+		if (debugUtilsMessengerCreateFunc != nullptr) {
 			VK_CHECK(debugUtilsMessengerCreateFunc(instance_, &debugUtilsMessengerInfo, nullptr, &debugMessenger_));
 		}
 	}
@@ -377,7 +377,7 @@ namespace Quadbit {
 		VK_CHECK(vkEnumeratePhysicalDevices(instance_, &deviceCount, physicalDevices.data()));
 
 		// Now find a suitable GPU
-		if(!VkUtils::FindSuitableGPU(*context_, physicalDevices)) {
+		if (!VkUtils::FindSuitableGPU(*context_, physicalDevices)) {
 			QB_LOG_ERROR("No suitable GPU's found on machine.\n");
 		}
 	}
@@ -386,7 +386,7 @@ namespace Quadbit {
 		// We'll start by filling out device queue information
 		std::vector<int> queueIndices;
 		queueIndices.push_back(context_->gpu->graphicsFamilyIdx);
-		if(context_->gpu->graphicsFamilyIdx != context_->gpu->presentFamilyIdx) {
+		if (context_->gpu->graphicsFamilyIdx != context_->gpu->presentFamilyIdx) {
 			queueIndices.push_back(context_->gpu->presentFamilyIdx);
 		}
 		if (context_->gpu->graphicsFamilyIdx != context_->gpu->computeFamilyIdx && context_->gpu->presentFamilyIdx != context_->gpu->computeFamilyIdx) {
@@ -396,7 +396,7 @@ namespace Quadbit {
 		std::vector<VkDeviceQueueCreateInfo> deviceQueueInfo;
 
 		const float priority = 1.0f;
-		for(auto i = 0; i < queueIndices.size(); i++) {
+		for (auto i = 0; i < queueIndices.size(); i++) {
 			VkDeviceQueueCreateInfo queueInfo = VkUtils::Init::DeviceQueueCreateInfo();
 			queueInfo.queueFamilyIndex = queueIndices[i];
 			queueInfo.queueCount = 1;
@@ -455,7 +455,7 @@ namespace Quadbit {
 		// We will create the fences with signaled bit set, so that the first call to vkWaitForFences doesn't hang
 		fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-		for(auto i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+		for (auto i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
 			VK_CHECK(vkCreateSemaphore(context_->device, &sempahoreInfo, nullptr, &context_->renderingResources[i].imageAvailableSemaphore));
 			VK_CHECK(vkCreateSemaphore(context_->device, &sempahoreInfo, nullptr, &context_->renderingResources[i].renderFinishedSemaphore));
 			VK_CHECK(vkCreateFence(context_->device, &fenceInfo, nullptr, &context_->renderingResources[i].fence));
@@ -464,7 +464,7 @@ namespace Quadbit {
 
 	void QbVkRenderer::AllocateCommandBuffers() {
 		// Allocate the command buffers required for the rendering resources
-		for(auto&& renderingResource : context_->renderingResources) {
+		for (auto&& renderingResource : context_->renderingResources) {
 			VkCommandBufferAllocateInfo commandBufferAllocateInfo = VkUtils::Init::CommandBufferAllocateInfo(context_->commandPool,
 				VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
 			VK_CHECK(vkAllocateCommandBuffers(context_->device, &commandBufferAllocateInfo, &renderingResource.commandbuffer));
@@ -479,12 +479,12 @@ namespace Quadbit {
 		VkImageCreateInfo imageInfo = VkUtils::Init::ImageCreateInfo(context_->swapchain.extent.width, context_->swapchain.extent.height, colourFormat,
 			VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, context_->multisamplingResources.msaaSamples);
 
-		context_->allocator->CreateImage(context_->multisamplingResources.msaaImage, imageInfo, QBVK_MEMORY_USAGE_GPU_ONLY);
+		context_->allocator->CreateImage(context_->multisamplingResources.msaaImage, imageInfo, QbVkMemoryUsage::QBVK_MEMORY_USAGE_GPU_ONLY);
 		context_->multisamplingResources.msaaImageView = VkUtils::CreateImageView(*context_, context_->multisamplingResources.msaaImage.imgHandle, colourFormat, VK_IMAGE_ASPECT_COLOR_BIT);
 
 		// Transition image layout with a temporary command buffer
-		VkUtils::TransitionImageLayout(*context_, context_->multisamplingResources.msaaImage.imgHandle, 
-			VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 
+		VkUtils::TransitionImageLayout(*context_, context_->multisamplingResources.msaaImage.imgHandle,
+			VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
 
 	}
@@ -495,7 +495,7 @@ namespace Quadbit {
 		VkImageCreateInfo imageInfo = VkUtils::Init::ImageCreateInfo(context_->swapchain.extent.width, context_->swapchain.extent.height, depthFormat,
 			VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, context_->multisamplingResources.msaaSamples);;
 
-		context_->allocator->CreateImage(context_->depthResources.depthImage, imageInfo, QBVK_MEMORY_USAGE_GPU_ONLY);
+		context_->allocator->CreateImage(context_->depthResources.depthImage, imageInfo, QbVkMemoryUsage::QBVK_MEMORY_USAGE_GPU_ONLY);
 		context_->depthResources.imageView = VkUtils::CreateImageView(*context_, context_->depthResources.depthImage.imgHandle, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
 
 		// Transition depth image
@@ -516,12 +516,12 @@ namespace Quadbit {
 
 		// Pick a minimum count of images in the swap chain
 		uint32_t desiredSwapchainImageCount = context_->gpu->surfaceCapabilities.minImageCount + 1;
-		if(context_->gpu->surfaceCapabilities.maxImageCount > 0 && (desiredSwapchainImageCount > context_->gpu->surfaceCapabilities.maxImageCount)) {
+		if (context_->gpu->surfaceCapabilities.maxImageCount > 0 && (desiredSwapchainImageCount > context_->gpu->surfaceCapabilities.maxImageCount)) {
 			desiredSwapchainImageCount = context_->gpu->surfaceCapabilities.maxImageCount;
 		}
 		// Prefer a non-rotated transform if possible
 		VkSurfaceTransformFlagsKHR preTransform;
-		if(context_->gpu->surfaceCapabilities.supportedTransforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR) {
+		if (context_->gpu->surfaceCapabilities.supportedTransforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR) {
 			preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
 		}
 		else {
@@ -547,16 +547,16 @@ namespace Quadbit {
 		swapchainInfo.clipped = VK_TRUE;
 
 		// We will enable transfer source/destination for swapchain images if its supported
-		if(context_->gpu->surfaceCapabilities.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) {
+		if (context_->gpu->surfaceCapabilities.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) {
 			swapchainInfo.imageUsage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 		}
-		if(context_->gpu->surfaceCapabilities.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_DST_BIT) {
+		if (context_->gpu->surfaceCapabilities.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_DST_BIT) {
 			swapchainInfo.imageUsage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 		}
 
 		// We need to check if the graphics and present family indices match,
 		// in which case the queue can have exclusive access to the images which offers the best performance
-		if(context_->gpu->graphicsFamilyIdx == context_->gpu->presentFamilyIdx) {
+		if (context_->gpu->graphicsFamilyIdx == context_->gpu->presentFamilyIdx) {
 			swapchainInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		}
 		// Otherwise the image has to be usable across multiple queue families
@@ -579,8 +579,8 @@ namespace Quadbit {
 		context_->swapchain.extent = extent;
 
 		// Delete the old swapchain if it exists, along with its imageviews.
-		if(oldSwapchain != VK_NULL_HANDLE) {
-			for(auto i = 0; i < context_->swapchain.imageViews.size(); i++) {
+		if (oldSwapchain != VK_NULL_HANDLE) {
+			for (auto i = 0; i < context_->swapchain.imageViews.size(); i++) {
 				vkDestroyImageView(context_->device, context_->swapchain.imageViews[i], nullptr);
 			}
 			vkDestroySwapchainKHR(context_->device, oldSwapchain, nullptr);
@@ -594,7 +594,7 @@ namespace Quadbit {
 
 		// And finally we will create the image views that act as interfaces for the images
 		context_->swapchain.imageViews.resize(context_->swapchain.images.size());
-		for(auto i = 0; i < context_->swapchain.images.size(); i++) {
+		for (auto i = 0; i < context_->swapchain.images.size(); i++) {
 			context_->swapchain.imageViews[i] = VkUtils::CreateImageView(*context_, context_->swapchain.images[i], context_->swapchain.imageFormat, VK_IMAGE_ASPECT_COLOR_BIT);
 		}
 
@@ -714,7 +714,7 @@ namespace Quadbit {
 		dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
 		// Now we can create the actual renderpass
-		std::array<VkAttachmentDescription, 3> attachments = 
+		std::array<VkAttachmentDescription, 3> attachments =
 		{ colourAttachment, depthAttachment, colourAttachmentResolve };
 		VkRenderPassCreateInfo renderPassInfo = VkUtils::Init::RenderPassCreateInfo();
 		renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());

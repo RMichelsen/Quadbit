@@ -26,7 +26,7 @@ namespace Quadbit {
 
 		VertexBufHandle GetNextVertexHandle() {
 			VertexBufHandle next = vertexBufferIdx_;
-			if(vertexBufferFreeList_.empty()) {
+			if (vertexBufferFreeList_.empty()) {
 				vertexBufferIdx_++;
 				assert(next < MAX_MESH_COUNT && "Cannot get next vertex buffer handle for mesh, max number of handles in use!");
 				return next;
@@ -41,7 +41,7 @@ namespace Quadbit {
 
 		IndexBufHandle GetNextIndexHandle() {
 			IndexBufHandle next = indexBufferIdx_;
-			if(indexBufferFreeList_.empty()) {
+			if (indexBufferFreeList_.empty()) {
 				indexBufferIdx_++;
 				assert(next < MAX_MESH_COUNT);
 				return next;
@@ -160,7 +160,7 @@ namespace Quadbit {
 
 		template<typename T>
 		T* GetSafePushConstPtr() {
-			if(sizeof(T) > 128) {
+			if (sizeof(T) > 128) {
 				QB_LOG_ERROR("Push Constants must have a max size of 128 bytes");
 				return nullptr;
 			}
@@ -178,7 +178,7 @@ namespace Quadbit {
 
 		template<typename T>
 		T* GetSafePushConstPtr() {
-			if(sizeof(T) > 128) {
+			if (sizeof(T) > 128) {
 				QB_LOG_ERROR("Push Constants must have a max size of 128 bytes");
 				return nullptr;
 			}
@@ -212,8 +212,9 @@ namespace Quadbit {
 		bool dragActive;
 
 		RenderCamera(float camYaw, float camPitch, glm::vec3 camPos, float aspectRatio, float viewDist) :
-			yaw(camYaw), pitch(camPitch), position(camPos), aspectRatio(aspectRatio), viewDistance(viewDist),
-			dragActive(false), up(glm::vec3(0.0f, 1.0f, 0.0f)) {
+			position(camPos), front(glm::vec3(0.0f, 0.0f, 0.0f)), up(glm::vec3(0.0f, 1.0f, 0.0f)),
+			aspectRatio(aspectRatio), viewDistance(viewDist), yaw(camYaw), pitch(camPitch),
+			view(glm::mat4(1)), dragActive(false) {
 
 			perspective = glm::perspective(glm::radians(45.0f), aspectRatio, 0.1f, viewDistance);
 			perspective[1][1] *= -1;

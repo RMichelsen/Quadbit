@@ -13,7 +13,7 @@ namespace Quadbit {
 
 		void RecordCommands(std::shared_ptr<QbVkComputeInstance> instance, std::function<void()> func);
 		void Dispatch(std::shared_ptr<QbVkComputeInstance> instance);
-		std::shared_ptr<QbVkComputeInstance> CreateInstance(std::vector<QbVkComputeDescriptor>& descriptors, const char* shader, 
+		std::shared_ptr<QbVkComputeInstance> CreateInstance(std::vector<QbVkComputeDescriptor>& descriptors, const char* shader,
 			const char* shaderFunc, const VkSpecializationInfo* specInfo = nullptr, const uint32_t pushConstantRangeSize = 0);
 		void DestroyInstance(std::shared_ptr<QbVkComputeInstance> computeInstance);
 		void ImGuiDrawState();

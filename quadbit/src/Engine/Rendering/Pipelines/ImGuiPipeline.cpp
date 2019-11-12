@@ -9,7 +9,7 @@
 #include "Engine/Rendering/Pipelines/ComputePipeline.h"
 
 namespace Quadbit {
-	ImGuiPipeline::ImGuiPipeline(QbVkContext &context) : context_(context) {
+	ImGuiPipeline::ImGuiPipeline(QbVkContext& context) : context_(context) {
 		InitImGui();
 
 		CreateFontTexture();
@@ -21,10 +21,10 @@ namespace Quadbit {
 		ImGui::DestroyContext();
 
 		// Since both the pipeline and layout are destroyed by the swapchain we should check before deleting
-		if(pipeline_ != VK_NULL_HANDLE) {
+		if (pipeline_ != VK_NULL_HANDLE) {
 			vkDestroyPipeline(context_.device, pipeline_, nullptr);
 		}
-		if(pipelineLayout_ != VK_NULL_HANDLE) {
+		if (pipelineLayout_ != VK_NULL_HANDLE) {
 			vkDestroyPipelineLayout(context_.device, pipelineLayout_, nullptr);
 		}
 
@@ -40,7 +40,7 @@ namespace Quadbit {
 		vkDestroyDescriptorSetLayout(context_.device, descriptorSetLayout_, nullptr);
 
 		// Destroy buffers
-		for(auto i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+		for (auto i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
 			context_.allocator->DestroyBuffer(vertexBuffer_[i]);
 			context_.allocator->DestroyBuffer(indexBuffer_[i]);
 		}
@@ -52,23 +52,23 @@ namespace Quadbit {
 		VkDeviceSize vertexBufferSize = imDrawData->TotalVtxCount * sizeof(ImDrawVert);
 		VkDeviceSize indexBufferSize = imDrawData->TotalIdxCount * sizeof(ImDrawIdx);
 
-		if(vertexBufferSize == 0 || indexBufferSize == 0) return;
+		if (vertexBufferSize == 0 || indexBufferSize == 0) return;
 
 		// Only update buffers if the vertex or index count has changed
-		if((vertexBuffer_[resourceIndex].buf == VK_NULL_HANDLE) || (vertexBuffer_[resourceIndex].alloc.size != vertexBufferSize)) {
+		if ((vertexBuffer_[resourceIndex].buf == VK_NULL_HANDLE) || (vertexBuffer_[resourceIndex].alloc.size != vertexBufferSize)) {
 			context_.allocator->DestroyBuffer(vertexBuffer_[resourceIndex]);
 			VkBufferCreateInfo bufferCreateInfo = VkUtils::Init::BufferCreateInfo(vertexBufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-			context_.allocator->CreateBuffer(vertexBuffer_[resourceIndex], bufferCreateInfo, QBVK_MEMORY_USAGE_CPU_TO_GPU);
+			context_.allocator->CreateBuffer(vertexBuffer_[resourceIndex], bufferCreateInfo, QbVkMemoryUsage::QBVK_MEMORY_USAGE_CPU_TO_GPU);
 		}
-		if((indexBuffer_[resourceIndex].buf == VK_NULL_HANDLE) || (indexBuffer_[resourceIndex].alloc.size != indexBufferSize)) {
+		if ((indexBuffer_[resourceIndex].buf == VK_NULL_HANDLE) || (indexBuffer_[resourceIndex].alloc.size != indexBufferSize)) {
 			context_.allocator->DestroyBuffer(indexBuffer_[resourceIndex]);
 			VkBufferCreateInfo bufferCreateInfo = VkUtils::Init::BufferCreateInfo(vertexBufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-			context_.allocator->CreateBuffer(indexBuffer_[resourceIndex], bufferCreateInfo, QBVK_MEMORY_USAGE_CPU_TO_GPU);
+			context_.allocator->CreateBuffer(indexBuffer_[resourceIndex], bufferCreateInfo, QbVkMemoryUsage::QBVK_MEMORY_USAGE_CPU_TO_GPU);
 		}
 
 		ImDrawVert* vertexMappedData = reinterpret_cast<ImDrawVert*>(vertexBuffer_[resourceIndex].alloc.data);
 		ImDrawIdx* indexMappedData = reinterpret_cast<ImDrawIdx*>(indexBuffer_[resourceIndex].alloc.data);
-		for(auto i = 0; i < imDrawData->CmdListsCount; i++) {
+		for (auto i = 0; i < imDrawData->CmdListsCount; i++) {
 			const ImDrawList* cmdList = imDrawData->CmdLists[i];
 			// Copy buffer data
 			memcpy(vertexMappedData, cmdList->VtxBuffer.Data, cmdList->VtxBuffer.Size * sizeof(ImDrawVert));
@@ -89,7 +89,7 @@ namespace Quadbit {
 		uint32_t vertexOffset = 0;
 		uint32_t indexOffset = 0;
 
-		if(imDrawData == nullptr || imDrawData->CmdListsCount == 0) {
+		if (imDrawData == nullptr || imDrawData->CmdListsCount == 0) {
 			return;
 		}
 
@@ -105,15 +105,15 @@ namespace Quadbit {
 		pushConstBlock_.translate = glm::vec2(-1.0f);
 		vkCmdPushConstants(commandbuffer, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstBlock), &pushConstBlock_);
 
-		if(imDrawData->CmdListsCount > 0) {
+		if (imDrawData->CmdListsCount > 0) {
 			VkDeviceSize offsets[1] = { 0 };
 			vkCmdBindVertexBuffers(commandbuffer, 0, 1, &vertexBuffer_[resourceIndex].buf, offsets);
 			vkCmdBindIndexBuffer(commandbuffer, indexBuffer_[resourceIndex].buf, 0, VK_INDEX_TYPE_UINT16);
 
-			for(auto i = 0; i < imDrawData->CmdListsCount; i++) {
+			for (auto i = 0; i < imDrawData->CmdListsCount; i++) {
 				const ImDrawList* cmdList = imDrawData->CmdLists[i];
 
-				for(auto j = 0; j < cmdList->CmdBuffer.Size; j++) {
+				for (auto j = 0; j < cmdList->CmdBuffer.Size; j++) {
 					const ImDrawCmd* pCmd = &cmdList->CmdBuffer[j];
 					VkRect2D scissorRect = VkUtils::Init::ScissorRect(
 						std::max(static_cast<int32_t>(pCmd->ClipRect.x), 0),
@@ -349,7 +349,7 @@ namespace Quadbit {
 		static auto tStart = std::chrono::time_point_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now());
 		auto tEnd = std::chrono::high_resolution_clock::now();
 
-		if(static_cast<std::chrono::duration<float, std::ratio<1>>>(tEnd - tStart).count() > 1) {
+		if (static_cast<std::chrono::duration<float, std::ratio<1>>>(tEnd - tStart).count() > 1) {
 			currentFrametime_ = std::accumulate(frametimeCache_.begin(), frametimeCache_.end(), 0.0f) / frametimeCache_.size() * 1000.0f;
 			currentFPS_ = frametimeCache_.size();
 			tStart = std::chrono::high_resolution_clock::now();

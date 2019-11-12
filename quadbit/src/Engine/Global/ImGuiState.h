@@ -17,7 +17,7 @@ namespace Quadbit::ImGuiState {
 	// argument list in REVERSE order!
 	template<typename... T>
 	inline void Inject(std::function<void()> functor, T... injections) {
-		for(auto&& x : { injections... }) {
+		for (auto&& x : { injections... }) {
 			pointers.push_back(x);
 			varCount++;
 		}

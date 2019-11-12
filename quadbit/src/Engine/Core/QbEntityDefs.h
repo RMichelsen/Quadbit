@@ -103,7 +103,7 @@ namespace Quadbit {
 
 		void RemoveIfExists(EntityID id) override {
 			assert(id.index < sparse_.size());
-			if(sparse_[id.index] == 0xFFFF'FFFF) return;
+			if (sparse_[id.index] == 0xFFFF'FFFF) return;
 
 			// Removal works by swap and pop
 			uint32_t lastIndex = FindEntityID(static_cast<uint32_t>(dense_.size()) - 1);

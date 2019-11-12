@@ -47,7 +47,7 @@ inline constexpr const char* DEVICE_EXT_NAMES[DEVICE_EXT_COUNT]{
 };
 
 inline constexpr const char* VulkanErrorToString(VkResult vkResult) {
-	switch(vkResult) {
+	switch (vkResult) {
 		VK_ERROR_STRING(VK_SUCCESS);
 		VK_ERROR_STRING(VK_NOT_READY);
 		VK_ERROR_STRING(VK_TIMEOUT);

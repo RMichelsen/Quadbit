@@ -11,7 +11,7 @@
 namespace Quadbit {
 	class MeshPipeline {
 	public:
-		MeshPipeline(QbVkContext &context);
+		MeshPipeline(QbVkContext& context);
 		~MeshPipeline();
 		void RebuildPipeline();
 
@@ -52,7 +52,7 @@ namespace Quadbit {
 		VertexBufHandle CreateVertexBuffer(const void* vertices, uint32_t vertexStride, uint32_t vertexCount);
 		IndexBufHandle CreateIndexBuffer(const std::vector<uint32_t>& indices);
 
-		std::shared_ptr<QbVkRenderMeshInstance> CreateInstance(std::vector<QbVkRenderDescriptor>& descriptors, std::vector<QbVkVertexInputAttribute> vertexAttribs, 
+		std::shared_ptr<QbVkRenderMeshInstance> CreateInstance(std::vector<QbVkRenderDescriptor>& descriptors, std::vector<QbVkVertexInputAttribute> vertexAttribs,
 			const char* vertexShader, const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry, int pushConstantStride = -1,
 			VkShaderStageFlags pushConstantShaderStage = VK_SHADER_STAGE_VERTEX_BIT, VkBool32 depthTestingEnabled = VK_TRUE);
 		void DestroyInstance(std::shared_ptr<QbVkRenderMeshInstance> instance);

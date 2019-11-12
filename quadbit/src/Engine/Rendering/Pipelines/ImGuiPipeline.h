@@ -6,7 +6,7 @@
 namespace Quadbit {
 	class ImGuiPipeline {
 	public:
-		ImGuiPipeline(QbVkContext &context);
+		ImGuiPipeline(QbVkContext& context);
 		~ImGuiPipeline();
 
 		void UpdateBuffers(uint32_t resourceIndex);

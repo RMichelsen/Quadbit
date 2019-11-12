@@ -11,7 +11,7 @@ namespace Quadbit {
 	using VertexBufHandle = uint16_t;
 	using IndexBufHandle = uint16_t;
 
-	enum QbVkMemoryUsage {
+	enum class QbVkMemoryUsage {
 		QBVK_MEMORY_USAGE_UNKNOWN,
 		QBVK_MEMORY_USAGE_CPU_ONLY,
 		QBVK_MEMORY_USAGE_GPU_ONLY,
@@ -19,7 +19,7 @@ namespace Quadbit {
 		QBVK_MEMORY_USAGE_GPU_TO_CPU
 	};
 
-	enum QbVkVertexInputAttribute {
+	enum class QbVkVertexInputAttribute {
 		QBVK_VERTEX_ATTRIBUTE_POSITION,
 		QBVK_VERTEX_ATTRIBUTE_NORMAL,
 		QBVK_VERTEX_ATTRIBUTE_UV,
@@ -35,7 +35,7 @@ namespace Quadbit {
 		VkDeviceMemory deviceMemory = VK_NULL_HANDLE;
 		VkDeviceSize offset = 0;
 		VkDeviceSize size = 0;
-		std::byte* data = nullptr;
+		unsigned char* data = nullptr;
 	};
 
 	struct QbVkBuffer {
@@ -99,7 +99,7 @@ namespace Quadbit {
 		double msAvgTime = 0.0;
 	};
 
-	enum QbVkAllocationType {
+	enum class QbVkAllocationType {
 		QBVK_ALLOCATION_TYPE_UNKNOWN,
 		QBVK_ALLOCATION_TYPE_FREE,
 		QBVK_ALLOCATION_TYPE_BUFFER,

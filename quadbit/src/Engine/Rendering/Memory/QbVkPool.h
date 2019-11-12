@@ -11,7 +11,7 @@ namespace Quadbit {
 		uint32_t nextBlockId_ = 0;
 		VkDeviceMemory deviceMemory_ = 0;
 		QbVkMemoryUsage memoryUsage_;
-		std::byte* data_ = nullptr;
+		unsigned char* data_ = nullptr;
 
 		struct Block {
 			uint32_t id = 0;
@@ -19,11 +19,12 @@ namespace Quadbit {
 			VkDeviceSize offset = 0;
 			Block* prev = nullptr;
 			std::unique_ptr<Block> next = nullptr;
-			QbVkAllocationType allocationType = QBVK_ALLOCATION_TYPE_UNKNOWN;
+			QbVkAllocationType allocationType = QbVkAllocationType::QBVK_ALLOCATION_TYPE_UNKNOWN;
 		};
 		std::unique_ptr<Block> head_ = std::make_unique<Block>();
 
 		QbVkPool(VkDevice device, const int32_t memoryTypeIndex, const VkDeviceSize size, QbVkMemoryUsage usage);
+		~QbVkPool();
 
 		bool Allocate(VkDeviceSize size, VkDeviceSize alignment, VkDeviceSize granularity, QbVkAllocationType allocationType, QbVkAllocation& allocation);
 		void Free(QbVkAllocation& allocation);
