@@ -1,9 +1,9 @@
 [submodule "quadbit/dependencies/glm"]
-	path = quadbit/dependencies/glm
+	path = e/dependencies/glm
 	url = https://github.com/g-truc/glm.git
 [submodule "quadbit/dependencies/tinyobjloader"]
-	path = quadbit/dependencies/tinyobjloader
+	path = e/dependencies/tinyobjloader
 	url = https://github.com/syoyo/tinyobjloader.git
 [submodule "quadbit/dependencies/stb/stb"]
-	path = quadbit/dependencies/stb/stb
+	path = e/dependencies/stb/stb
 	url = https://github.com/nothings/stb.git
