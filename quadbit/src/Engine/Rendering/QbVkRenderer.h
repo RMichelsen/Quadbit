@@ -26,10 +26,6 @@ namespace Quadbit {
 		VkMemoryBarrier CreateMemoryBarrier(VkAccessFlags srcMask, VkAccessFlags dstMask);
 
 		// Objects and Textures
-		//void LoadEnvironmentMap(const char* environmentTexture, VkFormat textureFormat);
-		//VkDescriptorImageInfo GetEnvironmentMapDescriptor();
-		//QbVkTexture LoadCubemap(const char* imagePath, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage, VkImageLayout imageLayout,
-		//	VkImageAspectFlags imageAspectFlags, QbVkMemoryUsage memoryUsage);
 		QbVkTexture LoadTexture(const char* imagePath, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage, VkImageLayout imageLayout,
 			VkImageAspectFlags imageAspectFlags, QbVkMemoryUsage memoryUsage, VkSamplerCreateInfo* samplerCreateInfo = nullptr,
 			VkSampleCountFlagBits numSamples = VK_SAMPLE_COUNT_1_BIT);
