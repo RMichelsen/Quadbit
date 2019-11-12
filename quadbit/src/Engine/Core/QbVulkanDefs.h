@@ -44,6 +44,10 @@ namespace Quadbit {
 		VkDescriptorBufferInfo descriptor{};
 	};
 
+	// Async buffers are like normal buffers but
+	// does not wait for fence immediately.
+	// They can be queried after async buffer creation to check whether
+	// content has been transferred.
 	struct QbVkAsyncBuffer {
 		VkBuffer buf = VK_NULL_HANDLE;
 		QbVkAllocation alloc{};

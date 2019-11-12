@@ -15,6 +15,7 @@ add_library(Quadbit STATIC
     src/Engine/Application/Window.cpp
     src/Engine/Entities/EntityManager.cpp
     src/Engine/Rendering/QbVkRenderer.cpp
+    src/Engine/Rendering/QbVkShaderInstance.cpp
     src/Engine/Rendering/Memory/QbVkAllocator.cpp
     src/Engine/Rendering/Memory/QbVkPool.cpp
     src/Engine/Rendering/Pipelines/ComputePipeline.cpp

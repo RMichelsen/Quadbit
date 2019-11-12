@@ -14,37 +14,25 @@
 
 #include "Utils/VoxelMesher.h"
 
-void Infinitum::Test() {
-	auto& entityManager = EntityManager::Instance();
-
-	renderMeshInstance_ = renderer_->CreateRenderMeshInstance({
-		Quadbit::QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_POSITION,
-		Quadbit::QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_COLOUR
-		},
-		"Resources/Shaders/Compiled/voxel_vert.spv", "main", "Resources/Shaders/Compiled/voxel_frag.spv", "main"
-	);
-
-	VoxelMesher::VoxelMesh mesh = MagicaVoxImporter::CreateVoxelMesh("Resources/Models/Tree.vox");
-
-	auto tree = entityManager.Create();
-	tree.AddComponent<Quadbit::RenderTransformComponent>(Quadbit::RenderTransformComponent(1.0f, glm::vec3(16.0f, 30.0f, 16.0f), glm::quat()));
-	tree.AddComponent<Quadbit::RenderMeshComponent>(renderer_->CreateMesh(mesh.vertices, sizeof(VoxelVertex), mesh.indices, renderMeshInstance_));
-}
-
 void Infinitum::Init() {
 	// Setup entities
 	auto& entityManager = EntityManager::Instance();
 	entityManager.RegisterComponents<VoxelBlockComponent, VoxelBlockUpdateTag, MeshGenerationUpdateTag, MeshReadyTag, PlayerTag>();
 
+	renderer_->LoadSkyGradient(glm::vec3(1.0f, 1.0f, 1.0f), glm::vec3(0.1f, 0.4f, 0.8f));
+
 	//camera_ = entityManager->Create();
 	//camera_.AddComponent<Quadbit::RenderCamera>(Quadbit::RenderCamera(0.0f, 0.0f, glm::vec3(), renderer_->GetAspectRatio(), 10000.0f));
 	//renderer_->RegisterCamera(camera_);
 
+	Quadbit::QbVkShaderInstance shaderInstance = renderer_->CreateShaderInstance();
+	shaderInstance.AddShader("Resources/Shaders/Compiled/voxel_vert.spv", "main", VK_SHADER_STAGE_VERTEX_BIT);
+	shaderInstance.AddShader("Resources/Shaders/Compiled/voxel_frag.spv", "main", VK_SHADER_STAGE_FRAGMENT_BIT);
+
 	renderMeshInstance_ = renderer_->CreateRenderMeshInstance({
-			Quadbit::QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_POSITION,
-			Quadbit::QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_COLOUR
-		},
-		"Resources/Shaders/Compiled/voxel_vert.spv", "main", "Resources/Shaders/Compiled/voxel_frag.spv", "main"
+		Quadbit::QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_POSITION,
+		Quadbit::QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_COLOUR
+		}, shaderInstance
 	);
 
 	player_ = entityManager.Create();

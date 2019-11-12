@@ -55,6 +55,11 @@ namespace Quadbit {
 		}
 	};
 
+	struct SkyGradientVertex {
+		glm::vec3 position;
+		glm::vec3 colour;
+	};
+
 	struct MeshVertex {
 		glm::vec3 position;
 		glm::vec3 normal;
@@ -174,7 +179,7 @@ namespace Quadbit {
 		uint32_t indexCount;
 		std::array<float, 32> pushConstants;
 		int pushConstantStride;
-		std::shared_ptr<QbVkRenderMeshInstance> instance;
+		const QbVkRenderMeshInstance* instance;
 
 		template<typename T>
 		T* GetSafePushConstPtr() {

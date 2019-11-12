@@ -2,6 +2,7 @@
 #include <functional>
 #include <variant>
 
+#include "Engine/Rendering/QbVkShaderInstance.h"
 #include "Engine/Core/QbRenderDefs.h"
 #include "Engine/Core/QbVulkanDefs.h"
 
@@ -24,6 +25,7 @@ namespace Quadbit {
 		void CreateGPUBuffer(QbVkBuffer& buffer, VkDeviceSize size, VkBufferUsageFlags bufferUsage, QbVkMemoryUsage memoryUsage);
 		void TransferDataToGPUBuffer(QbVkBuffer& buffer, VkDeviceSize size, const void* data);
 		VkMemoryBarrier CreateMemoryBarrier(VkAccessFlags srcMask, VkAccessFlags dstMask);
+		QbVkShaderInstance CreateShaderInstance();
 
 		// Objects and Textures
 		QbVkTexture LoadTexture(const char* imagePath, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage, VkImageLayout imageLayout,
@@ -34,7 +36,6 @@ namespace Quadbit {
 			VkSampler sampler = VK_NULL_HANDLE, VkSampleCountFlagBits numSamples = VK_SAMPLE_COUNT_1_BIT);
 		VkSampler CreateImageSampler(VkFilter samplerFilter, VkSamplerAddressMode addressMode, VkBool32 enableAnisotropy,
 			float maxAnisotropy, VkCompareOp compareOperation, VkSamplerMipmapMode samplerMipmapMode, float maxLod = 0.0f);
-
 
 		// Compute Pipeline
 		std::shared_ptr<QbVkComputeInstance> CreateComputeInstance(std::vector<QbVkComputeDescriptor>& descriptors, const char* shader, const char* shaderFunc,
@@ -47,18 +48,17 @@ namespace Quadbit {
 		}
 		QbVkComputeDescriptor CreateComputeDescriptor(VkDescriptorType type, std::variant<VkDescriptorImageInfo, VkDescriptorBufferInfo> data);
 
-
 		// Mesh Pipeline
 		Entity GetActiveCamera();
 		void RegisterCamera(Entity entity);
-		std::shared_ptr<QbVkRenderMeshInstance> CreateRenderMeshInstance(std::vector<QbVkRenderDescriptor>& descriptors,
-			std::vector<QbVkVertexInputAttribute> vertexAttribs, const char* vertexShader, const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry,
+		const QbVkRenderMeshInstance* CreateRenderMeshInstance(std::vector<QbVkRenderDescriptor>& descriptors,
+			std::vector<QbVkVertexInputAttribute> vertexAttribs, QbVkShaderInstance& shaderInstance,
 			int pushConstantStride = -1, VkShaderStageFlags pushConstantShaderStage = VK_SHADER_STAGE_VERTEX_BIT);
-		std::shared_ptr<QbVkRenderMeshInstance> CreateRenderMeshInstance(std::vector<QbVkVertexInputAttribute> vertexAttribs, const char* vertexShader, const char* vertexEntry,
-			const char* fragmentShader, const char* fragmentEntry, int pushConstantStride = -1, VkShaderStageFlags pushConstantShaderStage = VK_SHADER_STAGE_VERTEX_BIT);
+		const QbVkRenderMeshInstance* CreateRenderMeshInstance(std::vector<QbVkVertexInputAttribute> vertexAttribs, QbVkShaderInstance& shaderInstance, 
+			int pushConstantStride = -1, VkShaderStageFlags pushConstantShaderStage = VK_SHADER_STAGE_VERTEX_BIT);
 		RenderTexturedObjectComponent CreateObject(const char* objPath, const char* texturePath, VkFormat textureFormat);
 		template<typename T>
-		RenderMeshComponent CreateMesh(std::vector<T> vertices, uint32_t vertexStride, const std::vector<uint32_t>& indices, std::shared_ptr<QbVkRenderMeshInstance> externalInstance,
+		RenderMeshComponent CreateMesh(std::vector<T> vertices, uint32_t vertexStride, const std::vector<uint32_t>& indices, const QbVkRenderMeshInstance* externalInstance,
 			int pushConstantStride = -1) {
 
 			return RenderMeshComponent{
@@ -70,7 +70,7 @@ namespace Quadbit {
 				externalInstance
 			};
 		}
-		RenderMeshComponent CreateMesh(const char* objPath, std::vector<QbVkVertexInputAttribute> vertexModel, std::shared_ptr<QbVkRenderMeshInstance> externalInstance,
+		RenderMeshComponent CreateMesh(const char* objPath, std::vector<QbVkVertexInputAttribute> vertexModel, const QbVkRenderMeshInstance* externalInstance,
 			int pushConstantStride = -1);
 		void DestroyMesh(RenderMeshComponent& renderMeshComponent);
 		VertexBufHandle CreateVertexBuffer(const void* vertices, uint32_t vertexStride, uint32_t vertexCount);
@@ -81,6 +81,8 @@ namespace Quadbit {
 		}
 		QbVkRenderDescriptor CreateRenderDescriptor(VkDescriptorType type, std::variant<VkDescriptorImageInfo, VkDescriptorBufferInfo> data, VkShaderStageFlagBits shaderStage);
 
+		// Sky gradient setup
+		void LoadSkyGradient(glm::vec3 botColour, glm::vec3 topColour);
 
 	private:
 		bool canRender_ = false;

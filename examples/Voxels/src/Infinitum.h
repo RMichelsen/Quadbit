@@ -39,7 +39,7 @@ public:
 
 private:
 	std::unique_ptr<Quadbit::QbVkRenderer> renderer_;
-	std::shared_ptr<Quadbit::QbVkRenderMeshInstance> renderMeshInstance_;
+	const Quadbit::QbVkRenderMeshInstance* renderMeshInstance_;
 	FastNoiseSIMD* fastnoiseTerrain_;
 	FastNoiseSIMD* fastnoiseRegions_;
 	FastNoiseSIMD* fastnoiseColours_;

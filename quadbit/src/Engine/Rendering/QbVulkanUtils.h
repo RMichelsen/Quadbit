@@ -1211,4 +1211,28 @@ namespace Quadbit::VkUtils {
 		}
 		return model;
 	}
+
+	//inline VkPipelineShaderStageCreateInfo LoadShaders(const QbVkContext& context, const char* vertexShader, const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry) {
+	//	std::vector<char> vertexShaderBytecode = ReadShader(vertexShader);
+	//	std::vector<char> fragmentShaderBytecode = ReadShader(fragmentShader);
+	//	VkShaderModule vertShaderModule = CreateShaderModule(vertexShaderBytecode, context.device);
+	//	VkShaderModule fragShaderModule = CreateShaderModule(fragmentShaderBytecode, context.device);
+
+	//	// This part specifies the two shader types used in the pipeline
+	//	VkPipelineShaderStageCreateInfo shaderStageInfo[2] = {
+	//		VkUtils::Init::PipelineShaderStageCreateInfo(),
+	//		VkUtils::Init::PipelineShaderStageCreateInfo()
+	//	};
+	//	// Specifies type of shader
+	//	shaderStageInfo[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+	//	// Specifies shader module to load
+	//	shaderStageInfo[0].module = vertShaderModule;
+	//	// "main" refers to the Entrypoint of a given shader module
+	//	shaderStageInfo[0].pName = vertexEntry;
+
+	//	// Similarly for the fragment shader
+	//	shaderStageInfo[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	//	shaderStageInfo[1].module = fragShaderModule;
+	//	shaderStageInfo[1].pName = fragmentEntry;
+	//}
 }

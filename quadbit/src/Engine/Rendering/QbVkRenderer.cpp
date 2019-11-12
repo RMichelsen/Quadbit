@@ -197,6 +197,10 @@ namespace Quadbit {
 		return VkUtils::Init::MemoryBarrierVk(srcMask, dstMask);
 	}
 
+	QbVkShaderInstance QbVkRenderer::CreateShaderInstance() {
+		return QbVkShaderInstance(*context_);
+	}
+
 	//void QbVkRenderer::LoadEnvironmentMap(const char* environmentTexture, VkFormat textureFormat) {
 	//	meshPipeline_->LoadEnvironmentMap(environmentTexture, textureFormat);
 	//}
@@ -260,24 +264,23 @@ namespace Quadbit {
 		meshPipeline_->userCamera_ = entity;
 	}
 
-	std::shared_ptr<QbVkRenderMeshInstance> QbVkRenderer::CreateRenderMeshInstance(std::vector<QbVkRenderDescriptor>& descriptors,
-		std::vector<QbVkVertexInputAttribute> vertexAttribs, const char* vertexShader, const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry,
-		int pushConstantStride, VkShaderStageFlags pushConstantShaderStage) {
-		return meshPipeline_->CreateInstance(descriptors, vertexAttribs, vertexShader, vertexEntry, fragmentShader, fragmentEntry, pushConstantStride, pushConstantShaderStage);
+	const QbVkRenderMeshInstance* QbVkRenderer::CreateRenderMeshInstance(std::vector<QbVkRenderDescriptor>& descriptors,
+		std::vector<QbVkVertexInputAttribute> vertexAttribs, QbVkShaderInstance& shaderInstance, int pushConstantStride, VkShaderStageFlags pushConstantShaderStage) {
+		return meshPipeline_->CreateInstance(descriptors, vertexAttribs, shaderInstance, pushConstantStride, pushConstantShaderStage);
 	}
 
-	std::shared_ptr<QbVkRenderMeshInstance> QbVkRenderer::CreateRenderMeshInstance(std::vector<QbVkVertexInputAttribute> vertexAttribs, const char* vertexShader,
-		const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry, int pushConstantStride, VkShaderStageFlags pushConstantShaderStage) {
+	const QbVkRenderMeshInstance* QbVkRenderer::CreateRenderMeshInstance(std::vector<QbVkVertexInputAttribute> vertexAttribs, QbVkShaderInstance& shaderInstance, 
+		int pushConstantStride, VkShaderStageFlags pushConstantShaderStage) {
 		std::vector<QbVkRenderDescriptor> empty{};
-		return meshPipeline_->CreateInstance(empty, vertexAttribs, vertexShader, vertexEntry, fragmentShader, fragmentEntry, pushConstantStride, pushConstantShaderStage);
+		return meshPipeline_->CreateInstance(empty, vertexAttribs, shaderInstance, pushConstantStride, pushConstantShaderStage);
 	}
 
 	RenderTexturedObjectComponent QbVkRenderer::CreateObject(const char* objPath, const char* texturePath, VkFormat textureFormat) {
 		return meshPipeline_->CreateObject(objPath, texturePath, textureFormat);
 	}
 
-	RenderMeshComponent QbVkRenderer::CreateMesh(const char* objPath, std::vector<QbVkVertexInputAttribute> vertexModel, std::shared_ptr<QbVkRenderMeshInstance> externalInstance,
-		int pushConstantStride) {
+	RenderMeshComponent QbVkRenderer::CreateMesh(const char* objPath, std::vector<QbVkVertexInputAttribute> vertexModel, 
+		const QbVkRenderMeshInstance* externalInstance, int pushConstantStride) {
 		QbVkModel model = VkUtils::LoadModel(objPath, vertexModel);
 
 		return RenderMeshComponent{
@@ -306,6 +309,10 @@ namespace Quadbit {
 	QbVkRenderDescriptor QbVkRenderer::CreateRenderDescriptor(VkDescriptorType type, std::variant<VkDescriptorImageInfo,
 		VkDescriptorBufferInfo> data, VkShaderStageFlagBits shaderStage) {
 		return { type, 1, &data, shaderStage };
+	}
+
+	void QbVkRenderer::LoadSkyGradient(glm::vec3 botColour, glm::vec3 topColour) {
+		meshPipeline_->LoadSkyGradient(botColour, topColour);
 	}
 
 #ifndef NDEBUG

@@ -48,7 +48,7 @@ namespace Quadbit {
 			}
 		}
 		for (auto&& instance : externalInstances_) {
-			DestroyInstance(instance);
+			DestroyInstance(instance.get());
 		}
 	}
 
@@ -89,6 +89,29 @@ namespace Quadbit {
 
 		Quadbit::RenderCamera* camera;
 		(userCamera_ != NULL_ENTITY && userCamera_.IsValid()) ? camera = userCamera_.GetComponentPtr<RenderCamera>() : camera = fallbackCamera_.GetComponentPtr<RenderCamera>();
+
+		// Update environment map if applicable, use camera stuff to do this
+		if (environmentMap_ != NULL_ENTITY) {
+			auto mesh = environmentMap_.GetComponentPtr<Quadbit::RenderMeshComponent>();
+			EnvironmentMapPushConstants* pc = mesh->GetSafePushConstPtr<EnvironmentMapPushConstants>();
+			pc->proj = camera->perspective;
+			pc->proj[1][1] *= -1;
+
+			// Invert pitch??
+			camera->front.x = cos(glm::radians(camera->yaw)) * cos(glm::radians(-camera->pitch));
+			camera->front.y = sin(glm::radians(-camera->pitch));
+			camera->front.z = sin(glm::radians(camera->yaw)) * cos(glm::radians(-camera->pitch));
+			camera->front = glm::normalize(camera->front);
+			camera->view = glm::lookAt(camera->position, camera->position + camera->front, camera->up);
+			pc->view = glm::mat4(glm::mat3(camera->view));
+
+			// Reset
+			camera->front.x = cos(glm::radians(camera->yaw)) * cos(glm::radians(camera->pitch));
+			camera->front.y = sin(glm::radians(camera->pitch));
+			camera->front.z = sin(glm::radians(camera->yaw)) * cos(glm::radians(camera->pitch));
+			camera->front = glm::normalize(camera->front);
+			camera->view = glm::lookAt(camera->position, camera->position + camera->front, camera->up);
+		}
 
 		VkDeviceSize offsets[]{ 0 };
 
@@ -177,26 +200,9 @@ namespace Quadbit {
 	}
 
 	void MeshPipeline::CreatePipeline() {
-		// We start off by reading the shader bytecode from disk and creating the modules subsequently
-		VkShaderModule vertShaderModule = VkUtils::CreateShaderModule(defaultVert.data(), static_cast<uint32_t>(defaultVert.size()), context_.device);
-		VkShaderModule fragShaderModule = VkUtils::CreateShaderModule(defaultFrag.data(), static_cast<uint32_t>(defaultFrag.size()), context_.device);
-
-		// This part specifies the two shader types used in the pipeline
-		VkPipelineShaderStageCreateInfo shaderStageInfo[2] = {
-			VkUtils::Init::PipelineShaderStageCreateInfo(),
-			VkUtils::Init::PipelineShaderStageCreateInfo()
-		};
-		// Specifies type of shader
-		shaderStageInfo[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-		// Specifies shader module to load
-		shaderStageInfo[0].module = vertShaderModule;
-		// "main" refers to the Entrypoint of a given shader module
-		shaderStageInfo[0].pName = "main";
-
-		// Similarly for the fragment shader
-		shaderStageInfo[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-		shaderStageInfo[1].module = fragShaderModule;
-		shaderStageInfo[1].pName = "main";
+		QbVkShaderInstance shaderInstance = QbVkShaderInstance(context_);
+		shaderInstance.AddShader(defaultVert.data(), static_cast<uint32_t>(defaultVert.size()), "main", VK_SHADER_STAGE_VERTEX_BIT);
+		shaderInstance.AddShader(defaultFrag.data(), static_cast<uint32_t>(defaultFrag.size()), "main", VK_SHADER_STAGE_FRAGMENT_BIT);
 
 		// This part specifies the format of the vertex data passed to the vertex shader
 		auto bindingDescription = MeshVertex::GetBindingDescription();
@@ -315,7 +321,7 @@ namespace Quadbit {
 		// It's finally time to create the actual pipeline
 		VkGraphicsPipelineCreateInfo pipelineInfo = VkUtils::Init::GraphicsPipelineCreateInfo();
 		pipelineInfo.stageCount = 2;
-		pipelineInfo.pStages = shaderStageInfo;
+		pipelineInfo.pStages = shaderInstance.stages.data();
 		pipelineInfo.pVertexInputState = &vertexInputInfo;
 		pipelineInfo.pInputAssemblyState = &inputAssemblyInfo;
 		pipelineInfo.pViewportState = &viewportInfo;
@@ -335,8 +341,6 @@ namespace Quadbit {
 
 		// Finally we can create the pipeline
 		VK_CHECK(vkCreateGraphicsPipelines(context_.device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline_));
-		vkDestroyShaderModule(context_.device, vertShaderModule, nullptr);
-		vkDestroyShaderModule(context_.device, fragShaderModule, nullptr);
 	}
 
 	void MeshPipeline::DestroyMesh(RenderMeshComponent& renderMeshComponent) {
@@ -358,7 +362,7 @@ namespace Quadbit {
 
 	VertexBufHandle MeshPipeline::CreateVertexBuffer(const void* vertices, uint32_t vertexStride, uint32_t vertexCount) {
 		VertexBufHandle handle = meshBuffers_.GetNextVertexHandle();
-		VkDeviceSize bufferSize = static_cast<uint64_t>(vertexCount)* vertexStride;
+		VkDeviceSize bufferSize = static_cast<uint64_t>(vertexCount) * vertexStride;
 
 		VkUtils::CreateAsyncBuffer(context_, meshBuffers_.vertexBuffers_[handle], bufferSize, vertices, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
@@ -374,11 +378,11 @@ namespace Quadbit {
 		return handle;
 	}
 
-	std::shared_ptr<QbVkRenderMeshInstance> MeshPipeline::CreateInstance(std::vector<QbVkRenderDescriptor>& descriptors, std::vector<QbVkVertexInputAttribute> vertexAttribs,
-		const char* vertexShader, const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry,
-		int pushConstantStride, VkShaderStageFlags pushConstantShaderStage, VkBool32 depthTestingEnabled) {
+	const QbVkRenderMeshInstance* MeshPipeline::CreateInstance(std::vector<QbVkRenderDescriptor>& descriptors, std::vector<QbVkVertexInputAttribute> vertexAttribs,
+		QbVkShaderInstance& shaderInstance, int pushConstantStride, VkShaderStageFlags pushConstantShaderStage, VkBool32 depthTestingEnabled) {
 
-		auto renderMeshInstance = std::make_shared<QbVkRenderMeshInstance>();
+		externalInstances_.push_back(std::make_unique<QbVkRenderMeshInstance>());
+		QbVkRenderMeshInstance* renderMeshInstance = externalInstances_.back().get();
 
 		if (!descriptors.empty()) {
 			std::vector<VkDescriptorPoolSize> poolSizes;
@@ -432,29 +436,6 @@ namespace Quadbit {
 				vkUpdateDescriptorSets(context_.device, static_cast<uint32_t>(writeDescSets.size()), writeDescSets.data(), 0, nullptr);
 			}
 		}
-
-		// We start off by reading the shader bytecode from disk and creating the modules subsequently
-		std::vector<char> vertexShaderBytecode = VkUtils::ReadShader(vertexShader);
-		std::vector<char> fragmentShaderBytecode = VkUtils::ReadShader(fragmentShader);
-		VkShaderModule vertShaderModule = VkUtils::CreateShaderModule(vertexShaderBytecode, context_.device);
-		VkShaderModule fragShaderModule = VkUtils::CreateShaderModule(fragmentShaderBytecode, context_.device);
-
-		// This part specifies the two shader types used in the pipeline
-		VkPipelineShaderStageCreateInfo shaderStageInfo[2] = {
-			VkUtils::Init::PipelineShaderStageCreateInfo(),
-			VkUtils::Init::PipelineShaderStageCreateInfo()
-		};
-		// Specifies type of shader
-		shaderStageInfo[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-		// Specifies shader module to load
-		shaderStageInfo[0].module = vertShaderModule;
-		// "main" refers to the Entrypoint of a given shader module
-		shaderStageInfo[0].pName = vertexEntry;
-
-		// Similarly for the fragment shader
-		shaderStageInfo[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-		shaderStageInfo[1].module = fragShaderModule;
-		shaderStageInfo[1].pName = fragmentEntry;
 
 		// This part specifies the format of the vertex data passed to the vertex shader
 		auto bindingDescription = VkUtils::GetVertexBindingDescription(vertexAttribs);
@@ -568,7 +549,7 @@ namespace Quadbit {
 		// It's finally time to create the actual pipeline
 		VkGraphicsPipelineCreateInfo pipelineInfo = VkUtils::Init::GraphicsPipelineCreateInfo();
 		pipelineInfo.stageCount = 2;
-		pipelineInfo.pStages = shaderStageInfo;
+		pipelineInfo.pStages = shaderInstance.stages.data();
 		pipelineInfo.pVertexInputState = &vertexInputInfo;
 		pipelineInfo.pInputAssemblyState = &inputAssemblyInfo;
 		pipelineInfo.pViewportState = &viewportInfo;
@@ -588,14 +569,11 @@ namespace Quadbit {
 
 		// Finally we can create the pipeline
 		VK_CHECK(vkCreateGraphicsPipelines(context_.device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &renderMeshInstance->pipeline));
-		vkDestroyShaderModule(context_.device, vertShaderModule, nullptr);
-		vkDestroyShaderModule(context_.device, fragShaderModule, nullptr);
 
-		externalInstances_.push_back(renderMeshInstance);
 		return renderMeshInstance;
 	}
 
-	void MeshPipeline::DestroyInstance(std::shared_ptr<QbVkRenderMeshInstance> instance) {
+	void MeshPipeline::DestroyInstance(const QbVkRenderMeshInstance* instance) {
 		// Destroy pipeline
 		vkDestroyPipelineLayout(context_.device, instance->pipelineLayout, nullptr);
 		vkDestroyPipeline(context_.device, instance->pipeline, nullptr);
@@ -686,5 +664,56 @@ namespace Quadbit {
 			std::array<float, 32>(),
 			-1
 		};
+	}
+
+	void MeshPipeline::LoadSkyGradient(glm::vec3 botColour, glm::vec3 topColour) {
+		std::vector<Quadbit::QbVkVertexInputAttribute> vertexModel{
+			Quadbit::QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_POSITION,
+			Quadbit::QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_COLOUR
+		};
+
+		QbVkShaderInstance shaderInstance(context_);
+		shaderInstance.AddShader(gradientSkyboxVert.data(), gradientSkyboxVert.size(), "main", VK_SHADER_STAGE_VERTEX_BIT);
+		shaderInstance.AddShader(gradientSkyboxFrag.data(), gradientSkyboxFrag.size(), "main", VK_SHADER_STAGE_FRAGMENT_BIT);
+
+		const QbVkRenderMeshInstance* instance = CreateInstance(std::vector<QbVkRenderDescriptor> {}, vertexModel, shaderInstance, sizeof(EnvironmentMapPushConstants), VK_SHADER_STAGE_VERTEX_BIT, VK_FALSE);
+
+		const std::vector<SkyGradientVertex> cubeVertices = {
+			{{-1.0f, -1.0f, 1.0f},	topColour},
+			{{1.0f, -1.0f, 1.0f},	topColour},
+			{{1.0f, 1.0f, 1.0f},	botColour},
+			{{-1.0f, 1.0f, 1.0f},	botColour},
+
+			{{-1.0f, -1.0f, -1.0f}, topColour},
+			{{1.0f, -1.0f, -1.0f},	topColour},
+			{{1.0f, 1.0f, -1.0f},	botColour},
+			{{-1.0f, 1.0f, -1.0f},	botColour}
+		};
+
+		const std::vector<uint32_t> cubeIndices = {
+			0, 1, 2,
+			2, 3, 0,
+			1, 5, 6,
+			6, 2, 1,
+			7, 6, 5,
+			5, 4, 7,
+			4, 0, 3,
+			3, 7, 4,
+			4, 5, 1,
+			1, 0, 4,
+			3, 2, 6,
+			6, 7, 3
+		};
+
+		environmentMap_ = EntityManager::Instance().Create();
+		environmentMap_.AddComponent<RenderMeshComponent>({
+			CreateVertexBuffer(cubeVertices.data(), sizeof(SkyGradientVertex), static_cast<uint32_t>(cubeVertices.size())),
+			CreateIndexBuffer(cubeIndices),
+			static_cast<uint32_t>(cubeIndices.size()),
+			std::array<float, 32>(),
+			sizeof(EnvironmentMapPushConstants),
+			instance
+			});
+		environmentMap_.AddComponent<Quadbit::RenderTransformComponent>(Quadbit::RenderTransformComponent(1.0f, { 0.0f, 0.0f, 0.0f }, { 0, 0, 0, 1 }));
 	}
 }
