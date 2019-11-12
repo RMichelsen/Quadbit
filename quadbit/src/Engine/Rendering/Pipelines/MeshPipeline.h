@@ -37,9 +37,6 @@ namespace Quadbit {
 		Entity fallbackCamera_ = NULL_ENTITY;
 		Entity userCamera_ = NULL_ENTITY;
 
-		QbVkTexture environmentTexture_{};
-		Entity environmentMap_ = NULL_ENTITY;
-
 		std::vector<VertexBufHandle> vertexHandleDeleteQueue_;
 		std::vector<IndexBufHandle> indexHandleDeleteQueue_;
 
@@ -58,9 +55,6 @@ namespace Quadbit {
 		void DestroyInstance(std::shared_ptr<QbVkRenderMeshInstance> instance);
 
 		Entity GetActiveCamera();
-		//VkDescriptorImageInfo GetEnvironmentMapDescriptor();
-		//void LoadEnvironmentMap(const char* environmentTexture, VkFormat textureFormat);
-
 		RenderTexturedObjectComponent CreateObject(const char* objPath, const char* texturePath, VkFormat textureFormat);
 	};
 }

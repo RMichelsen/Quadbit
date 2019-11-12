@@ -4,18 +4,16 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 project(Voxels LANGUAGES CXX)
 
-find_package(Vulkan REQUIRED)
-
-add_subdirectory(Source/Extern/FastNoiseSIMD)
+add_subdirectory(src/Extern/FastNoiseSIMD)
 
 add_executable(Voxels WIN32
-    Source/Main.cpp
-    Source/Infinitum.cpp
+    src/Main.cpp
+    src/Infinitum.cpp
     )
 
 target_include_directories(Voxels
     PRIVATE
-        Source/Extern
+        src/Extern
     )
 
 target_link_libraries(Voxels
@@ -26,4 +24,4 @@ target_link_libraries(Voxels
 
 add_custom_command(TARGET Voxels PRE_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy_directory
-                       ${CMAKE_CURRENT_SOURCE_DIR}/Resources/ $<TARGET_FILE_DIR:Voxels>/Resources)
+                       ${CMAKE_CURRENT_SOURCE_DIR}/resources/ $<TARGET_FILE_DIR:Voxels>/resources)

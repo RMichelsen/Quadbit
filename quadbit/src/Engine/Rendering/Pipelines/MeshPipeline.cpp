@@ -90,29 +90,6 @@ namespace Quadbit {
 		Quadbit::RenderCamera* camera;
 		(userCamera_ != NULL_ENTITY && userCamera_.IsValid()) ? camera = userCamera_.GetComponentPtr<RenderCamera>() : camera = fallbackCamera_.GetComponentPtr<RenderCamera>();
 
-		// Update environment map if applicable, use camera stuff to do this
-		if (environmentMap_ != NULL_ENTITY) {
-			auto mesh = environmentMap_.GetComponentPtr<Quadbit::RenderMeshComponent>();
-			EnvironmentMapPushConstants* pc = mesh->GetSafePushConstPtr<EnvironmentMapPushConstants>();
-			pc->proj = camera->perspective;
-			pc->proj[1][1] *= -1;
-
-			// Invert pitch??
-			camera->front.x = cos(glm::radians(camera->yaw)) * cos(glm::radians(-camera->pitch));
-			camera->front.y = sin(glm::radians(-camera->pitch));
-			camera->front.z = sin(glm::radians(camera->yaw)) * cos(glm::radians(-camera->pitch));
-			camera->front = glm::normalize(camera->front);
-			camera->view = glm::lookAt(camera->position, camera->position + camera->front, camera->up);
-			pc->view = glm::mat4(glm::mat3(camera->view));
-
-			// Reset
-			camera->front.x = cos(glm::radians(camera->yaw)) * cos(glm::radians(camera->pitch));
-			camera->front.y = sin(glm::radians(camera->pitch));
-			camera->front.z = sin(glm::radians(camera->yaw)) * cos(glm::radians(camera->pitch));
-			camera->front = glm::normalize(camera->front);
-			camera->view = glm::lookAt(camera->position, camera->position + camera->front, camera->up);
-		}
-
 		VkDeviceSize offsets[]{ 0 };
 
 		entityManager_.ForEach<RenderTexturedObjectComponent, RenderTransformComponent>([&](Entity entity, RenderTexturedObjectComponent& obj, RenderTransformComponent& transform) noexcept {
@@ -632,41 +609,6 @@ namespace Quadbit {
 	Entity MeshPipeline::GetActiveCamera() {
 		return (userCamera_ == NULL_ENTITY) ? fallbackCamera_ : userCamera_;
 	}
-
-	//VkDescriptorImageInfo MeshPipeline::GetEnvironmentMapDescriptor() {
-	//	return environmentTexture_.descriptor;
-	//}
-
-	//void MeshPipeline::LoadEnvironmentMap(const char* environmentTexture, VkFormat textureFormat) {
-	//	environmentTexture_ = VkUtils::LoadCubemap(context_, environmentTexture, textureFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-	//		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT, Quadbit::QbVkMemoryUsage::QBVK_MEMORY_USAGE_GPU_ONLY);
-
-	//	std::vector<Quadbit::QbVkRenderDescriptor> renderDescriptors {
-	//		QbVkRenderDescriptor { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &environmentTexture_.descriptor, VK_SHADER_STAGE_FRAGMENT_BIT }
-	//	};
-
-	//	std::vector <Quadbit::QbVkVertexInputAttribute> vertexModel {
-	//		Quadbit::QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_POSITION
-	//	};
-
-	//	std::shared_ptr<Quadbit::QbVkRenderMeshInstance> instance = CreateInstance(renderDescriptors, vertexModel,
-	//		"Resources/Shaders/Compiled/skybox_vert.spv", "main", "Resources/Shaders/Compiled/skybox_frag.spv", "main", 
-	//		sizeof(EnvironmentMapPushConstants), VK_SHADER_STAGE_VERTEX_BIT, VK_FALSE);
-
-	//	environmentMap_ = EntityManager::Instance().Create();
-
-	//	std::vector<uint32_t> indices{ 2, 1, 0, 5, 4, 3, 8, 7, 6, 11, 10, 9, 14, 13, 12, 17, 16, 15, 20, 19, 18, 23, 22, 21, 26, 25, 24, 29, 28, 27, 32, 31, 30, 35, 34, 33 };
-	//	QbVkModel model = VkUtils::LoadModel("Resources/Objects/cube.obj", vertexModel);
-	//	environmentMap_.AddComponent<Quadbit::RenderMeshComponent>({
-	//		CreateVertexBuffer(model.vertices.data(), model.vertexStride, static_cast<uint32_t>(model.vertices.size())),
-	//		CreateIndexBuffer(indices),
-	//		static_cast<uint32_t>(model.indices.size()),
-	//		std::array<float, 32>(),
-	//		sizeof(EnvironmentMapPushConstants),
-	//		instance
-	//		});
-	//	environmentMap_.AddComponent<Quadbit::RenderTransformComponent>(Quadbit::RenderTransformComponent(1.0f, { 0.0f, 0.0f, 0.0f }, { 0, 0, 0, 1 }));
-	//}
 
 	RenderTexturedObjectComponent MeshPipeline::CreateObject(const char* objPath, const char* texturePath, VkFormat textureFormat) {
 		// First load the texture
