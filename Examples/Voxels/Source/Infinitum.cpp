@@ -1,6 +1,6 @@
 #include "Infinitum.h"
 
-#include <ImGui/imgui.h>
+//#include <imgui/imgui.h>
 
 #include "Engine/Core/InputHandler.h"
 #include "Engine/Global/ImGuiState.h"
@@ -80,35 +80,35 @@ void Infinitum::Init() {
 	static const char* fractalTypes[] = { "FBM", "Billow", "RigidMulti" };
 	static const char* perturbTypes[] = { "None", "Gradient", "Gradient Fractal", "Normalize", "Gradient + Normalize", "Gradient Fractal + Normalize" };
 
-	Quadbit::ImGuiState::Inject([]() {
-		ImGui::SetNextWindowSize(ImVec2(300, 100), ImGuiCond_FirstUseEver);
-		ImGui::Begin("Terrain Generation", nullptr);
-		ImGui::DragInt("Seed", &terrainSettings_.seed, 0.1f, 0, 9999999);
-		ImGui::Combo("Noise Type", &terrainSettings_.noiseType, noiseTypes, IM_ARRAYSIZE(noiseTypes));
-		ImGui::DragFloat("Noise Frequency", &terrainSettings_.noiseFrequency, 0.001f, 0.0f, 5.0f);
-		ImGui::Combo("Fractal Noise Type", &terrainSettings_.fractalType, fractalTypes, IM_ARRAYSIZE(fractalTypes));
-		ImGui::DragInt("Fractal Octaves", &terrainSettings_.fractalOctaves, 0.01f, 0, 100);
-		ImGui::DragFloat("Fractal Lacunarity", &terrainSettings_.fractalLacunarity, 0.001f, 0.0f, 5.0f);
-		ImGui::DragFloat("Fractal Gain", &terrainSettings_.fractalGain, 0.001f, 0.0f, 5.0f);
-		ImGui::Combo("Perturb Type", &terrainSettings_.perturbType, perturbTypes, IM_ARRAYSIZE(perturbTypes));
-		ImGui::Text("Press G to generate new terrain");
-		ImGui::End();
-	});
+	//Quadbit::ImGuiState::Inject([]() {
+	//	ImGui::SetNextWindowSize(ImVec2(300, 100), ImGuiCond_FirstUseEver);
+	//	ImGui::Begin("Terrain Generation", nullptr);
+	//	ImGui::DragInt("Seed", &terrainSettings_.seed, 0.1f, 0, 9999999);
+	//	ImGui::Combo("Noise Type", &terrainSettings_.noiseType, noiseTypes, IM_ARRAYSIZE(noiseTypes));
+	//	ImGui::DragFloat("Noise Frequency", &terrainSettings_.noiseFrequency, 0.001f, 0.0f, 5.0f);
+	//	ImGui::Combo("Fractal Noise Type", &terrainSettings_.fractalType, fractalTypes, IM_ARRAYSIZE(fractalTypes));
+	//	ImGui::DragInt("Fractal Octaves", &terrainSettings_.fractalOctaves, 0.01f, 0, 100);
+	//	ImGui::DragFloat("Fractal Lacunarity", &terrainSettings_.fractalLacunarity, 0.001f, 0.0f, 5.0f);
+	//	ImGui::DragFloat("Fractal Gain", &terrainSettings_.fractalGain, 0.001f, 0.0f, 5.0f);
+	//	ImGui::Combo("Perturb Type", &terrainSettings_.perturbType, perturbTypes, IM_ARRAYSIZE(perturbTypes));
+	//	ImGui::Text("Press G to generate new terrain");
+	//	ImGui::End();
+	//});
 
-	Quadbit::ImGuiState::Inject([]() {
-		ImGui::SetNextWindowSize(ImVec2(300, 100), ImGuiCond_FirstUseEver);
-		ImGui::Begin("Colour Generation", nullptr);
-		ImGui::DragInt("Seed", &colourSettings_.seed, 0.1f, 0, 9999999);
-		ImGui::Combo("Noise Type", &colourSettings_.noiseType, noiseTypes, IM_ARRAYSIZE(noiseTypes));
-		ImGui::DragFloat("Noise Frequency", &colourSettings_.noiseFrequency, 0.001f, 0.0f, 5.0f);
-		ImGui::Combo("Fractal Noise Type", &colourSettings_.fractalType, fractalTypes, IM_ARRAYSIZE(fractalTypes));
-		ImGui::DragInt("Fractal Octaves", &colourSettings_.fractalOctaves, 0.01f, 0, 100);
-		ImGui::DragFloat("Fractal Lacunarity", &colourSettings_.fractalLacunarity, 0.001f, 0.0f, 5.0f);
-		ImGui::DragFloat("Fractal Gain", &colourSettings_.fractalGain, 0.001f, 0.0f, 5.0f);
-		ImGui::Combo("Perturb Type", &colourSettings_.perturbType, perturbTypes, IM_ARRAYSIZE(perturbTypes));
-		ImGui::Text("Press G to generate new terrain");
-		ImGui::End();
-		});
+	//Quadbit::ImGuiState::Inject([]() {
+	//	ImGui::SetNextWindowSize(ImVec2(300, 100), ImGuiCond_FirstUseEver);
+	//	ImGui::Begin("Colour Generation", nullptr);
+	//	ImGui::DragInt("Seed", &colourSettings_.seed, 0.1f, 0, 9999999);
+	//	ImGui::Combo("Noise Type", &colourSettings_.noiseType, noiseTypes, IM_ARRAYSIZE(noiseTypes));
+	//	ImGui::DragFloat("Noise Frequency", &colourSettings_.noiseFrequency, 0.001f, 0.0f, 5.0f);
+	//	ImGui::Combo("Fractal Noise Type", &colourSettings_.fractalType, fractalTypes, IM_ARRAYSIZE(fractalTypes));
+	//	ImGui::DragInt("Fractal Octaves", &colourSettings_.fractalOctaves, 0.01f, 0, 100);
+	//	ImGui::DragFloat("Fractal Lacunarity", &colourSettings_.fractalLacunarity, 0.001f, 0.0f, 5.0f);
+	//	ImGui::DragFloat("Fractal Gain", &colourSettings_.fractalGain, 0.001f, 0.0f, 5.0f);
+	//	ImGui::Combo("Perturb Type", &colourSettings_.perturbType, perturbTypes, IM_ARRAYSIZE(perturbTypes));
+	//	ImGui::Text("Press G to generate new terrain");
+	//	ImGui::End();
+	//	});
 
 	// Spawn base
 	for(auto i = 0; i < VOXEL_BLOCK_WIDTH * 10; i += VOXEL_BLOCK_WIDTH) {

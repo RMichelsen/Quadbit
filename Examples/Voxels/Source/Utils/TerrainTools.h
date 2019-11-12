@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Extern/FastNoiseSIMD/FastNoiseSIMD.h"
+#include <FastNoiseSIMD/FastNoiseSIMD.h>
 
 #include "../Data/Components.h"
 #include "MagicaVoxImporter.h"

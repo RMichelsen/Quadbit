@@ -1,7 +1,7 @@
 #pragma once
 #include <Windows.h>
 
-#include "Extern/FastNoiseSIMD/FastNoiseSIMD.h"
+#include <FastNoiseSIMD/FastNoiseSIMD.h>
 
 #include "Engine/Rendering/QbVkRenderer.h"
 #include "Engine/Entities/EntityManager.h"

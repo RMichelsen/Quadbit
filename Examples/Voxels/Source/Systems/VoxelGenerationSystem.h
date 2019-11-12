@@ -3,7 +3,7 @@
 #include "Engine/Entities/EntityManager.h"
 #include "Engine/Entities/ComponentSystem.h"
 
-#include "../Extern/FastNoiseSIMD/FastNoiseSIMD.h"
+#include <FastNoiseSIMD/FastNoiseSIMD.h>
 
 #include "../Utils/TerrainTools.h"
 #include "../Utils/CommonUtils.h"
