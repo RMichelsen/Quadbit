@@ -6,7 +6,7 @@
 
 namespace Quadbit {
 	QbVkPool::QbVkPool(VkDevice device, const int32_t memoryTypeIndex, const VkDeviceSize size, QbVkMemoryUsage usage) :
-		device_(device), capacity_(size), memoryTypeIndex_(memoryTypeIndex), memoryUsage_(usage) {
+		capacity_(size), memoryTypeIndex_(memoryTypeIndex), device_(device), memoryUsage_(usage) {
 
 		VkMemoryAllocateInfo memoryAllocateInfo = VkUtils::Init::MemoryAllocateInfo();
 		memoryAllocateInfo.allocationSize = capacity_;

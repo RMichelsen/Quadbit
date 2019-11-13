@@ -673,10 +673,11 @@ namespace Quadbit {
 		};
 
 		QbVkShaderInstance shaderInstance(context_);
-		shaderInstance.AddShader(gradientSkyboxVert.data(), gradientSkyboxVert.size(), "main", VK_SHADER_STAGE_VERTEX_BIT);
-		shaderInstance.AddShader(gradientSkyboxFrag.data(), gradientSkyboxFrag.size(), "main", VK_SHADER_STAGE_FRAGMENT_BIT);
+		shaderInstance.AddShader(gradientSkyboxVert.data(), static_cast<uint32_t>(gradientSkyboxVert.size()), "main", VK_SHADER_STAGE_VERTEX_BIT);
+		shaderInstance.AddShader(gradientSkyboxFrag.data(), static_cast<uint32_t>(gradientSkyboxFrag.size()), "main", VK_SHADER_STAGE_FRAGMENT_BIT);
 
-		const QbVkRenderMeshInstance* instance = CreateInstance(std::vector<QbVkRenderDescriptor> {}, vertexModel, shaderInstance, sizeof(EnvironmentMapPushConstants), VK_SHADER_STAGE_VERTEX_BIT, VK_FALSE);
+		std::vector<QbVkRenderDescriptor> empty{};
+		const QbVkRenderMeshInstance* instance = CreateInstance(empty, vertexModel, shaderInstance, sizeof(EnvironmentMapPushConstants), VK_SHADER_STAGE_VERTEX_BIT, VK_FALSE);
 
 		const std::vector<SkyGradientVertex> cubeVertices = {
 			{{-1.0f, -1.0f, 1.0f},	topColour},

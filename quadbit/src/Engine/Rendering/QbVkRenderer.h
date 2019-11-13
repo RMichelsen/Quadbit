@@ -38,15 +38,15 @@ namespace Quadbit {
 			float maxAnisotropy, VkCompareOp compareOperation, VkSamplerMipmapMode samplerMipmapMode, float maxLod = 0.0f);
 
 		// Compute Pipeline
-		std::shared_ptr<QbVkComputeInstance> CreateComputeInstance(std::vector<QbVkComputeDescriptor>& descriptors, const char* shader, const char* shaderFunc,
+		QbVkComputeInstance* CreateComputeInstance(std::vector<QbVkComputeDescriptor>& descriptors, const char* shader, const char* shaderFunc,
 			const VkSpecializationInfo* specInfo = nullptr, uint32_t pushConstantRangeSize = 0);
-		void ComputeDispatch(std::shared_ptr<QbVkComputeInstance> instance);
-		void ComputeRecord(std::shared_ptr<QbVkComputeInstance> instance, std::function<void()> func);
+		void ComputeDispatch(QbVkComputeInstance* instance);
+		void ComputeRecord(const QbVkComputeInstance* instance, std::function<void()> func);
 		template<typename T>
-		QbVkComputeDescriptor CreateComputeDescriptor(VkDescriptorType type, std::vector<T>& data) {
-			return { type, static_cast<uint32_t>(data.size()), data.data() };
+		QbVkComputeDescriptor CreateComputeDescriptor(VkDescriptorType type, std::vector<T>& descriptors) {
+			return { type, static_cast<uint32_t>(descriptors.size()), descriptors.data() };
 		}
-		QbVkComputeDescriptor CreateComputeDescriptor(VkDescriptorType type, std::variant<VkDescriptorImageInfo, VkDescriptorBufferInfo> data);
+		QbVkComputeDescriptor CreateComputeDescriptor(VkDescriptorType type, void* descriptor);
 
 		// Mesh Pipeline
 		Entity GetActiveCamera();
@@ -79,7 +79,7 @@ namespace Quadbit {
 		QbVkRenderDescriptor CreateRenderDescriptor(VkDescriptorType type, std::vector<T>& data, VkShaderStageFlagBits shaderStage) {
 			return { type, static_cast<uint32_t>(data.size()), data.data(), shaderStage };
 		}
-		QbVkRenderDescriptor CreateRenderDescriptor(VkDescriptorType type, std::variant<VkDescriptorImageInfo, VkDescriptorBufferInfo> data, VkShaderStageFlagBits shaderStage);
+		QbVkRenderDescriptor CreateRenderDescriptor(VkDescriptorType type, void* descriptor, VkShaderStageFlagBits shaderStage);
 
 		// Sky gradient setup
 		void LoadSkyGradient(glm::vec3 botColour, glm::vec3 topColour);
@@ -93,10 +93,10 @@ namespace Quadbit {
 		EntityManager& entityManager_;
 
 		VkInstance instance_ = VK_NULL_HANDLE;
-		std::unique_ptr<QbVkContext> context_ = std::make_unique<QbVkContext>();
-		std::unique_ptr<MeshPipeline> meshPipeline_ = nullptr;
-		std::unique_ptr<ImGuiPipeline> imGuiPipeline_ = nullptr;
-		std::unique_ptr<ComputePipeline> computePipeline_ = nullptr;
+		std::unique_ptr<QbVkContext> context_;
+		std::unique_ptr<MeshPipeline> meshPipeline_;
+		std::unique_ptr<ImGuiPipeline> imGuiPipeline_;
+		std::unique_ptr<ComputePipeline> computePipeline_;
 
 		// DEBUG BUILD ONLY
 #ifndef NDEBUG

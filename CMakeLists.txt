@@ -10,3 +10,4 @@ add_subdirectory(quadbit)
 # Add examples
 add_subdirectory(examples/Voxels)
 add_subdirectory(examples/Water)
+add_subdirectory(examples/Testing)

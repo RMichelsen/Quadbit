@@ -37,9 +37,9 @@ void Water::Init() {
 	ubo->useNormalMap = 0;
 
 	std::vector<Quadbit::QbVkRenderDescriptor> renderDescriptors {
-		renderer_->CreateRenderDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, displacementResources_.displacementMap.descriptor, VK_SHADER_STAGE_VERTEX_BIT),
-		renderer_->CreateRenderDescriptor(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, displacementResources_.normalMap.descriptor, VK_SHADER_STAGE_FRAGMENT_BIT),
-		renderer_->CreateRenderDescriptor(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, togglesUBO_.descriptor, VK_SHADER_STAGE_FRAGMENT_BIT),
+		renderer_->CreateRenderDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &displacementResources_.displacementMap.descriptor, VK_SHADER_STAGE_VERTEX_BIT),
+		renderer_->CreateRenderDescriptor(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, &displacementResources_.normalMap.descriptor, VK_SHADER_STAGE_FRAGMENT_BIT),
+		renderer_->CreateRenderDescriptor(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, &togglesUBO_.descriptor, VK_SHADER_STAGE_FRAGMENT_BIT),
 	};
 
 	Quadbit::QbVkShaderInstance shaderInstance = renderer_->CreateShaderInstance();
@@ -201,10 +201,10 @@ void Water::InitPrecalcComputeInstance() {
 
 	// Setup precalc compute shader
 	std::vector<Quadbit::QbVkComputeDescriptor> computeDescriptors = {
-			renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, precalcResources_.ubo.descriptor),
-			renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, precalcResources_.h0Tilde.descriptor),
-			renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, precalcResources_.h0TildeConj.descriptor),
-			renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, precalcResources_.uniformRandomsStorageBuffer.descriptor)
+			renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, &precalcResources_.ubo.descriptor),
+			renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,  &precalcResources_.h0Tilde.descriptor),
+			renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,  &precalcResources_.h0TildeConj.descriptor),
+			renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, &precalcResources_.uniformRandomsStorageBuffer.descriptor)
 	};
 	precalcInstance_ = renderer_->CreateComputeInstance(computeDescriptors, "Resources/Shaders/Compiled/precalc_comp.spv", "main");
 }
@@ -231,14 +231,14 @@ void Water::InitWaveheightComputeInstance() {
 		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, Quadbit::QbVkMemoryUsage::QBVK_MEMORY_USAGE_GPU_ONLY);
 
 	std::vector<Quadbit::QbVkComputeDescriptor> computeDescriptors = {
-		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, waveheightResources_.ubo.descriptor),
-		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, precalcResources_.h0Tilde.descriptor),
-		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, precalcResources_.h0TildeConj.descriptor),
-		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, waveheightResources_.h0TildeTx.descriptor),
-		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, waveheightResources_.h0TildeTy.descriptor),
-		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, waveheightResources_.h0TildeTz.descriptor),
-		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, waveheightResources_.h0TildeSlopeX.descriptor),
-		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, waveheightResources_.h0TildeSlopeZ.descriptor)
+		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, &waveheightResources_.ubo.descriptor),
+		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,  &precalcResources_.h0Tilde.descriptor),
+		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,  &precalcResources_.h0TildeConj.descriptor),
+		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,  &waveheightResources_.h0TildeTx.descriptor),
+		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,  &waveheightResources_.h0TildeTy.descriptor),
+		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,  &waveheightResources_.h0TildeTz.descriptor),
+		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,  &waveheightResources_.h0TildeSlopeX.descriptor),
+		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,  &waveheightResources_.h0TildeSlopeZ.descriptor)
 	};
 
 	waveheightInstance_ = renderer_->CreateComputeInstance(computeDescriptors, "Resources/Shaders/Compiled/waveheight_comp.spv", "main");
@@ -341,13 +341,13 @@ void Water::InitDisplacementInstance() {
 
 	// Setup the displacement compute shader
 	std::vector<Quadbit::QbVkComputeDescriptor> computeDescriptors = {
-		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, verticalIFFTResources_.dX.descriptor),
-		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, verticalIFFTResources_.dY.descriptor),
-		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, verticalIFFTResources_.dZ.descriptor),
-		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, verticalIFFTResources_.dSlopeX.descriptor),
-		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, verticalIFFTResources_.dSlopeZ.descriptor),
-		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, displacementResources_.displacementMap.descriptor),
-		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, displacementResources_.normalMap.descriptor)
+		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &verticalIFFTResources_.dX.descriptor),
+		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &verticalIFFTResources_.dY.descriptor),
+		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &verticalIFFTResources_.dZ.descriptor),
+		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &verticalIFFTResources_.dSlopeX.descriptor),
+		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &verticalIFFTResources_.dSlopeZ.descriptor),
+		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &displacementResources_.displacementMap.descriptor),
+		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &displacementResources_.normalMap.descriptor)
 	};
 
 	displacementInstance_ = renderer_->CreateComputeInstance(computeDescriptors, "Resources/Shaders/Compiled/displacement_comp.spv", "main");

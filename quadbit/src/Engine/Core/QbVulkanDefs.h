@@ -3,6 +3,7 @@
 #include <vulkan/vulkan.h>
 #include <vector>
 #include <array>
+#include <variant>
 
 inline constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 

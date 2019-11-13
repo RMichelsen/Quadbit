@@ -22,7 +22,8 @@ namespace Quadbit {
 	QbVkRenderer::QbVkRenderer(HINSTANCE hInstance, HWND hwnd) :
 		localHandle_(hInstance),
 		windowHandle_(hwnd),
-		entityManager_(EntityManager::Instance()) {
+		entityManager_(EntityManager::Instance()),
+		context_(std::make_unique<QbVkContext>()) {
 		// REMEMBER: Order matters as some functions depend on member variables being initialized.
 		CreateInstance();
 #ifndef NDEBUG
@@ -235,21 +236,21 @@ namespace Quadbit {
 		return sampler;
 	}
 
-	std::shared_ptr<QbVkComputeInstance> QbVkRenderer::CreateComputeInstance(std::vector<QbVkComputeDescriptor>& descriptors,
+	QbVkComputeInstance* QbVkRenderer::CreateComputeInstance(std::vector<QbVkComputeDescriptor>& descriptors,
 		const char* shader, const char* shaderFunc, const VkSpecializationInfo* specInfo, uint32_t pushConstantRangeSize) {
 		return computePipeline_->CreateInstance(descriptors, shader, shaderFunc, specInfo, pushConstantRangeSize);
 	}
 
-	void QbVkRenderer::ComputeDispatch(std::shared_ptr<QbVkComputeInstance> instance) {
+	void QbVkRenderer::ComputeDispatch(QbVkComputeInstance* instance) {
 		computePipeline_->Dispatch(instance);
 	}
 
-	void QbVkRenderer::ComputeRecord(std::shared_ptr<QbVkComputeInstance> instance, std::function<void()> func) {
+	void QbVkRenderer::ComputeRecord(const QbVkComputeInstance* instance, std::function<void()> func) {
 		computePipeline_->RecordCommands(instance, func);
 	}
 
-	QbVkComputeDescriptor QbVkRenderer::CreateComputeDescriptor(VkDescriptorType type, std::variant<VkDescriptorImageInfo, VkDescriptorBufferInfo> data) {
-		return { type, 1, &data };
+	QbVkComputeDescriptor QbVkRenderer::CreateComputeDescriptor(VkDescriptorType type, void* descriptor) {
+		return { type, 1, descriptor };
 	}
 
 	Entity QbVkRenderer::GetActiveCamera() {
@@ -306,9 +307,8 @@ namespace Quadbit {
 		return meshPipeline_->CreateIndexBuffer(indices);
 	}
 
-	QbVkRenderDescriptor QbVkRenderer::CreateRenderDescriptor(VkDescriptorType type, std::variant<VkDescriptorImageInfo,
-		VkDescriptorBufferInfo> data, VkShaderStageFlagBits shaderStage) {
-		return { type, 1, &data, shaderStage };
+	QbVkRenderDescriptor QbVkRenderer::CreateRenderDescriptor(VkDescriptorType type, void* descriptor, VkShaderStageFlagBits shaderStage) {
+		return { type, 1, descriptor, shaderStage };
 	}
 
 	void QbVkRenderer::LoadSkyGradient(glm::vec3 botColour, glm::vec3 topColour) {
@@ -770,7 +770,7 @@ namespace Quadbit {
 		renderPassInfo.renderArea.extent = context_->swapchain.extent;
 
 		// This specifies the clear values to use for the VK_ATTACHMENT_LOAD_OP_CLEAR operation (in the color and depth attachments)
-		clearValues[0].color = { 0.2f, 0.2f, 0.2f, 1.0f };
+		clearValues[0].color = { {0.2f, 0.2f, 0.2f, 1.0f} };
 		clearValues[1].depthStencil = { 1.0f, 0 };
 		renderPassInfo.clearValueCount = 2;
 		renderPassInfo.pClearValues = clearValues.data();

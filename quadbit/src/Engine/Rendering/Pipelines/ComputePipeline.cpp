@@ -21,15 +21,15 @@ namespace Quadbit {
 	}
 
 	ComputePipeline::~ComputePipeline() {
-		for (auto instance : activeInstances_) {
-			DestroyInstance(std::get<std::shared_ptr<QbVkComputeInstance>>(instance));
+		for (const auto& instance : activeInstances_) {
+			DestroyInstance(std::get<std::unique_ptr<QbVkComputeInstance>>(instance).get());
 		}
 
 		vkDestroyCommandPool(context_.device, commandPool_, nullptr);
 		vkDestroyFence(context_.device, computeFence_, nullptr);
 	}
 
-	void ComputePipeline::RecordCommands(std::shared_ptr<QbVkComputeInstance> instance, std::function<void()> func) {
+	void ComputePipeline::RecordCommands(const QbVkComputeInstance* instance, std::function<void()> func) {
 		VkCommandBufferBeginInfo cmdBufInfo = VkUtils::Init::CommandBufferBeginInfo();
 		VK_CHECK(vkBeginCommandBuffer(instance->commandBuffer, &cmdBufInfo));
 		vkCmdResetQueryPool(instance->commandBuffer, instance->queryPool, 0, 128);
@@ -41,7 +41,7 @@ namespace Quadbit {
 		VK_CHECK(vkEndCommandBuffer(instance->commandBuffer));
 	}
 
-	void ComputePipeline::Dispatch(std::shared_ptr<QbVkComputeInstance> computeInstance) {
+	void ComputePipeline::Dispatch(QbVkComputeInstance* computeInstance) {
 		VkSubmitInfo computeSubmitInfo = VkSubmitInfo{};
 		computeSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 		computeSubmitInfo.commandBufferCount = 1;
@@ -60,9 +60,10 @@ namespace Quadbit {
 		computeInstance->msAvgTime = computeInstance->msAvgTime * 0.95 + (computeEnd - computeStart) * 0.05;
 	}
 
-	std::shared_ptr<QbVkComputeInstance> ComputePipeline::CreateInstance(std::vector<QbVkComputeDescriptor>& descriptors, const char* shader,
+	QbVkComputeInstance* ComputePipeline::CreateInstance(std::vector<QbVkComputeDescriptor>& descriptors, const char* shader,
 		const char* shaderFunc, const VkSpecializationInfo* specInfo, const uint32_t pushConstantRangeSize) {
-		auto computeInstance = std::make_shared<QbVkComputeInstance>();
+		activeInstances_.push_back({ shader, std::make_unique<QbVkComputeInstance>() });
+		QbVkComputeInstance* computeInstance = std::get<std::unique_ptr<QbVkComputeInstance>>(activeInstances_.back()).get();
 
 		std::vector<VkDescriptorPoolSize> poolSizes;
 		for (auto i = 0; i < descriptors.size(); i++) {
@@ -151,11 +152,10 @@ namespace Quadbit {
 
 		vkDestroyShaderModule(context_.device, computeShaderModule, nullptr);
 
-		activeInstances_.push_back(std::make_tuple(shader, computeInstance));
 		return computeInstance;
 	}
 
-	void ComputePipeline::DestroyInstance(std::shared_ptr<QbVkComputeInstance> computeInstance) {
+	void ComputePipeline::DestroyInstance(const QbVkComputeInstance* computeInstance) {
 		vkDestroyDescriptorSetLayout(context_.device, computeInstance->descriptorSetLayout, nullptr);
 		vkFreeDescriptorSets(context_.device, computeInstance->descriptorPool, 1, &computeInstance->descriptorSet);
 		vkDestroyDescriptorPool(context_.device, computeInstance->descriptorPool, nullptr);
@@ -167,8 +167,8 @@ namespace Quadbit {
 	void ComputePipeline::ImGuiDrawState() {
 		ImGui::SetNextWindowSize(ImVec2(500, 200), ImGuiCond_FirstUseEver);
 		ImGui::Begin("Quadbit Compute Shader Performance", nullptr);
-		for (auto instance : activeInstances_) {
-			auto computeInstance = std::get<std::shared_ptr<QbVkComputeInstance>>(instance);
+		for (const auto& instance : activeInstances_) {
+			auto* computeInstance = std::get<std::unique_ptr<QbVkComputeInstance>>(instance).get();
 			auto label = std::get<const char*>(instance);
 			ImGui::Text("%s %.5fms", label, computeInstance->msAvgTime);
 		}

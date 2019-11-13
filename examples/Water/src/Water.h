@@ -1,7 +1,7 @@
 #pragma once
 
-#include <glm/gtx/compatibility.hpp>
 #include <Windows.h>
+#include <glm/gtx/compatibility.hpp>
 
 #include "Engine/Rendering/QbVkRenderer.h"
 #include "Engine/Entities/EntityManager.h"
@@ -106,11 +106,11 @@ private:
 	InverseFFTResources horizontalIFFTResources_{};
 	InverseFFTResources verticalIFFTResources_{};
 	DisplacementResources displacementResources_{};
-	std::shared_ptr<Quadbit::QbVkComputeInstance> precalcInstance_;
-	std::shared_ptr<Quadbit::QbVkComputeInstance> waveheightInstance_;
-	std::shared_ptr<Quadbit::QbVkComputeInstance> horizontalIFFTInstance_;
-	std::shared_ptr<Quadbit::QbVkComputeInstance> verticalIFFTInstance_;
-	std::shared_ptr<Quadbit::QbVkComputeInstance> displacementInstance_;
+	Quadbit::QbVkComputeInstance* precalcInstance_ = nullptr;
+	Quadbit::QbVkComputeInstance* waveheightInstance_ = nullptr;
+	Quadbit::QbVkComputeInstance* horizontalIFFTInstance_ = nullptr;
+	Quadbit::QbVkComputeInstance* verticalIFFTInstance_ = nullptr;
+	Quadbit::QbVkComputeInstance* displacementInstance_ = nullptr;
 
 	Quadbit::QbVkBuffer togglesUBO_;
 

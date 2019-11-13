@@ -212,8 +212,8 @@ namespace Quadbit::VkUtils {
 
 		inline VkRect2D ScissorRect(int32_t offsetX, int32_t offsetY, uint32_t height, uint32_t width) {
 			return VkRect2D{
-				offsetX, offsetY,
-				height, width
+				{offsetX, offsetY},
+			    {height, width}
 			};
 		}
 

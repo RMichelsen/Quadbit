@@ -51,8 +51,8 @@ namespace Quadbit {
 
 		// Remove by swap and pop
 		auto lastEntity = entities_.back();
-		sparse_[entities_.back().id_.index] = sparse_[entity.id_.index];
-		std::swap(entities_[sparse_[entity.id_.index]], entities_.back());
+		sparse_[lastEntity.id_.index] = sparse_[entity.id_.index];
+		std::swap(entities_[sparse_[entity.id_.index]], lastEntity);
 		entities_.pop_back();
 		sparse_[entity.id_.index] = 0xFFFFFFFF;
 

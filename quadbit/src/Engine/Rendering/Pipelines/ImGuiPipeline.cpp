@@ -365,7 +365,7 @@ namespace Quadbit {
 
 		ImGui::Text("Frametime: %.2f ms", currentFrametime_);
 		ImGui::Separator();
-		ImGui::Text("FPS: %i", currentFPS_);
+		ImGui::Text("FPS: %llu", currentFPS_);
 
 		ImGui::End();
 	}

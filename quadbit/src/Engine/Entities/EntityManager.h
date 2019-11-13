@@ -77,7 +77,7 @@ namespace Quadbit {
 	class EntityManager {
 	public:
 		std::unique_ptr<SystemDispatch> systemDispatch_;
-		std::array<std::shared_ptr<ComponentPool>, MAX_COMPONENTS> componentPools_;
+		std::array<ComponentPool*, MAX_COMPONENTS> componentPools_;
 
 		static EntityManager& Instance();
 
@@ -89,15 +89,18 @@ namespace Quadbit {
 			systemDispatch_->Shutdown();
 			systemDispatch_.reset();
 			for (auto&& component : componentPools_) {
-				component.reset();
+				delete component;
 			}
 		}
+
+		template<typename C>
+		using SparseSetPtr = SparseSet<C>*;
 
 		template<typename C>
 		void RegisterComponent() {
 			size_t componentID = ComponentID::GetUnique<C>();
 			assert(componentPools_[componentID] == nullptr && "Failed to register component: Component is already registered with the entity manager\n");
-			componentPools_[componentID] = std::make_shared<SparseSet<C>>();
+			componentPools_[componentID] = new SparseSet<C>();
 		}
 
 		template<typename... C>
@@ -109,7 +112,7 @@ namespace Quadbit {
 		void AddComponent(const Entity& entity) const {
 			size_t componentID = ComponentID::GetUnique<C>();
 			assert(componentPools_[componentID] != nullptr && "Failed to add component: Component isn't registered with the entity manager\n");
-			std::static_pointer_cast<SparseSet<C>>(componentPools_[componentID])->Insert(entity.id_);
+			reinterpret_cast<SparseSetPtr<C>>(componentPools_[componentID])->Insert(entity.id_);
 		}
 
 		// Aggregate initialization
@@ -117,28 +120,25 @@ namespace Quadbit {
 		void AddComponent(const Entity& entity, C&& t) const {
 			size_t componentID = ComponentID::GetUnique<C>();
 			assert(componentPools_[componentID] != nullptr && "Failed to add component: Component isn't registered with the entity manager\n");
-			std::static_pointer_cast<SparseSet<C>>(componentPools_[componentID])->Insert(entity.id_, std::move(t));
+			reinterpret_cast<SparseSetPtr<C>>(componentPools_[componentID])->Insert(entity.id_, std::move(t));
 		}
 
 		template<typename C>
 		C* const GetComponentPtr(const Entity& entity) const {
-			return std::static_pointer_cast<SparseSet<C>>(componentPools_[ComponentID::GetUnique<C>()])->GetComponentPtr(entity.id_);
+			return reinterpret_cast<SparseSetPtr<C>>(componentPools_[ComponentID::GetUnique<C>()])->GetComponentPtr(entity.id_);
 		}
 
 		template<typename C>
 		bool HasComponent(const Entity& entity) const {
-			return std::static_pointer_cast<SparseSet<C>>(componentPools_[ComponentID::GetUnique<C>()])->HasComponent(entity.id_);
+			return reinterpret_cast<SparseSetPtr<C>>(componentPools_[ComponentID::GetUnique<C>()])->HasComponent(entity.id_);
 		}
 
 		template<typename C>
 		void RemoveComponent(const Entity& entity) const {
 			size_t componentID = ComponentID::GetUnique<C>();
 			assert(componentPools_[componentID] != nullptr && "Failed to remove component: Component isn't registered with the entity manager\n");
-			std::static_pointer_cast<SparseSet<C>>(componentPools_[componentID])->Remove(entity.id_);
+			reinterpret_cast<SparseSetPtr<C>>(componentPools_[componentID])->Remove(entity.id_);
 		}
-
-		template<typename C>
-		using sparseSetPtr = std::shared_ptr<SparseSet<C>>;
 
 		template<typename... Components, typename F>
 		void ForEach(F fun) {
@@ -153,10 +153,10 @@ namespace Quadbit {
 				});
 
 			for (auto entityIndex : smallest) {
-				const bool allValid = ((std::get<sparseSetPtr<Components>>(pools)->sparse_[entityIndex] != 0xFFFF'FFFF) && ...);
+				const bool allValid = ((std::get<SparseSetPtr<Components>>(pools)->sparse_[entityIndex] != 0xFFFF'FFFF) && ...);
 				if (!allValid) continue;
 
-				fun(entities_[sparse_[entityIndex]], std::get<sparseSetPtr<Components>>(pools)->dense_[std::get<sparseSetPtr<Components>>(pools)->sparse_[entityIndex]]...);
+				fun(entities_[sparse_[entityIndex]], std::get<SparseSetPtr<Components>>(pools)->dense_[std::get<SparseSetPtr<Components>>(pools)->sparse_[entityIndex]]...);
 
 				(RemoveTag<Components>(entities_[sparse_[entityIndex]]), ...);
 			}
@@ -178,10 +178,10 @@ namespace Quadbit {
 			EntityCommandBuffer commandBuffer;
 
 			for (auto entityIndex : smallest) {
-				const bool allValid = ((std::get<sparseSetPtr<Components>>(pools)->sparse_[entityIndex] != 0xFFFF'FFFF) && ...);
+				const bool allValid = ((std::get<SparseSetPtr<Components>>(pools)->sparse_[entityIndex] != 0xFFFF'FFFF) && ...);
 				if (!allValid) continue;
 
-				fun(entities_[sparse_[entityIndex]], &commandBuffer, std::get<sparseSetPtr<Components>>(pools)->dense_[std::get<sparseSetPtr<Components>>(pools)->sparse_[entityIndex]]...);
+				fun(entities_[sparse_[entityIndex]], &commandBuffer, std::get<SparseSetPtr<Components>>(pools)->dense_[std::get<SparseSetPtr<Components>>(pools)->sparse_[entityIndex]]...);
 
 				(RemoveTag<Components>(entities_[sparse_[entityIndex]]), ...);
 			}
@@ -203,10 +203,10 @@ namespace Quadbit {
 				});
 
 			for (auto entityIndex : smallest) {
-				const bool allValid = ((std::get<sparseSetPtr<Components>>(pools)->sparse_[entityIndex] != 0xFFFF'FFFF) && ...);
+				const bool allValid = ((std::get<SparseSetPtr<Components>>(pools)->sparse_[entityIndex] != 0xFFFF'FFFF) && ...);
 				if (!allValid) continue;
 
-				fun(entities_[sparse_[entityIndex]], std::get<sparseSetPtr<Components>>(pools)->dense_[std::get<sparseSetPtr<Components>>(pools)->sparse_[entityIndex]]...);
+				fun(entities_[sparse_[entityIndex]], std::get<SparseSetPtr<Components>>(pools)->dense_[std::get<SparseSetPtr<Components>>(pools)->sparse_[entityIndex]]...);
 
 				(RemoveTag<Components>(entities_[sparse_[entityIndex]]), ...);
 				AddTag<T>(entities_[sparse_[entityIndex]]);
@@ -229,10 +229,10 @@ namespace Quadbit {
 			EntityCommandBuffer commandBuffer;
 
 			std::for_each(std::execution::par, smallest.begin(), smallest.end(), [&](auto entityIndex) {
-				const bool allValid = ((std::get<sparseSetPtr<Components>>(pools)->sparse_[entityIndex] != 0xFFFF'FFFF) && ...);
+				const bool allValid = ((std::get<SparseSetPtr<Components>>(pools)->sparse_[entityIndex] != 0xFFFF'FFFF) && ...);
 				if (!allValid) return;
 
-				fun(entities_[sparse_[entityIndex]], &commandBuffer, std::get<sparseSetPtr<Components>>(pools)->dense_[std::get<sparseSetPtr<Components>>(pools)->sparse_[entityIndex]]...);
+				fun(entities_[sparse_[entityIndex]], &commandBuffer, std::get<SparseSetPtr<Components>>(pools)->dense_[std::get<SparseSetPtr<Components>>(pools)->sparse_[entityIndex]]...);
 				});
 
 			// Remove tags, NOT SAFE IN PARRALEL
@@ -257,10 +257,10 @@ namespace Quadbit {
 				});
 
 			std::for_each(std::execution::par, smallest.begin(), smallest.end(), [&](auto entityIndex) {
-				const bool allValid = ((std::get<sparseSetPtr<Components>>(pools)->sparse_[entityIndex] != 0xFFFF'FFFF) && ...);
+				const bool allValid = ((std::get<SparseSetPtr<Components>>(pools)->sparse_[entityIndex] != 0xFFFF'FFFF) && ...);
 				if (!allValid) return;
 
-				fun(entities_[sparse_[entityIndex]], std::get<sparseSetPtr<Components>>(pools)->dense_[std::get<sparseSetPtr<Components>>(pools)->sparse_[entityIndex]]...);
+				fun(entities_[sparse_[entityIndex]], std::get<SparseSetPtr<Components>>(pools)->dense_[std::get<SparseSetPtr<Components>>(pools)->sparse_[entityIndex]]...);
 				});
 
 			// Remove tags, NOT SAFE IN PARRALEL
@@ -282,10 +282,10 @@ namespace Quadbit {
 				});
 
 			std::for_each(std::execution::par, smallest.begin(), smallest.end(), [&](auto entityIndex) {
-				const bool allValid = ((std::get<sparseSetPtr<Components>>(pools)->sparse_[entityIndex] != 0xFFFF'FFFF) && ...);
+				const bool allValid = ((std::get<SparseSetPtr<Components>>(pools)->sparse_[entityIndex] != 0xFFFF'FFFF) && ...);
 				if (!allValid) return;
 
-				fun(entities_[sparse_[entityIndex]], std::get<sparseSetPtr<Components>>(pools)->dense_[std::get<sparseSetPtr<Components>>(pools)->sparse_[entityIndex]]...);
+				fun(entities_[sparse_[entityIndex]], std::get<SparseSetPtr<Components>>(pools)->dense_[std::get<SparseSetPtr<Components>>(pools)->sparse_[entityIndex]]...);
 				});
 
 			// Remove tags, NOT SAFE IN PARRALEL
@@ -316,10 +316,10 @@ namespace Quadbit {
 		EntityManager& operator= (const EntityManager&) = delete;
 
 		template<typename C>
-		std::shared_ptr<SparseSet<C>> GetPool() {
+		SparseSet<C>* GetPool() {
 			size_t componentID = ComponentID::GetUnique<C>();
 			assert(componentPools_[componentID] != nullptr && "Failed to get pool: Component isn't registered with the entity manager\n");
-			return std::static_pointer_cast<SparseSet<C>>(componentPools_[componentID]);
+			return reinterpret_cast<SparseSet<C>*>(componentPools_[componentID]);
 		}
 
 		template<typename... Components>
@@ -335,6 +335,7 @@ namespace Quadbit {
 		constexpr F ForEachTupleImpl(Tuple&& t, F&& f, std::index_sequence<I...>) {
 			return (void)std::initializer_list<int>{(std::forward<F>(f)(std::get<I>(std::forward<Tuple>(t))), 0)...}, f;
 		}
+
 		template<typename Tuple, typename F>
 		constexpr F ForEachTuple(Tuple&& t, F&& f) {
 			return ForEachTupleImpl(std::forward<Tuple>(t), std::forward<F>(f),

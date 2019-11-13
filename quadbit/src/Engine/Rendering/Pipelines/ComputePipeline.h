@@ -11,15 +11,15 @@ namespace Quadbit {
 		ComputePipeline(QbVkContext& context);
 		~ComputePipeline();
 
-		void RecordCommands(std::shared_ptr<QbVkComputeInstance> instance, std::function<void()> func);
-		void Dispatch(std::shared_ptr<QbVkComputeInstance> instance);
-		std::shared_ptr<QbVkComputeInstance> CreateInstance(std::vector<QbVkComputeDescriptor>& descriptors, const char* shader,
+		void RecordCommands(const QbVkComputeInstance* instance, std::function<void()> func);
+		void Dispatch(QbVkComputeInstance* instance);
+		QbVkComputeInstance* CreateInstance(std::vector<QbVkComputeDescriptor>& descriptors, const char* shader,
 			const char* shaderFunc, const VkSpecializationInfo* specInfo = nullptr, const uint32_t pushConstantRangeSize = 0);
-		void DestroyInstance(std::shared_ptr<QbVkComputeInstance> computeInstance);
+		void DestroyInstance(const QbVkComputeInstance* computeInstance);
 		void ImGuiDrawState();
 
 	private:
-		std::vector<std::tuple<const char*, std::shared_ptr<QbVkComputeInstance>>> activeInstances_;
+		std::vector<std::tuple<const char*, std::unique_ptr<QbVkComputeInstance>>> activeInstances_;
 
 		QbVkContext& context_;
 

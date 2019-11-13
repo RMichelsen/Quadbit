@@ -15,7 +15,7 @@ if(ret != VK_SUCCESS) QB_LOG_WARN("VkResult: %s is %s in %s at line %d\n", #x, V
 if(!(x)) QB_LOG_WARN("VK: %s - %s\n", msg, #x); \
 }
 
-#ifndef NDEBUG
+#ifdef NDEBUG
 inline constexpr int VALIDATION_LAYER_COUNT = 1;
 inline constexpr const char* VALIDATION_LAYERS[VALIDATION_LAYER_COUNT]{
 	"VK_LAYER_KHRONOS_validation"

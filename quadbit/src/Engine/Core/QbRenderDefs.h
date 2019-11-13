@@ -28,13 +28,13 @@ namespace Quadbit {
 			VertexBufHandle next = vertexBufferIdx_;
 			if (vertexBufferFreeList_.empty()) {
 				vertexBufferIdx_++;
-				assert(next < MAX_MESH_COUNT && "Cannot get next vertex buffer handle for mesh, max number of handles in use!");
+				assert(next < (MAX_MESH_COUNT - 1) && "Cannot get next vertex buffer handle for mesh, max number of handles in use!");
 				return next;
 			}
 			else {
 				next = vertexBufferFreeList_.front();
 				vertexBufferFreeList_.pop_front();
-				assert(next < MAX_MESH_COUNT && "Cannot get next index buffer handle for mesh, max number of handles in use!");
+				assert(next < (MAX_MESH_COUNT - 1) && "Cannot get next vertex buffer handle for mesh, max number of handles in use!");
 				return next;
 			}
 		}
@@ -43,13 +43,13 @@ namespace Quadbit {
 			IndexBufHandle next = indexBufferIdx_;
 			if (indexBufferFreeList_.empty()) {
 				indexBufferIdx_++;
-				assert(next < MAX_MESH_COUNT);
+				assert(next < (MAX_MESH_COUNT - 1) && "Cannot get next index buffer handle for mesh, max number of handles in use!");
 				return next;
 			}
 			else {
 				next = indexBufferFreeList_.front();
 				indexBufferFreeList_.pop_front();
-				assert(next < MAX_MESH_COUNT);
+				assert(next < (MAX_MESH_COUNT - 1) && "Cannot get next index buffer handle for mesh, max number of handles in use!");
 				return next;
 			}
 		}
@@ -113,7 +113,7 @@ namespace Quadbit {
 		glm::quat rotation;
 		float scale;
 
-		RenderTransformComponent(float scale, glm::vec3 pos, glm::quat rot) : scale(scale), position(pos), rotation(rot) {
+		RenderTransformComponent(float scale, glm::vec3 pos, glm::quat rot) : position(pos), rotation(rot), scale(scale) {
 			UpdateModel();
 		}
 

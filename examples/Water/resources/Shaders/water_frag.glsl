@@ -10,7 +10,7 @@ layout(binding = 2) uniform UBO {
 	float colourIntensity;
 } ubo;
 
-layout(binding = 3) uniform samplerCube environment_map;
+// layout(binding = 3) uniform samplerCube environment_map;
 
 layout(location = 0) in vec3 inColour;
 layout(location = 1) in vec2 inTextPos;
@@ -42,9 +42,9 @@ void main() {
 	float R_theta = R_0 + (1 - R_0) * (1 - cos_theta) * (1 - cos_theta) * (1 - cos_theta) * (1 - cos_theta) * (1 - cos_theta);
 
 	//outColour = diff * baseColour;
-	vec4 refractionColour = mix(vec4(texture(environment_map, Refr).rgb, 1.0f), baseColour, ubo.colourIntensity);
-	vec4 reflectionColour = vec4(texture(environment_map, Refl).rgb, 1.0f);
-	outColour = mix(refractionColour, reflectionColour, R_theta);
+	//vec4 refractionColour = mix(vec4(texture(environment_map, Refr).rgb, 1.0f), baseColour, ubo.colourIntensity);
+	//vec4 reflectionColour = vec4(texture(environment_map, Refl).rgb, 1.0f);
+	//outColour = mix(refractionColour, reflectionColour, R_theta);
 
 	outColour = baseColour;
 }

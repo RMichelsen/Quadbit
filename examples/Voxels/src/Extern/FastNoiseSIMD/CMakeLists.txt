@@ -15,4 +15,14 @@ target_sources(FastNoiseSIMD
         ${CMAKE_CURRENT_LIST_DIR}/FastNoiseSIMD/FastNoiseSIMD_sse41.cpp
     )
 
+if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+set_source_files_properties(${CMAKE_CURRENT_LIST_DIR}/FastNoiseSIMD/FastNoiseSIMD_avx2.cpp PROPERTIES COMPILE_FLAGS /arch:AVX2)
+set_source_files_properties(${CMAKE_CURRENT_LIST_DIR}/FastNoiseSIMD/FastNoiseSIMD_avx512.cpp PROPERTIES COMPILE_FLAGS /arch:AVX2)
+else()
+set_source_files_properties(${CMAKE_CURRENT_LIST_DIR}/FastNoiseSIMD/FastNoiseSIMD_avx2.cpp PROPERTIES COMPILE_FLAGS -mavx2)
+set_source_files_properties(${CMAKE_CURRENT_LIST_DIR}/FastNoiseSIMD/FastNoiseSIMD_avx512.cpp PROPERTIES COMPILE_FLAGS -mavx512f)
+set_source_files_properties(${CMAKE_CURRENT_LIST_DIR}/FastNoiseSIMD/FastNoiseSIMD_sse2.cpp PROPERTIES COMPILE_FLAGS -msse2)
+set_source_files_properties(${CMAKE_CURRENT_LIST_DIR}/FastNoiseSIMD/FastNoiseSIMD_sse41.cpp PROPERTIES COMPILE_FLAGS -msse4.1)
+endif()
+
 target_include_directories(FastNoiseSIMD INTERFACE ${CMAKE_CURRENT_LIST_DIR})
