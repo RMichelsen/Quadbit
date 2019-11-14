@@ -1,6 +1,6 @@
 #include "QbVkShaderInstance.h"
 
-#include "Engine/Rendering/QbVulkanUtils.h"
+#include "Engine/Rendering/QbVkUtils.h"
 
 namespace Quadbit {
 	QbVkShaderInstance::~QbVkShaderInstance() {

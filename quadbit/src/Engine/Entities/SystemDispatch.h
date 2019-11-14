@@ -2,8 +2,8 @@
 #include <vector>
 #include <imgui/imgui.h>
 
-#include "Engine/Core/QbEntityDefs.h"
 #include "Engine/Core/Sfinae.h"
+#include "Engine/Entities/QbEntityDefs.h"
 #include "Engine/Entities/ComponentSystem.h"
 #include "Engine/Entities/EntityManager.h"
 

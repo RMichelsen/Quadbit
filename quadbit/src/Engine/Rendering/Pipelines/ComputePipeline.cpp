@@ -4,7 +4,7 @@
 
 #include "Engine/Core/QbVulkanDefs.h"
 #include "Engine/Core/QbVulkanInternalDefs.h"
-#include "Engine/Rendering/QbVulkanUtils.h"
+#include "Engine/Rendering/QbVkUtils.h"
 
 namespace Quadbit {
 	ComputePipeline::ComputePipeline(QbVkContext& context) : context_(context) {
@@ -29,6 +29,7 @@ namespace Quadbit {
 		vkDestroyFence(context_.device, computeFence_, nullptr);
 	}
 
+	// Records user-defined vulkan commands directly into a commandbuffer
 	void ComputePipeline::RecordCommands(const QbVkComputeInstance* instance, std::function<void()> func) {
 		VkCommandBufferBeginInfo cmdBufInfo = VkUtils::Init::CommandBufferBeginInfo();
 		VK_CHECK(vkBeginCommandBuffer(instance->commandBuffer, &cmdBufInfo));

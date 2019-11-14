@@ -1,8 +1,6 @@
 #pragma once
 
 #include <vulkan/vulkan.h>
-#include <vector>
-#include <array>
 
 #define VK_ERROR_STRING(x) case (int)x: return #x;
 

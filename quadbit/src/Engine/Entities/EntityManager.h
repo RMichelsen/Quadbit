@@ -3,8 +3,8 @@
 #include <execution>
 #include <any>
 
-#include "Engine/Core/QbEntityDefs.h"
 #include "Engine/Core/QbRenderDefs.h"
+#include "Engine/Entities/QbEntityDefs.h"
 #include "Engine/Entities/SystemDispatch.h"
 
 namespace Quadbit {
@@ -77,6 +77,7 @@ namespace Quadbit {
 	class EntityManager {
 	public:
 		std::unique_ptr<SystemDispatch> systemDispatch_;
+		// TODO: GET RID OF SHARED POINTER, MAYBE GET RID OF COMPONENTPOOL ABSTRACTION ITS NOT HELPFUL!
 		std::array<std::shared_ptr<ComponentPool>, MAX_COMPONENTS> componentPools_;
 
 		static EntityManager& Instance();

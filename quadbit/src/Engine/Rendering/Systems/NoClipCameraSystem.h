@@ -4,7 +4,7 @@
 #include <glm/glm.hpp>
 #include <glm/vec3.hpp>
 
-#include "Engine/Core/InputHandler.h"
+#include "Engine/Application/InputHandler.h"
 #include "Engine/Core/QbRenderDefs.h"
 #include "Engine/Entities/EntityManager.h"
 #include "Engine/Entities/ComponentSystem.h"
@@ -22,48 +22,50 @@ namespace Quadbit {
 		}
 
 		void Update(float deltaTime) {
+			auto& inputHandler = InputHandler::Instance();
+
 			EntityManager::Instance().ForEach<RenderCamera>([&](Entity entity, RenderCamera& camera) {
-				if (InputHandler::rightMouseDragging && !camera.dragActive) {
+				if (inputHandler.mouseDrag_.right.active && !camera.dragActive) {
 					camera.dragActive = true;
 					ShowCursor(false);
 				}
-				else if (!InputHandler::rightMouseDragging && camera.dragActive) {
+				else if (!inputHandler.mouseDrag_.right.active && camera.dragActive) {
 					camera.dragActive = false;
 					// Set the cursor back to the cached position
-					SetCursorPos(InputHandler::rightDragCachedPos.x, InputHandler::rightDragCachedPos.y);
+					SetCursorPos(inputHandler.mouseDrag_.right.cachedPos.x, inputHandler.mouseDrag_.right.cachedPos.y);
 					ShowCursor(true);
 				}
 
-				if (InputHandler::rightMouseDragging || InputHandler::keycodes[0x41] || InputHandler::keycodes[0x44] ||
-					InputHandler::keycodes[0x53] || InputHandler::keycodes[0x57]) {
+				if (inputHandler.mouseDrag_.right.active || inputHandler.keyState_[0x41] || inputHandler.keyState_[0x44] ||
+					inputHandler.keyState_[0x53] || inputHandler.keyState_[0x57]) {
 
 					const float cameraSpeed = 100.0f * deltaTime;
 
 					// 'W'
-					if (InputHandler::keycodes[0x57]) {
+					if (inputHandler.keyState_[0x57]) {
 						camera.position += camera.front * cameraSpeed;
 					}
 					// 'S'
-					if (InputHandler::keycodes[0x53]) {
+					if (inputHandler.keyState_[0x53]) {
 						camera.position -= camera.front * cameraSpeed;
 					}
 					// 'D'
-					if (InputHandler::keycodes[0x44]) {
+					if (inputHandler.keyState_[0x44]) {
 						camera.position += glm::normalize(glm::cross(camera.front, glm::vec3(0.0f, 1.0f, 0.0f))) * cameraSpeed;
 					}
 					// 'A'
-					if (InputHandler::keycodes[0x41]) {
+					if (inputHandler.keyState_[0x41]) {
 						camera.position -= glm::normalize(glm::cross(camera.front, glm::vec3(0.0f, 1.0f, 0.0f))) * cameraSpeed;
 					}
 
-					if (InputHandler::rightMouseDragging) {
+					if (inputHandler.mouseDrag_.right.active) {
 						const float dragSpeed = 100.0f * deltaTime;
 
-						if (InputHandler::deltaMouseMovement[0] != 0) {
-							camera.yaw += static_cast<float>(InputHandler::deltaMouseMovement[0])* dragSpeed;
+						if (inputHandler.mouseDelta_.x != 0) {
+							camera.yaw += static_cast<float>(inputHandler.mouseDelta_.x)* dragSpeed;
 						}
-						if (InputHandler::deltaMouseMovement[1] != 0) {
-							camera.pitch -= static_cast<float>(InputHandler::deltaMouseMovement[1])* dragSpeed;
+						if (inputHandler.mouseDelta_.y != 0) {
+							camera.pitch -= static_cast<float>(inputHandler.mouseDelta_.y)* dragSpeed;
 							// Put constraints on pitch.
 							// 1.5533rad is approx 89deg
 							if (camera.pitch > 89.0f) {

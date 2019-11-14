@@ -13,6 +13,7 @@ add_subdirectory(dependencies/tinyobjloader)
 
 add_library(Quadbit STATIC
     src/Engine/Application/Window.cpp
+    src/Engine/Application/InputHandler.cpp
     src/Engine/Entities/EntityManager.cpp
     src/Engine/Rendering/QbVkRenderer.cpp
     src/Engine/Rendering/QbVkShaderInstance.cpp

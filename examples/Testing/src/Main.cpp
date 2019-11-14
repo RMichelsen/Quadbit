@@ -1,13 +1,12 @@
 #include <Windows.h>
 #include <memory>
 
-#include "Engine/Core/InputHandler.h"
 #include "Engine/Core/Time.h"
 #include "Engine/Application/Window.h"
 #include "Game.h"
 
 int __stdcall WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nCmdShow) {
-	auto window = std::make_unique<Quadbit::Window>(hInstance, nCmdShow, Quadbit::InputHandler::WindowCallback);
+	auto window = std::make_unique<Quadbit::Window>(hInstance, nCmdShow);
 	auto game = std::make_unique<Game>(hInstance, window->hwnd_);
 
 	game->Init();

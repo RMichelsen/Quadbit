@@ -25,9 +25,10 @@ namespace Quadbit {
 		QbVkBuffer CreateGPUBuffer(VkDeviceSize size, VkBufferUsageFlags bufferUsage, QbVkMemoryUsage memoryUsage);
 		void TransferDataToGPUBuffer(QbVkBuffer& buffer, VkDeviceSize size, const void* data);
 		VkMemoryBarrier CreateMemoryBarrier(VkAccessFlags srcMask, VkAccessFlags dstMask);
+
 		QbVkShaderInstance CreateShaderInstance();
 
-		// Objects and Textures
+		// Objects and Textures (Graphics)
 		QbVkTexture LoadTexture(const char* imagePath, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage, VkImageLayout imageLayout,
 			VkImageAspectFlags imageAspectFlags, QbVkMemoryUsage memoryUsage, VkSamplerCreateInfo* samplerCreateInfo = nullptr,
 			VkSampleCountFlagBits numSamples = VK_SAMPLE_COUNT_1_BIT);
@@ -37,7 +38,7 @@ namespace Quadbit {
 		VkSampler CreateImageSampler(VkFilter samplerFilter, VkSamplerAddressMode addressMode, VkBool32 enableAnisotropy,
 			float maxAnisotropy, VkCompareOp compareOperation, VkSamplerMipmapMode samplerMipmapMode, float maxLod = 0.0f);
 
-		// Compute Pipeline
+		// Compute Pipeline (Compute)
 		QbVkComputeInstance* CreateComputeInstance(std::vector<QbVkComputeDescriptor>& descriptors, const char* shader, const char* shaderFunc,
 			const VkSpecializationInfo* specInfo = nullptr, uint32_t pushConstantRangeSize = 0);
 		void ComputeDispatch(QbVkComputeInstance* instance);
@@ -48,7 +49,7 @@ namespace Quadbit {
 		}
 		QbVkComputeDescriptor CreateComputeDescriptor(VkDescriptorType type, void* descriptor);
 
-		// Mesh Pipeline
+		// Mesh Pipeline (Graphics)
 		Entity GetActiveCamera();
 		void RegisterCamera(Entity entity);
 		const QbVkRenderMeshInstance* CreateRenderMeshInstance(std::vector<QbVkRenderDescriptor>& descriptors,

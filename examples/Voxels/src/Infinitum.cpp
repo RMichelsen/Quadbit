@@ -2,7 +2,7 @@
 
 //#include <imgui/imgui.h>
 
-#include "Engine/Core/InputHandler.h"
+#include "Engine/Application/InputHandler.h"
 #include "Engine/Global/ImGuiState.h"
 #include "Engine/Entities/EntityManager.h"
 
@@ -115,7 +115,7 @@ void Infinitum::Simulate(float deltaTime) {
 	entityManager.systemDispatch_->RunSystem<VoxelGenerationSystem>(deltaTime, fastnoiseTerrain_, fastnoiseRegions_, fastnoiseColours_);
 	entityManager.systemDispatch_->RunSystem<MeshGenerationSystem>(deltaTime, renderer_.get(), renderMeshInstance_);
 
-	if(Quadbit::InputHandler::KeyPressed(0x47)) {
+	if(Quadbit::InputHandler::Instance().keyPressed_[0x47]) {
 		for(auto&& entity : chunks_) {
 			renderer_->DestroyMesh(*entity.GetComponentPtr<RenderMeshComponent>());
 			entity.RemoveComponent<RenderMeshComponent>();
