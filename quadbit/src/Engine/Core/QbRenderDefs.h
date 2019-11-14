@@ -4,6 +4,7 @@
 #include <vector>
 #include <array>
 #include <deque>
+#include <unordered_set>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -16,6 +17,13 @@ inline constexpr int MAX_MESH_COUNT = 65536;
 inline constexpr int MAX_TEXTURES = 50;
 
 namespace Quadbit {
+	struct UserAllocations {
+		std::unordered_set<VkImageView> imageViews;
+		std::unordered_set<VkImage> images;
+		std::unordered_set<VkBuffer> buffers;
+		std::unordered_set<VkSampler> samplers;
+	};
+
 	struct MeshBuffers {
 		VertexBufHandle vertexBufferIdx_;
 		IndexBufHandle indexBufferIdx_;

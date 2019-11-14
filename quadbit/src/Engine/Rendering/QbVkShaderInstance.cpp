@@ -32,4 +32,3 @@ namespace Quadbit {
 		stages.push_back(shader);
 	}
 }
-

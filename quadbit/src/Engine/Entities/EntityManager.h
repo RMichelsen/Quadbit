@@ -77,7 +77,7 @@ namespace Quadbit {
 	class EntityManager {
 	public:
 		std::unique_ptr<SystemDispatch> systemDispatch_;
-		std::array<ComponentPool*, MAX_COMPONENTS> componentPools_;
+		std::array<std::shared_ptr<ComponentPool>, MAX_COMPONENTS> componentPools_;
 
 		static EntityManager& Instance();
 
@@ -89,18 +89,15 @@ namespace Quadbit {
 			systemDispatch_->Shutdown();
 			systemDispatch_.reset();
 			for (auto&& component : componentPools_) {
-				delete component;
+				component.reset();
 			}
 		}
-
-		template<typename C>
-		using SparseSetPtr = SparseSet<C>*;
 
 		template<typename C>
 		void RegisterComponent() {
 			size_t componentID = ComponentID::GetUnique<C>();
 			assert(componentPools_[componentID] == nullptr && "Failed to register component: Component is already registered with the entity manager\n");
-			componentPools_[componentID] = new SparseSet<C>();
+			componentPools_[componentID] = std::make_shared<SparseSet<C>>();
 		}
 
 		template<typename... C>
@@ -111,8 +108,8 @@ namespace Quadbit {
 		template<typename C>
 		void AddComponent(const Entity& entity) const {
 			size_t componentID = ComponentID::GetUnique<C>();
-			assert(componentPools_[componentID] != nullptr && "Failed to add component: Component isn't registered with the entity manager\n");
-			reinterpret_cast<SparseSetPtr<C>>(componentPools_[componentID])->Insert(entity.id_);
+			assert(componentPools_[componentID].get() != nullptr && "Failed to add component: Component isn't registered with the entity manager\n");
+			std::static_pointer_cast<SparseSet<C>>(componentPools_[componentID])->Insert(entity.id_);
 		}
 
 		// Aggregate initialization
@@ -120,25 +117,28 @@ namespace Quadbit {
 		void AddComponent(const Entity& entity, C&& t) const {
 			size_t componentID = ComponentID::GetUnique<C>();
 			assert(componentPools_[componentID] != nullptr && "Failed to add component: Component isn't registered with the entity manager\n");
-			reinterpret_cast<SparseSetPtr<C>>(componentPools_[componentID])->Insert(entity.id_, std::move(t));
+			std::static_pointer_cast<SparseSet<C>>(componentPools_[componentID])->Insert(entity.id_, std::move(t));
 		}
 
 		template<typename C>
 		C* const GetComponentPtr(const Entity& entity) const {
-			return reinterpret_cast<SparseSetPtr<C>>(componentPools_[ComponentID::GetUnique<C>()])->GetComponentPtr(entity.id_);
+			return std::static_pointer_cast<SparseSet<C>>(componentPools_[ComponentID::GetUnique<C>()])->GetComponentPtr(entity.id_);
 		}
 
 		template<typename C>
 		bool HasComponent(const Entity& entity) const {
-			return reinterpret_cast<SparseSetPtr<C>>(componentPools_[ComponentID::GetUnique<C>()])->HasComponent(entity.id_);
+			return std::static_pointer_cast<SparseSet<C>>(componentPools_[ComponentID::GetUnique<C>()])->HasComponent(entity.id_);
 		}
 
 		template<typename C>
 		void RemoveComponent(const Entity& entity) const {
 			size_t componentID = ComponentID::GetUnique<C>();
 			assert(componentPools_[componentID] != nullptr && "Failed to remove component: Component isn't registered with the entity manager\n");
-			reinterpret_cast<SparseSetPtr<C>>(componentPools_[componentID])->Remove(entity.id_);
+			std::static_pointer_cast<SparseSet<C>>(componentPools_[componentID])->Remove(entity.id_);
 		}
+
+		template<typename C>
+		using SparseSetPtr = std::shared_ptr<SparseSet<C>>;
 
 		template<typename... Components, typename F>
 		void ForEach(F fun) {
@@ -316,10 +316,10 @@ namespace Quadbit {
 		EntityManager& operator= (const EntityManager&) = delete;
 
 		template<typename C>
-		SparseSet<C>* GetPool() {
+		std::shared_ptr<SparseSet<C>> GetPool() {
 			size_t componentID = ComponentID::GetUnique<C>();
 			assert(componentPools_[componentID] != nullptr && "Failed to get pool: Component isn't registered with the entity manager\n");
-			return reinterpret_cast<SparseSet<C>*>(componentPools_[componentID]);
+			return std::static_pointer_cast<SparseSet<C>>(componentPools_[componentID]);
 		}
 
 		template<typename... Components>

@@ -101,7 +101,7 @@ namespace Quadbit {
 			entityFromComponentIndices_.pop_back();
 		}
 
-		void RemoveIfExists(EntityID id) override {
+		virtual void RemoveIfExists(EntityID id) override {
 			assert(id.index < sparse_.size());
 			if (sparse_[id.index] == 0xFFFF'FFFF) return;
 

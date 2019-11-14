@@ -1,6 +1,6 @@
 #pragma once
 #include <functional>
-#include <variant>
+#include <unordered_set>
 
 #include "Engine/Rendering/QbVkShaderInstance.h"
 #include "Engine/Core/QbRenderDefs.h"
@@ -22,7 +22,7 @@ namespace Quadbit {
 		// General
 		void DrawFrame();
 		float GetAspectRatio();
-		void CreateGPUBuffer(QbVkBuffer& buffer, VkDeviceSize size, VkBufferUsageFlags bufferUsage, QbVkMemoryUsage memoryUsage);
+		QbVkBuffer CreateGPUBuffer(VkDeviceSize size, VkBufferUsageFlags bufferUsage, QbVkMemoryUsage memoryUsage);
 		void TransferDataToGPUBuffer(QbVkBuffer& buffer, VkDeviceSize size, const void* data);
 		VkMemoryBarrier CreateMemoryBarrier(VkAccessFlags srcMask, VkAccessFlags dstMask);
 		QbVkShaderInstance CreateShaderInstance();
@@ -31,7 +31,7 @@ namespace Quadbit {
 		QbVkTexture LoadTexture(const char* imagePath, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage, VkImageLayout imageLayout,
 			VkImageAspectFlags imageAspectFlags, QbVkMemoryUsage memoryUsage, VkSamplerCreateInfo* samplerCreateInfo = nullptr,
 			VkSampleCountFlagBits numSamples = VK_SAMPLE_COUNT_1_BIT);
-		void CreateTexture(QbVkTexture& texture, uint32_t width, uint32_t height, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage, VkImageLayout imageLayout,
+		QbVkTexture CreateTexture(uint32_t width, uint32_t height, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage, VkImageLayout imageLayout,
 			VkImageAspectFlags imageAspectFlags, VkPipelineStageFlagBits srcStage, VkPipelineStageFlagBits dstStage, QbVkMemoryUsage memoryUsage,
 			VkSampler sampler = VK_NULL_HANDLE, VkSampleCountFlagBits numSamples = VK_SAMPLE_COUNT_1_BIT);
 		VkSampler CreateImageSampler(VkFilter samplerFilter, VkSamplerAddressMode addressMode, VkBool32 enableAnisotropy,
@@ -97,6 +97,8 @@ namespace Quadbit {
 		std::unique_ptr<MeshPipeline> meshPipeline_;
 		std::unique_ptr<ImGuiPipeline> imGuiPipeline_;
 		std::unique_ptr<ComputePipeline> computePipeline_;
+
+		UserAllocations userAllocations_{};
 
 		// DEBUG BUILD ONLY
 #ifndef NDEBUG

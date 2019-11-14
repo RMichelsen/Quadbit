@@ -579,7 +579,6 @@ namespace Quadbit {
 		vkDestroyPipeline(context_.device, instance->pipeline, nullptr);
 
 		// Destroy descriptors
-		if (instance->descriptorPool != VK_NULL_HANDLE)vkFreeDescriptorSets(context_.device, instance->descriptorPool, static_cast<uint32_t>(instance->descriptorSets.size()), instance->descriptorSets.data());
 		if (instance->descriptorPool != VK_NULL_HANDLE) vkDestroyDescriptorPool(context_.device, instance->descriptorPool, nullptr);
 		if (instance->descriptorSetLayout != VK_NULL_HANDLE) vkDestroyDescriptorSetLayout(context_.device, instance->descriptorSetLayout, nullptr);
 	}

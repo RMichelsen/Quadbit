@@ -14,11 +14,11 @@ namespace Quadbit {
 	class SystemDispatch {
 	public:
 		std::size_t systemCount_ = 0;
-		std::array<ComponentSystem*, MAX_SYSTEMS> systems_;
+		std::array<std::unique_ptr<ComponentSystem>, MAX_SYSTEMS> systems_;
 
 		void Shutdown() {
 			for (auto&& system : systems_) {
-				delete system;
+				system.reset();
 			}
 		}
 
@@ -26,10 +26,10 @@ namespace Quadbit {
 		void RegisterSystem() {
 			static_assert(std::is_base_of_v<ComponentSystem, S>, "All systems must inherit from ComponentSystem");
 			size_t systemID = SystemID::GetUnique<S>();
-			systems_[systemID] = new S();
+			systems_[systemID] = std::make_unique<S>();
 			systems_[systemID]->name = typeid(S).name();
 			if constexpr (SFINAE::is_detected_v<has_init, S>) {
-				reinterpret_cast<S*>(systems_[systemID])->Init();
+				reinterpret_cast<S*>(systems_[systemID].get())->Init();
 			}
 			systemCount_++;
 		}
@@ -40,7 +40,7 @@ namespace Quadbit {
 			if (systems_[systemID] == nullptr) {
 				RegisterSystem<S>();
 			}
-			auto* ptr = reinterpret_cast<S*>(systems_[systemID]);
+			auto* ptr = reinterpret_cast<S*>(systems_[systemID].get());
 			ptr->UpdateStart();
 			ptr->Update(deltaTime, args...);
 			ptr->UpdateEnd();

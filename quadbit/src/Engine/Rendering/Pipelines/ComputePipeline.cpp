@@ -156,8 +156,8 @@ namespace Quadbit {
 	}
 
 	void ComputePipeline::DestroyInstance(const QbVkComputeInstance* computeInstance) {
+		vkDestroyQueryPool(context_.device, computeInstance->queryPool, nullptr);
 		vkDestroyDescriptorSetLayout(context_.device, computeInstance->descriptorSetLayout, nullptr);
-		vkFreeDescriptorSets(context_.device, computeInstance->descriptorPool, 1, &computeInstance->descriptorSet);
 		vkDestroyDescriptorPool(context_.device, computeInstance->descriptorPool, nullptr);
 		vkDestroyPipelineLayout(context_.device, computeInstance->pipelineLayout, nullptr);
 		vkDestroyPipeline(context_.device, computeInstance->pipeline, nullptr);

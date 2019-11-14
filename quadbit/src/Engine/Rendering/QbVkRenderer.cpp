@@ -59,11 +59,11 @@ namespace Quadbit {
 		// We need to start off by waiting for the GPU to be idle
 		VK_CHECK(vkDeviceWaitIdle(context_->device));
 
-#ifndef NDEBUG
-		// Destroy debug messenger
-		auto destroyDebugUtilsMessengerEXT = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance_, "vkDestroyDebugUtilsMessengerEXT");
-		destroyDebugUtilsMessengerEXT(instance_, debugMessenger_, nullptr);
-#endif
+		// Destroy user-created images and buffers
+		for (const auto& imageView : userAllocations_.imageViews) vkDestroyImageView(context_->device, imageView, nullptr);
+		for (const auto& image : userAllocations_.images) vkDestroyImage(context_->device, image, nullptr);
+		for (const auto& buffer : userAllocations_.buffers) vkDestroyBuffer(context_->device, buffer, nullptr);
+		for (const auto& sampler : userAllocations_.samplers) vkDestroySampler(context_->device, sampler, nullptr);
 
 		// Destroy pipelines
 		meshPipeline_.reset();
@@ -107,6 +107,14 @@ namespace Quadbit {
 
 		// Destroy surface
 		vkDestroySurfaceKHR(instance_, context_->surface, nullptr);
+
+#ifndef NDEBUG
+		auto DestroyDebugUtilsMessengerEXT = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
+			vkGetInstanceProcAddr(instance_, "vkDestroyDebugUtilsMessengerEXT"));
+		if (DestroyDebugUtilsMessengerEXT != nullptr) {
+			DestroyDebugUtilsMessengerEXT(instance_, debugMessenger_, nullptr);
+		}
+#endif
 
 		// Destroy instance
 		vkDestroyInstance(instance_, nullptr);
@@ -186,8 +194,11 @@ namespace Quadbit {
 		return static_cast<float>(context_->swapchain.extent.width) / static_cast<float>(context_->swapchain.extent.height);
 	}
 
-	void QbVkRenderer::CreateGPUBuffer(QbVkBuffer& buffer, VkDeviceSize size, VkBufferUsageFlags bufferUsage, QbVkMemoryUsage memoryUsage) {
+	QbVkBuffer QbVkRenderer::CreateGPUBuffer(VkDeviceSize size, VkBufferUsageFlags bufferUsage, QbVkMemoryUsage memoryUsage) {
+		QbVkBuffer buffer{};
 		VkUtils::CreateGPUBuffer(*context_, buffer, size, bufferUsage, memoryUsage);
+		userAllocations_.buffers.insert(buffer.buf);
+		return buffer;
 	}
 
 	void QbVkRenderer::TransferDataToGPUBuffer(QbVkBuffer& buffer, VkDeviceSize size, const void* data) {
@@ -216,13 +227,20 @@ namespace Quadbit {
 
 	QbVkTexture QbVkRenderer::LoadTexture(const char* imagePath, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage, VkImageLayout imageLayout,
 		VkImageAspectFlags imageAspectFlags, QbVkMemoryUsage memoryUsage, VkSamplerCreateInfo* samplerCreateInfo, VkSampleCountFlagBits numSamples) {
-		return VkUtils::LoadTexture(*context_, imagePath, imageFormat, imageTiling, imageUsage, imageLayout, imageAspectFlags, memoryUsage, samplerCreateInfo, numSamples);
+		QbVkTexture texture = VkUtils::LoadTexture(*context_, imagePath, imageFormat, imageTiling, imageUsage, imageLayout, imageAspectFlags, memoryUsage, samplerCreateInfo, numSamples);
+		userAllocations_.imageViews.insert(texture.imageView);
+		userAllocations_.images.insert(texture.image.imgHandle);
+		return texture;
 	}
 
-	void QbVkRenderer::CreateTexture(QbVkTexture& texture, uint32_t width, uint32_t height, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage,
+	QbVkTexture QbVkRenderer::CreateTexture(uint32_t width, uint32_t height, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage,
 		VkImageLayout imageLayout, VkImageAspectFlags imageAspectFlags, VkPipelineStageFlagBits srcStage, VkPipelineStageFlagBits dstStage, QbVkMemoryUsage memoryUsage,
 		VkSampler sampler, VkSampleCountFlagBits numSamples) {
+		QbVkTexture texture{};
 		VkUtils::CreateTexture(*context_, texture, width, height, imageFormat, imageTiling, imageUsage, imageLayout, imageAspectFlags, srcStage, dstStage, memoryUsage, sampler, numSamples);
+		userAllocations_.imageViews.insert(texture.imageView);
+		userAllocations_.images.insert(texture.image.imgHandle);
+		return texture;
 	}
 
 	VkSampler QbVkRenderer::CreateImageSampler(VkFilter samplerFilter, VkSamplerAddressMode addressMode, VkBool32 enableAnisotropy,
@@ -233,6 +251,7 @@ namespace Quadbit {
 		auto createInfo = VkUtils::Init::SamplerCreateInfo(samplerFilter, addressMode, enableAnisotropy, maxAnisotropy, compareOperation, samplerMipmapMode, maxLod);
 		VK_CHECK(vkCreateSampler(context_->device, &createInfo, nullptr, &sampler));
 
+		userAllocations_.samplers.insert(sampler);
 		return sampler;
 	}
 
@@ -334,9 +353,9 @@ namespace Quadbit {
 		debugUtilsMessengerInfo.pfnUserCallback = DebugMessengerCallback;
 
 		// Because we are using an extension function we need to load it ourselves.
-		auto debugUtilsMessengerCreateFunc = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance_, "vkCreateDebugUtilsMessengerEXT");
-		if (debugUtilsMessengerCreateFunc != nullptr) {
-			VK_CHECK(debugUtilsMessengerCreateFunc(instance_, &debugUtilsMessengerInfo, nullptr, &debugMessenger_));
+		auto CreateDebugUtilsMessengerEXT = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance_, "vkCreateDebugUtilsMessengerEXT");
+		if (CreateDebugUtilsMessengerEXT != nullptr) {
+			VK_CHECK(CreateDebugUtilsMessengerEXT(instance_, &debugUtilsMessengerInfo, nullptr, &debugMessenger_));
 		}
 	}
 #endif
@@ -476,8 +495,6 @@ namespace Quadbit {
 				VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
 			VK_CHECK(vkAllocateCommandBuffers(context_->device, &commandBufferAllocateInfo, &renderingResource.commandbuffer));
 		}
-		VkCommandBufferAllocateInfo commandBufferAllocateInfo = VkUtils::Init::CommandBufferAllocateInfo(context_->commandPool,
-			VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
 	}
 
 	void QbVkRenderer::CreateMultisamplingResources() {
