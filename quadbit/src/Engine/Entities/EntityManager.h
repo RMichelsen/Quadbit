@@ -3,7 +3,7 @@
 #include <execution>
 #include <any>
 
-#include "Engine/Entities/QbEntityDefs.h"
+#include "Engine/Entities/EntityTypes.h"
 #include "Engine/Entities/SystemDispatch.h"
 #include "Engine/Entities/SparseSet.h"
 #include "Engine/Rendering/RenderTypes.h"
@@ -70,23 +70,8 @@ namespace Quadbit {
 	};
 
 	struct ComponentPool {
-		void* sparseSet;
-		void(*RemoveIfExists)(void*, EntityID id);
-		void(*Destructor)(void*);
-
-		template<typename C>
-		static ComponentPool New() {
-			return ComponentPool {
-				new SparseSet<C>(),
-				[](void* sparseSet, EntityID id) { static_cast<SparseSet<C>*>(sparseSet)->RemoveIfExists(id); },
-				[](void* sparseSet) { static_cast<const SparseSet<C>*>(sparseSet)->~SparseSet<C>(); }
-			};
-		}
-
-		template<typename C>
-		SparseSet<C>* GetPtr() {
-			return reinterpret_cast<SparseSet<C>*>(sparseSet);
-		}
+		virtual ~ComponentPool() {};
+		virtual void RemoveIfExists(EntityID id) = 0;
 	};
 
 	/*
@@ -98,30 +83,19 @@ namespace Quadbit {
 	class EntityManager {
 	public:
 		std::unique_ptr<SystemDispatch> systemDispatch_;
-		std::array<ComponentPool, MAX_COMPONENTS> componentPools_;
+		std::array<std::unique_ptr<ComponentPool>, MAX_COMPONENTS> componentPools_;
 
 		static EntityManager& Instance();
 
 		Entity Create();
 		void Destroy(const Entity& entity);
 		bool IsValid(const Entity& entity);
-
-		void Shutdown() {
-			systemDispatch_->Shutdown();
-			systemDispatch_.reset();
-			for (auto&& component : componentPools_) {
-				// We can break at the first null-pointer since component pools
-				// cannot be unregistered (destroyed) at runtime and thus when we
-				// encounter a nullptr, no pools are left in the array.
-				if (component.sparseSet != nullptr) break;
-				component.Destructor(component.sparseSet);
-			}
-		}
+		void Shutdown();
 
 		template<typename C>
 		SparseSet<C>* GetComponentStoragePtr() {
 			size_t componentID = ComponentID::GetUnique<C>();
-			return reinterpret_cast<SparseSet<C>*>(componentPools_[componentID].sparseSet);
+			return reinterpret_cast<SparseSet<C>*>(componentPools_[componentID].get());
 		}
 
 		template<typename C>
@@ -129,7 +103,7 @@ namespace Quadbit {
 			size_t componentID = ComponentID::GetUnique<C>();
 			auto componentStorage = Instance().GetComponentStoragePtr<C>();
 			assert(componentStorage == nullptr && "Failed to register component: Component is already registered with the entity manager\n");
-			componentPools_[componentID] = ComponentPool::New<C>();
+			componentPools_[componentID] = std::make_unique<SparseSet<C>>();
 		}
 
 		template<typename... C>
@@ -348,10 +322,10 @@ namespace Quadbit {
 		EntityManager& operator= (const EntityManager&) = delete;
 
 		template<typename C>
-		SparseSet<C>* GetPool() {
+		SparseSet<C>* const GetPool() {
 			size_t componentID = ComponentID::GetUnique<C>();
 			assert(componentPools_[componentID].sparseSet != nullptr && "Failed to get pool: Component isn't registered with the entity manager\n");
-			return reinterpret_cast<SparseSet<C>*>(componentPools_[componentID].sparseSet);
+			return reinterpret_cast<SparseSet<C>*>(componentPools_[componentID].get());
 		}
 
 		template<typename... Components>

@@ -49,8 +49,8 @@ namespace Quadbit {
 			// We can break at the first null-pointer since component pools
 			// cannot be unregistered (destroyed) at runtime and thus when we
 			// encounter a nullptr, no pools are left in the array.
-			if (pool.sparseSet == nullptr) break;
-			pool.RemoveIfExists(pool.sparseSet, entity.id_);
+			if (pool.get() == nullptr) break;
+			pool->RemoveIfExists(entity.id_);
 		}
 
 		// Remove by swap and pop
@@ -66,5 +66,17 @@ namespace Quadbit {
 
 	bool EntityManager::IsValid(const Entity& entity) {
 		return entity.id_.version == entityVersions_[entity.id_.index];
+	}
+
+	void EntityManager::Shutdown() {
+		systemDispatch_->Shutdown();
+		systemDispatch_.reset();
+		for (auto&& pool : componentPools_) {
+			// We can break at the first null-pointer since component pools
+			// cannot be unregistered (destroyed) at runtime and thus when we
+			// encounter a nullptr, no pools are left in the array.
+			if (pool.get() == nullptr) break;
+			pool.reset();
+		}
 	}
 }

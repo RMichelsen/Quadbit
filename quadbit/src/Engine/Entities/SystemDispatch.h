@@ -7,7 +7,7 @@
 #include "Engine/Core/Sfinae.h"
 #include "Engine/Entities/ComponentSystem.h"
 #include "Engine/Entities/EntityManager.h"
-#include "Engine/Entities/QbEntityDefs.h"
+#include "Engine/Entities/EntityTypes.h"
 
 namespace Quadbit {
 	template <class S>

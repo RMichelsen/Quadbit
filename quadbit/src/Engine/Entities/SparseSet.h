@@ -1,11 +1,11 @@
 #pragma once
 
 #include "Engine/Core/Logging.h"
-#include "Engine/Entities/QbEntityDefs.h"
+#include "Engine/Entities/EntityTypes.h"
 
 namespace Quadbit {
 	template<typename T>
-	class SparseSet {
+	class SparseSet : public ComponentPool {
 	public:
 		std::vector<uint32_t> sparse_ = std::vector<uint32_t>(INIT_MAX_ENTITIES, 0xFFFF'FFFF);
 		std::vector<T> dense_;
@@ -14,8 +14,6 @@ namespace Quadbit {
 		SparseSet() {
 			QB_LOG_INFO("Sparse of type \"%s\" (%zi bytes) created\n", typeid(T).name(), sizeof(T));
 		}
-
-		~SparseSet() {}
 
 		void Insert(EntityID id) {
 			assert(id.index < sparse_.size());
@@ -56,7 +54,7 @@ namespace Quadbit {
 			entityFromComponentIndices_.pop_back();
 		}
 
-		void RemoveIfExists(EntityID id) {
+		void RemoveIfExists(EntityID id) override {
 			assert(id.index < sparse_.size());
 			if (sparse_[id.index] == 0xFFFF'FFFF) return;
 

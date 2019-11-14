@@ -3,7 +3,7 @@
 #include <random>
 #include <imgui/imgui.h>
 
-#include "Engine/Entities/QbEntityDefs.h"
+#include "Engine/Entities/EntityTypes.h"
 
 void Water::Init() {
 	auto& renderer = Quadbit::QbVkRenderer::Instance();
