@@ -5,8 +5,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 project(Testing LANGUAGES CXX)
 
 add_executable(Testing WIN32
-    src/Main.cpp
-    src/Game.cpp
+    src/Testing.cpp
     )
 
 target_link_libraries(Testing

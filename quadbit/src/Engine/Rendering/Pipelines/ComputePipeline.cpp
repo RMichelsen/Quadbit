@@ -2,9 +2,8 @@
 
 #include <imgui/imgui.h>
 
-#include "Engine/Core/QbVulkanDefs.h"
-#include "Engine/Core/QbVulkanInternalDefs.h"
-#include "Engine/Rendering/QbVkUtils.h"
+#include "Engine/Rendering/VulkanTypes.h"
+#include "Engine/Rendering/VulkanUtils.h"
 
 namespace Quadbit {
 	ComputePipeline::ComputePipeline(QbVkContext& context) : context_(context) {

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Engine/Core/QbRenderDefs.h"
-#include "Engine/Core/QbVulkanDefs.h"
+#include "Engine/Rendering/RenderTypes.h"
+#include "Engine/Rendering/VulkanTypes.h"
 
 namespace Quadbit {
 	class ImGuiPipeline {

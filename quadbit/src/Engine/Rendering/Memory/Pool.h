@@ -1,16 +1,16 @@
 #pragma once
 
-#include "Engine/Core/QbVulkanDefs.h"
+#include "Engine/Rendering/VulkanTypes.h"
 
 namespace Quadbit {
 	struct QbVkPool {
-		VkDeviceSize capacity_;
+		VkDeviceSize capacity_ = 0;
 		VkDeviceSize allocatedSize_ = 0;
 		int32_t memoryTypeIndex_;
-		VkDevice device_;
+		VkDevice device_ = VK_NULL_HANDLE;
 		uint32_t nextBlockId_ = 0;
 		VkDeviceMemory deviceMemory_ = 0;
-		QbVkMemoryUsage memoryUsage_;
+		QbVkMemoryUsage memoryUsage_ = QbVkMemoryUsage::QBVK_MEMORY_USAGE_UNKNOWN;
 		unsigned char* data_ = nullptr;
 
 		struct Block {
@@ -28,7 +28,6 @@ namespace Quadbit {
 
 		bool Allocate(VkDeviceSize size, VkDeviceSize alignment, VkDeviceSize granularity, QbVkAllocationType allocationType, QbVkAllocation& allocation);
 		void Free(QbVkAllocation& allocation);
-		void Shutdown();
 		void DrawImGuiPool(uint32_t num);
 	};
 }

@@ -1,10 +1,10 @@
 #include "Infinitum.h"
 
-//#include <imgui/imgui.h>
+#include <imgui/imgui.h>
 
 #include "Engine/Application/InputHandler.h"
-#include "Engine/Global/ImGuiState.h"
 #include "Engine/Entities/EntityManager.h"
+#include "Engine/Rendering/Renderer.h"
 
 #include "Data/Components.h"
 #include "Systems/VoxelGenerationSystem.h"
@@ -17,19 +17,20 @@
 void Infinitum::Init() {
 	// Setup entities
 	auto& entityManager = EntityManager::Instance();
+	auto& renderer = QbVkRenderer::Instance();
 	entityManager.RegisterComponents<VoxelBlockComponent, VoxelBlockUpdateTag, MeshGenerationUpdateTag, MeshReadyTag, PlayerTag>();
 
-	renderer_->LoadSkyGradient(glm::vec3(1.0f, 1.0f, 1.0f), glm::vec3(0.1f, 0.4f, 0.8f));
+	renderer.LoadSkyGradient(glm::vec3(1.0f, 1.0f, 1.0f), glm::vec3(0.1f, 0.4f, 0.8f));
 
 	//camera_ = entityManager->Create();
-	//camera_.AddComponent<Quadbit::RenderCamera>(Quadbit::RenderCamera(0.0f, 0.0f, glm::vec3(), renderer_->GetAspectRatio(), 10000.0f));
-	//renderer_->RegisterCamera(camera_);
+	//camera_.AddComponent<Quadbit::RenderCamera>(Quadbit::RenderCamera(0.0f, 0.0f, glm::vec3(), renderer->GetAspectRatio(), 10000.0f));
+	//renderer->RegisterCamera(camera_);
 
-	Quadbit::QbVkShaderInstance shaderInstance = renderer_->CreateShaderInstance();
+	Quadbit::QbVkShaderInstance shaderInstance = renderer.CreateShaderInstance();
 	shaderInstance.AddShader("Resources/Shaders/Compiled/voxel_vert.spv", "main", VK_SHADER_STAGE_VERTEX_BIT);
 	shaderInstance.AddShader("Resources/Shaders/Compiled/voxel_frag.spv", "main", VK_SHADER_STAGE_FRAGMENT_BIT);
 
-	renderMeshInstance_ = renderer_->CreateRenderMeshInstance({
+	renderMeshInstance_ = renderer.CreateRenderMeshInstance({
 		Quadbit::QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_POSITION,
 		Quadbit::QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_COLOUR
 		}, shaderInstance
@@ -37,7 +38,7 @@ void Infinitum::Init() {
 
 	player_ = entityManager.Create();
 	player_.AddComponent<Quadbit::RenderTransformComponent>(Quadbit::RenderTransformComponent(1.0f, glm::vec3(16.0f, 30.0f, 16.0f), glm::quat()));
-	player_.AddComponent<Quadbit::RenderMeshComponent>(renderer_->CreateMesh(cubeVertices, sizeof(VoxelVertex), cubeIndices, renderMeshInstance_));
+	player_.AddComponent<Quadbit::RenderMeshComponent>(renderer.CreateMesh(cubeVertices, sizeof(VoxelVertex), cubeIndices, renderMeshInstance_));
 	player_.AddComponent<PlayerTag>();
 
 	uint32_t globalSeed = 4646;
@@ -64,40 +65,6 @@ void Infinitum::Init() {
 	fastnoiseRegions_->SetCellularDistanceFunction(FastNoiseSIMD::CellularDistanceFunction::Euclidean);
 	fastnoiseRegions_->SetCellularJitter(0.3f);
 
-	static const char* noiseTypes[] = { "Value", "ValueFractal", "Perlin", "PerlinFractal", "Simplex", "SimplexFractal", "WhiteNoise", "Cellular", "Cubic", "CubicFractal" };
-	static const char* fractalTypes[] = { "FBM", "Billow", "RigidMulti" };
-	static const char* perturbTypes[] = { "None", "Gradient", "Gradient Fractal", "Normalize", "Gradient + Normalize", "Gradient Fractal + Normalize" };
-
-	//Quadbit::ImGuiState::Inject([]() {
-	//	ImGui::SetNextWindowSize(ImVec2(300, 100), ImGuiCond_FirstUseEver);
-	//	ImGui::Begin("Terrain Generation", nullptr);
-	//	ImGui::DragInt("Seed", &terrainSettings_.seed, 0.1f, 0, 9999999);
-	//	ImGui::Combo("Noise Type", &terrainSettings_.noiseType, noiseTypes, IM_ARRAYSIZE(noiseTypes));
-	//	ImGui::DragFloat("Noise Frequency", &terrainSettings_.noiseFrequency, 0.001f, 0.0f, 5.0f);
-	//	ImGui::Combo("Fractal Noise Type", &terrainSettings_.fractalType, fractalTypes, IM_ARRAYSIZE(fractalTypes));
-	//	ImGui::DragInt("Fractal Octaves", &terrainSettings_.fractalOctaves, 0.01f, 0, 100);
-	//	ImGui::DragFloat("Fractal Lacunarity", &terrainSettings_.fractalLacunarity, 0.001f, 0.0f, 5.0f);
-	//	ImGui::DragFloat("Fractal Gain", &terrainSettings_.fractalGain, 0.001f, 0.0f, 5.0f);
-	//	ImGui::Combo("Perturb Type", &terrainSettings_.perturbType, perturbTypes, IM_ARRAYSIZE(perturbTypes));
-	//	ImGui::Text("Press G to generate new terrain");
-	//	ImGui::End();
-	//});
-
-	//Quadbit::ImGuiState::Inject([]() {
-	//	ImGui::SetNextWindowSize(ImVec2(300, 100), ImGuiCond_FirstUseEver);
-	//	ImGui::Begin("Colour Generation", nullptr);
-	//	ImGui::DragInt("Seed", &colourSettings_.seed, 0.1f, 0, 9999999);
-	//	ImGui::Combo("Noise Type", &colourSettings_.noiseType, noiseTypes, IM_ARRAYSIZE(noiseTypes));
-	//	ImGui::DragFloat("Noise Frequency", &colourSettings_.noiseFrequency, 0.001f, 0.0f, 5.0f);
-	//	ImGui::Combo("Fractal Noise Type", &colourSettings_.fractalType, fractalTypes, IM_ARRAYSIZE(fractalTypes));
-	//	ImGui::DragInt("Fractal Octaves", &colourSettings_.fractalOctaves, 0.01f, 0, 100);
-	//	ImGui::DragFloat("Fractal Lacunarity", &colourSettings_.fractalLacunarity, 0.001f, 0.0f, 5.0f);
-	//	ImGui::DragFloat("Fractal Gain", &colourSettings_.fractalGain, 0.001f, 0.0f, 5.0f);
-	//	ImGui::Combo("Perturb Type", &colourSettings_.perturbType, perturbTypes, IM_ARRAYSIZE(perturbTypes));
-	//	ImGui::Text("Press G to generate new terrain");
-	//	ImGui::End();
-	//	});
-
 	// Spawn base
 	for(auto i = 0; i < VOXEL_BLOCK_WIDTH * 10; i += VOXEL_BLOCK_WIDTH) {
 		for(auto j = 0; j < VOXEL_BLOCK_WIDTH * 10; j += VOXEL_BLOCK_WIDTH) {
@@ -111,13 +78,14 @@ void Infinitum::Init() {
 
 void Infinitum::Simulate(float deltaTime) {
 	auto& entityManager = EntityManager::Instance();
+	auto& renderer = QbVkRenderer::Instance();
 
 	entityManager.systemDispatch_->RunSystem<VoxelGenerationSystem>(deltaTime, fastnoiseTerrain_, fastnoiseRegions_, fastnoiseColours_);
-	entityManager.systemDispatch_->RunSystem<MeshGenerationSystem>(deltaTime, renderer_.get(), renderMeshInstance_);
+	entityManager.systemDispatch_->RunSystem<MeshGenerationSystem>(deltaTime, &renderer, renderMeshInstance_);
 
 	if(Quadbit::InputHandler::Instance().keyPressed_[0x47]) {
 		for(auto&& entity : chunks_) {
-			renderer_->DestroyMesh(*entity.GetComponentPtr<RenderMeshComponent>());
+			renderer.DestroyMesh(*entity.GetComponentPtr<RenderMeshComponent>());
 			entity.RemoveComponent<RenderMeshComponent>();
 
 			fastnoiseTerrain_->SetSeed(terrainSettings_.seed);
@@ -145,5 +113,34 @@ void Infinitum::Simulate(float deltaTime) {
 }
 
 void Infinitum::DrawFrame() {
-	renderer_->DrawFrame();
+	DrawImGui();
+	Quadbit::QbVkRenderer::Instance().DrawFrame();
+}
+
+void Infinitum::DrawImGui() {
+	ImGui::SetNextWindowSize(ImVec2(300, 100), ImGuiCond_FirstUseEver);
+	ImGui::Begin("Terrain Generation", nullptr);
+	ImGui::DragInt("Seed", &terrainSettings_.seed, 0.1f, 0, 9999999);
+	ImGui::Combo("Noise Type", &terrainSettings_.noiseType, NOISE_TYPES, IM_ARRAYSIZE(NOISE_TYPES));
+	ImGui::DragFloat("Noise Frequency", &terrainSettings_.noiseFrequency, 0.001f, 0.0f, 5.0f);
+	ImGui::Combo("Fractal Noise Type", &terrainSettings_.fractalType, FRACTAL_TYPES, IM_ARRAYSIZE(FRACTAL_TYPES));
+	ImGui::DragInt("Fractal Octaves", &terrainSettings_.fractalOctaves, 0.01f, 0, 100);
+	ImGui::DragFloat("Fractal Lacunarity", &terrainSettings_.fractalLacunarity, 0.001f, 0.0f, 5.0f);
+	ImGui::DragFloat("Fractal Gain", &terrainSettings_.fractalGain, 0.001f, 0.0f, 5.0f);
+	ImGui::Combo("Perturb Type", &terrainSettings_.perturbType, PERTURB_TYPES, IM_ARRAYSIZE(PERTURB_TYPES));
+	ImGui::Text("Press G to generate new terrain");
+	ImGui::End();
+
+	ImGui::SetNextWindowSize(ImVec2(300, 100), ImGuiCond_FirstUseEver);
+	ImGui::Begin("Colour Generation", nullptr);
+	ImGui::DragInt("Seed", &colourSettings_.seed, 0.1f, 0, 9999999);
+	ImGui::Combo("Noise Type", &colourSettings_.noiseType, NOISE_TYPES, IM_ARRAYSIZE(NOISE_TYPES));
+	ImGui::DragFloat("Noise Frequency", &colourSettings_.noiseFrequency, 0.001f, 0.0f, 5.0f);
+	ImGui::Combo("Fractal Noise Type", &colourSettings_.fractalType, FRACTAL_TYPES, IM_ARRAYSIZE(FRACTAL_TYPES));
+	ImGui::DragInt("Fractal Octaves", &colourSettings_.fractalOctaves, 0.01f, 0, 100);
+	ImGui::DragFloat("Fractal Lacunarity", &colourSettings_.fractalLacunarity, 0.001f, 0.0f, 5.0f);
+	ImGui::DragFloat("Fractal Gain", &colourSettings_.fractalGain, 0.001f, 0.0f, 5.0f);
+	ImGui::Combo("Perturb Type", &colourSettings_.perturbType, PERTURB_TYPES, IM_ARRAYSIZE(PERTURB_TYPES));
+	ImGui::Text("Press G to generate new terrain");
+	ImGui::End();
 }

@@ -1,11 +1,13 @@
 #pragma once
+#include <array>
+#include <memory>
 #include <vector>
 #include <imgui/imgui.h>
 
 #include "Engine/Core/Sfinae.h"
-#include "Engine/Entities/QbEntityDefs.h"
 #include "Engine/Entities/ComponentSystem.h"
 #include "Engine/Entities/EntityManager.h"
+#include "Engine/Entities/QbEntityDefs.h"
 
 namespace Quadbit {
 	template <class S>
@@ -17,8 +19,8 @@ namespace Quadbit {
 		std::array<std::unique_ptr<ComponentSystem>, MAX_SYSTEMS> systems_;
 
 		void Shutdown() {
-			for (auto&& system : systems_) {
-				system.reset();
+			for (int i = 0; i < systemCount_; i++) {
+				systems_[i].reset();
 			}
 		}
 

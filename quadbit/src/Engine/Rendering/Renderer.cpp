@@ -2,27 +2,61 @@
 #define STB_IMAGE_IMPLEMENTATION
 #define TINYOBJLOADER_IMPLEMENTATION
 
-#include "QbVkRenderer.h"
+#include "Renderer.h"
 
 #include "Engine/Core/Time.h"
-#include "Engine/Core/QbRenderDefs.h"
-#include "Engine/Core/QbVulkanInternalDefs.h"
-#include "Engine/Global/ImGuiState.h"
 #include "Engine/Entities/EntityManager.h"
 #include "Engine/Entities/SystemDispatch.h"
-#include "Engine/Rendering/QbVkUtils.h"
-#include "Engine/Rendering/Memory/QbVkAllocator.h"
+#include "Engine/Rendering/RenderTypes.h"
+#include "Engine/Rendering/VulkanUtils.h"
+#include "Engine/Rendering/Memory/Allocator.h"
 #include "Engine/Rendering/Pipelines/ComputePipeline.h"
 #include "Engine/Rendering/Pipelines/MeshPipeline.h"
 #include "Engine/Rendering/Pipelines/ImGuiPipeline.h"
 
 
+#ifndef NDEBUG
+inline constexpr int VALIDATION_LAYER_COUNT = 1;
+inline constexpr const char* VALIDATION_LAYERS[VALIDATION_LAYER_COUNT]{
+	"VK_LAYER_KHRONOS_validation"
+};
+#else
+inline constexpr int VALIDATION_LAYER_COUNT = 0;
+inline constexpr const char* const* VALIDATION_LAYERS = nullptr;
+#endif
+
+// Add debug messenger callback extension for validation layer if in debug mode
+#ifndef NDEBUG
+inline constexpr int INSTANCE_EXT_COUNT = 3;
+inline constexpr const char* INSTANCE_EXT_NAMES[INSTANCE_EXT_COUNT]{
+	VK_KHR_SURFACE_EXTENSION_NAME,
+	VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
+	VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
+};
+#else
+inline constexpr int INSTANCE_EXT_COUNT = 2;
+inline constexpr const char* INSTANCE_EXT_NAMES[INSTANCE_EXT_COUNT]{
+	VK_KHR_SURFACE_EXTENSION_NAME,
+	VK_KHR_WIN32_SURFACE_EXTENSION_NAME
+};
+#endif
+
+inline constexpr int DEVICE_EXT_COUNT = 1;
+inline constexpr const char* DEVICE_EXT_NAMES[DEVICE_EXT_COUNT]{
+	VK_KHR_SWAPCHAIN_EXTENSION_NAME
+};
+
 namespace Quadbit {
-	QbVkRenderer::QbVkRenderer(HINSTANCE hInstance, HWND hwnd) :
-		localHandle_(hInstance),
-		windowHandle_(hwnd),
-		entityManager_(EntityManager::Instance()),
-		context_(std::make_unique<QbVkContext>()) {
+	QbVkRenderer& QbVkRenderer::Instance() {
+		static QbVkRenderer renderer;
+		return renderer;
+	}
+
+	void QbVkRenderer::Init(HINSTANCE hInstance, HWND hwnd) {
+		localHandle_ = hInstance;
+		windowHandle_ = hwnd;
+		context_ = std::make_unique<QbVkContext>();
+
 		// REMEMBER: Order matters as some functions depend on member variables being initialized.
 		CreateInstance();
 #ifndef NDEBUG
@@ -54,7 +88,7 @@ namespace Quadbit {
 		computePipeline_ = std::make_unique<ComputePipeline>(*context_);
 	}
 
-	QbVkRenderer::~QbVkRenderer() {
+	void QbVkRenderer::Shutdown() {
 		// We need to start off by waiting for the GPU to be idle
 		VK_CHECK(vkDeviceWaitIdle(context_->device));
 
@@ -117,8 +151,6 @@ namespace Quadbit {
 
 		// Destroy instance
 		vkDestroyInstance(instance_, nullptr);
-
-		entityManager_.Shutdown();
 	}
 
 	void QbVkRenderer::DrawFrame() {
@@ -751,20 +783,24 @@ namespace Quadbit {
 	}
 
 	void QbVkRenderer::ImGuiUpdateContent() {
-		ImGui::NewFrame();
 
 		imGuiPipeline_->ImGuiDrawState();
 		EntityManager::Instance().systemDispatch_->ImGuiDrawState();
 		context_->allocator->ImGuiDrawState();
 		computePipeline_->ImGuiDrawState();
 
+		// Any ImGui draw commands before this call will be rendered to the screen
+		// this also means user-code as Game->Simulate() is done before rendering 
+		// each frame
+		ImGui::Render();
+
+
 		// Get injected ImGui commands from the global state
-		for (const auto& injector : ImGuiState::injectors) {
-			injector();
-		}
+		//for (const auto& injector : ImGuiState::injectors) {
+			//injector();
+		//}
 
 		// Render to generate draw buffers
-		ImGui::Render();
 	}
 
 	void QbVkRenderer::PrepareFrame(uint32_t resourceIndex, VkCommandBuffer commandbuffer, VkFramebuffer& framebuffer, VkImageView imageView) {

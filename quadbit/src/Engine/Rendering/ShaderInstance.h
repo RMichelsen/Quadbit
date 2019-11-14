@@ -3,7 +3,7 @@
 #include <vulkan/vulkan.h>
 #include <vector>
 
-#include "Engine/Core/QbVulkanDefs.h"
+#include "Engine/Rendering/VulkanTypes.h"
 
 namespace Quadbit {
 	class QbVkShaderInstance {

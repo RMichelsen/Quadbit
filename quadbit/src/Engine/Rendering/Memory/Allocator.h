@@ -1,8 +1,8 @@
 #pragma once
 #include <forward_list>
 
-#include "Engine/Core/QbVulkanDefs.h"
-#include "Engine/Rendering/Memory/QbVkPool.h"
+#include "Engine/Rendering/VulkanTypes.h"
+#include "Engine/Rendering/Memory/Pool.h"
 
 namespace Quadbit {
 	class QbVkAllocator {

@@ -2,9 +2,9 @@
 #include <functional>
 #include <unordered_set>
 
-#include "Engine/Rendering/QbVkShaderInstance.h"
-#include "Engine/Core/QbRenderDefs.h"
-#include "Engine/Core/QbVulkanDefs.h"
+#include "Engine/Rendering/ShaderInstance.h"
+#include "Engine/Rendering/RenderTypes.h"
+#include "Engine/Rendering/VulkanTypes.h"
 
 namespace Quadbit {
 	// Forward declarations
@@ -16,8 +16,10 @@ namespace Quadbit {
 
 	class QbVkRenderer {
 	public:
-		QbVkRenderer(HINSTANCE hInstance, HWND hwnd);
-		~QbVkRenderer();
+		static QbVkRenderer& Instance();
+
+		void Init(HINSTANCE hInstance, HWND hwnd);
+		void Shutdown();
 
 		// General
 		void DrawFrame();
@@ -90,8 +92,6 @@ namespace Quadbit {
 
 		HINSTANCE localHandle_ = NULL;
 		HWND windowHandle_ = NULL;
-
-		EntityManager& entityManager_;
 
 		VkInstance instance_ = VK_NULL_HANDLE;
 		std::unique_ptr<QbVkContext> context_;

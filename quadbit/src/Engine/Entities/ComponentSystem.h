@@ -12,6 +12,8 @@ namespace Quadbit {
 			tStart = std::chrono::time_point_cast<std::chrono::nanoseconds>(clock::now());
 		}
 
+		virtual ~ComponentSystem() {}
+
 		void UpdateStart() {
 			tStart = clock::now();
 		}

@@ -44,9 +44,13 @@ namespace Quadbit {
 	}
 
 	void EntityManager::Destroy(const Entity& entity) {
+		// Destroy component pools one by one
 		for (auto&& pool : componentPools_) {
-			if (pool == nullptr) break;
-			pool->RemoveIfExists(entity.id_);
+			// We can break at the first null-pointer since component pools
+			// cannot be unregistered (destroyed) at runtime and thus when we
+			// encounter a nullptr, no pools are left in the array.
+			if (pool.sparseSet == nullptr) break;
+			pool.RemoveIfExists(pool.sparseSet, entity.id_);
 		}
 
 		// Remove by swap and pop

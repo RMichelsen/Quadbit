@@ -3,12 +3,12 @@
 #include <tiny_obj_loader.h>
 
 #include "Engine/Core/Time.h"
-#include "Engine/Core/QbVulkanDefs.h"
-#include "Engine/Core/QbRenderDefs.h"
+#include "Engine/Rendering/VulkanTypes.h"
+#include "Engine/Rendering/RenderTypes.h"
 #include "Engine/Entities/ComponentSystem.h"
 #include "Engine/Entities/SystemDispatch.h"
 #include "Engine/Entities/EntityManager.h"
-#include "Engine/Rendering/QbVkUtils.h"
+#include "Engine/Rendering/VulkanUtils.h"
 #include "Engine/Rendering/Systems/NoClipCameraSystem.h"
 #include "Engine/Rendering/ShaderBytecode.h"
 

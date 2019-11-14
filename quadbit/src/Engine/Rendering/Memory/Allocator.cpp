@@ -1,9 +1,9 @@
-#include "QbVkAllocator.h"
+#include "Allocator.h"
 
 #include <imgui/imgui.h>
 
-#include "Engine/Core/QbVulkanDefs.h"
-#include "Engine/Rendering/QbVkUtils.h"
+#include "Engine/Rendering/VulkanTypes.h"
+#include "Engine/Rendering/VulkanUtils.h"
 
 constexpr int DEFAULT_DEVICE_LOCAL_POOLSIZE = 256 * 1024 * 1024;
 constexpr int DEFAULT_HOST_VISIBLE_POOLSIZE = 128 * 1024 * 1024;

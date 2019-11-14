@@ -5,7 +5,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 project(Water LANGUAGES CXX)
 
 add_executable(Water WIN32
-    src/Main.cpp
     src/Water.cpp
     )
 

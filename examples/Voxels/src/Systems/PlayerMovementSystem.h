@@ -6,7 +6,7 @@
 
 #include "Engine/Entities/EntityManager.h"
 #include "Engine/Entities/ComponentSystem.h"
-#include "Engine/Rendering/QbVkRenderer.h"
+#include "Engine/Rendering/Renderer.h"
 
 #include "../Data/Components.h"
 

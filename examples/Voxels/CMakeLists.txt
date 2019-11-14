@@ -7,7 +7,6 @@ project(Voxels LANGUAGES CXX)
 add_subdirectory(src/Extern/FastNoiseSIMD)
 
 add_executable(Voxels WIN32
-    src/Main.cpp
     src/Infinitum.cpp
     )
 

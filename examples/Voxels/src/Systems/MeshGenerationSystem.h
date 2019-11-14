@@ -5,7 +5,7 @@
 #include "../Utils/TerrainTools.h"
 #include "../Utils/VoxelMesher.h"
 
-#include "Engine/Rendering/QbVkRenderer.h"
+#include "Engine/Rendering/Renderer.h"
 #include "Engine/Entities/EntityManager.h"
 
 

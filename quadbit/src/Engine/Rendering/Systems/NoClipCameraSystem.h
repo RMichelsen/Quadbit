@@ -5,7 +5,7 @@
 #include <glm/vec3.hpp>
 
 #include "Engine/Application/InputHandler.h"
-#include "Engine/Core/QbRenderDefs.h"
+#include "Engine/Rendering/RenderTypes.h"
 #include "Engine/Entities/EntityManager.h"
 #include "Engine/Entities/ComponentSystem.h"
 

@@ -1,6 +1,7 @@
 #include "Window.h"
 
 #include <windowsx.h>
+#include <imgui/imgui.h>
 
 #include "Engine/Application/InputHandler.h"
 #include "Engine/Core/Time.h"
@@ -33,6 +34,8 @@ namespace Quadbit {
 	}
 
 	bool Window::ProcessMessages() {
+		// Start a new ImGui frame
+		ImGui::NewFrame();
 		Time::UpdateTimer();
 		InputHandler::Instance().NewFrame();
 		MSG msg;

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Engine/Core/QbInputDefs.h"
+#include "Engine/Application/QbInputDefs.h"
 
 namespace Quadbit {
 	class InputHandler {

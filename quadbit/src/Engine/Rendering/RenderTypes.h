@@ -10,7 +10,7 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/quaternion.hpp>
 
-#include "Engine/Core/QbVulkanDefs.h"
+#include "Engine/Rendering/VulkanTypes.h"
 #include "Engine/Core/Logging.h"
 
 inline constexpr int MAX_MESH_COUNT = 65536;

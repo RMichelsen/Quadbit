@@ -4,10 +4,10 @@
 #include <vector>
 #include <deque>
 
-#include "Engine/Rendering/QbVkShaderInstance.h"
-#include "Engine/Core/QbRenderDefs.h"
-#include "Engine/Core/QbVulkanDefs.h"
 #include "Engine/Entities/EntityManager.h"
+#include "Engine/Rendering/ShaderInstance.h"
+#include "Engine/Rendering/RenderTypes.h"
+#include "Engine/Rendering/VulkanTypes.h"
 
 namespace Quadbit {
 	class MeshPipeline {
