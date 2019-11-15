@@ -47,15 +47,18 @@ inline constexpr const char* DEVICE_EXT_NAMES[DEVICE_EXT_COUNT]{
 };
 
 namespace Quadbit {
-	QbVkRenderer& QbVkRenderer::Instance() {
-		static QbVkRenderer renderer;
-		return renderer;
-	}
+	//QbVkRenderer& QbVkRenderer::Instance() {
+	//	static QbVkRenderer renderer;
+	//	return renderer;
+	//}
 
-	void QbVkRenderer::Init(HINSTANCE hInstance, HWND hwnd) {
-		localHandle_ = hInstance;
-		windowHandle_ = hwnd;
-		context_ = std::make_unique<QbVkContext>();
+	QbVkRenderer::QbVkRenderer(HINSTANCE hInstance, HWND hwnd, InputHandler* inputHandler, EntityManager* entityManager) :
+	    localHandle_(hInstance), 
+		windowHandle_(hwnd), 
+		context_(std::make_unique<QbVkContext>()) {
+
+		context_->inputHandler = inputHandler;
+		context_->entityManager = entityManager;
 
 		// REMEMBER: Order matters as some functions depend on member variables being initialized.
 		CreateInstance();
@@ -88,7 +91,7 @@ namespace Quadbit {
 		computePipeline_ = std::make_unique<ComputePipeline>(*context_);
 	}
 
-	void QbVkRenderer::Shutdown() {
+	QbVkRenderer::~QbVkRenderer() {
 		// We need to start off by waiting for the GPU to be idle
 		VK_CHECK(vkDeviceWaitIdle(context_->device));
 
@@ -308,7 +311,7 @@ namespace Quadbit {
 	}
 
 	void QbVkRenderer::RegisterCamera(Entity entity) {
-		if (!entity.HasComponent<RenderCamera>()) {
+		if(!context_->entityManager->HasComponent<RenderCamera>(entity)) {
 			QB_LOG_ERROR("Cannot register camera: Entity must have the Quadbit::RenderCamera component\n");
 			return;
 		}
@@ -785,7 +788,7 @@ namespace Quadbit {
 	void QbVkRenderer::ImGuiUpdateContent() {
 
 		imGuiPipeline_->ImGuiDrawState();
-		EntityManager::Instance().systemDispatch_->ImGuiDrawState();
+		context_->entityManager->systemDispatch_->ImGuiDrawState();
 		context_->allocator->ImGuiDrawState();
 		computePipeline_->ImGuiDrawState();
 
@@ -793,14 +796,6 @@ namespace Quadbit {
 		// this also means user-code as Game->Simulate() is done before rendering 
 		// each frame
 		ImGui::Render();
-
-
-		// Get injected ImGui commands from the global state
-		//for (const auto& injector : ImGuiState::injectors) {
-			//injector();
-		//}
-
-		// Render to generate draw buffers
 	}
 
 	void QbVkRenderer::PrepareFrame(uint32_t resourceIndex, VkCommandBuffer commandbuffer, VkFramebuffer& framebuffer, VkImageView imageView) {

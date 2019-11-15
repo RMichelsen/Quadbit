@@ -1,5 +1,7 @@
 #include "ImGuiPipeline.h"
 
+#include <imgui/imgui.h>
+
 #include "Engine/Application/InputHandler.h"
 #include "Engine/Core/Time.h"
 #include "Engine/Entities/EntityManager.h"
@@ -338,13 +340,7 @@ namespace Quadbit {
 	}
 
 	void ImGuiPipeline::ImGuiDrawState() {
-		auto& inputHandler = InputHandler::Instance();
-		ImGuiIO& io = ImGui::GetIO();
-		io.DeltaTime = Time::deltaTime;
 		frametimeCache_.push_back(Time::deltaTime);
-		io.MousePos = ImVec2(static_cast<float>(inputHandler.mousePos_.x), static_cast<float>(inputHandler.mousePos_.y));
-		io.MouseDown[0] = inputHandler.mouseButtonActive_.left;
-		io.MouseDown[1] = inputHandler.mouseButtonActive_.right;
 
 		static auto tStart = std::chrono::time_point_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now());
 		auto tEnd = std::chrono::high_resolution_clock::now();

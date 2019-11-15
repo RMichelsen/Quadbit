@@ -4,21 +4,20 @@
 namespace Quadbit {
 	Entity::Entity() : id_(0, 1) {}
 
-	void Entity::Destroy() {
-		EntityManager::Instance().Destroy(*this);
-	}
-
-	bool Entity::IsValid() {
-		return id_.version == EntityManager::Instance().GetEntityVersion(id_);
-	}
-
 	EntityManager::EntityManager() {
-		systemDispatch_ = std::make_unique<SystemDispatch>();
+		systemDispatch_ = std::make_unique<SystemDispatch>(this);
 	}
 
-	EntityManager& EntityManager::Instance() {
-		static EntityManager instance;
-		return instance;
+	EntityManager::~EntityManager() {
+		systemDispatch_->Shutdown();
+		systemDispatch_.reset();
+		for (auto&& pool : componentPools_) {
+			// We can break at the first null-pointer since component pools
+			// cannot be unregistered (destroyed) at runtime and thus when we
+			// encounter a nullptr, no pools are left in the array.
+			if (pool.get() == nullptr) break;
+			pool.reset();
+		}
 	}
 
 	Entity EntityManager::Create() {
@@ -66,17 +65,5 @@ namespace Quadbit {
 
 	bool EntityManager::IsValid(const Entity& entity) {
 		return entity.id_.version == entityVersions_[entity.id_.index];
-	}
-
-	void EntityManager::Shutdown() {
-		systemDispatch_->Shutdown();
-		systemDispatch_.reset();
-		for (auto&& pool : componentPools_) {
-			// We can break at the first null-pointer since component pools
-			// cannot be unregistered (destroyed) at runtime and thus when we
-			// encounter a nullptr, no pools are left in the array.
-			if (pool.get() == nullptr) break;
-			pool.reset();
-		}
 	}
 }

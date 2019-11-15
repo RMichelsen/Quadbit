@@ -5,9 +5,7 @@
 #include <imgui/imgui.h>
 
 #include "Engine/Core/Sfinae.h"
-#include "Engine/Entities/ComponentSystem.h"
 #include "Engine/Entities/EntityManager.h"
-#include "Engine/Entities/EntityTypes.h"
 
 namespace Quadbit {
 	template <class S>
@@ -15,8 +13,11 @@ namespace Quadbit {
 
 	class SystemDispatch {
 	public:
+		EntityManager* const entityManager_;
 		std::size_t systemCount_ = 0;
 		std::array<std::unique_ptr<ComponentSystem>, MAX_SYSTEMS> systems_;
+
+		SystemDispatch(EntityManager* const entityManager) : entityManager_(entityManager) {}
 
 		void Shutdown() {
 			for (int i = 0; i < systemCount_; i++) {
@@ -29,6 +30,7 @@ namespace Quadbit {
 			static_assert(std::is_base_of_v<ComponentSystem, S>, "All systems must inherit from ComponentSystem");
 			size_t systemID = SystemID::GetUnique<S>();
 			systems_[systemID] = std::make_unique<S>();
+			systems_[systemID]->entityManager_ = entityManager_;
 			systems_[systemID]->name = typeid(S).name();
 			if constexpr (SFINAE::is_detected_v<has_init, S>) {
 				reinterpret_cast<S*>(systems_[systemID].get())->Init();

@@ -45,4 +45,9 @@ namespace Quadbit {
 		bool operator == (const EntityID& other) const { return index == other.index; }
 		bool operator != (const EntityID& other) const { return index != other.index; }
 	};
+
+	struct ComponentPool {
+		virtual ~ComponentPool() {};
+		virtual void RemoveIfExists(EntityID id) = 0;
+	};
 }

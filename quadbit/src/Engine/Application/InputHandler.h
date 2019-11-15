@@ -16,7 +16,7 @@ namespace Quadbit {
 		KeyboardControlKeys controlKeysPressed_{};
 		unsigned char keyPressed_[0xFF];
 
-		static InputHandler& Instance();
+		//static InputHandler& Instance();
 		void NewFrame();
 		void ProcessRawInput(RAWINPUT* rawInput, HWND hwnd);
 	};

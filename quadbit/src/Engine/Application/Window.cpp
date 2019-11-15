@@ -22,6 +22,9 @@ namespace Quadbit {
 			QB_LOG_ERROR("Failed to register input devices\n");
 			return;
 		}
+
+		inputHandler_ = std::make_unique<InputHandler>();
+
 		if (!SetupConsole()) {
 			QB_LOG_ERROR("Failed to setup the console\n");
 			return;
@@ -36,8 +39,14 @@ namespace Quadbit {
 	bool Window::ProcessMessages() {
 		// Start a new ImGui frame
 		ImGui::NewFrame();
+		ImGuiIO& io = ImGui::GetIO();
+		io.DeltaTime = Time::deltaTime;
+		io.MousePos = ImVec2(static_cast<float>(inputHandler_->mousePos_.x), static_cast<float>(inputHandler_->mousePos_.y));
+		io.MouseDown[0] = inputHandler_->mouseButtonActive_.left;
+		io.MouseDown[1] = inputHandler_->mouseButtonActive_.right;
+
 		Time::UpdateTimer();
-		InputHandler::Instance().NewFrame();
+		inputHandler_->NewFrame();
 		MSG msg;
 		while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
 			TranslateMessage(&msg);
@@ -120,7 +129,7 @@ namespace Quadbit {
 				QB_LOG_ERROR("GetRawInputData didn't return correct size!\n");
 			}
 			else {
-				InputHandler::Instance().ProcessRawInput((RAWINPUT*)rawInput, window->hwnd_);
+				window->inputHandler_->ProcessRawInput((RAWINPUT*)rawInput, window->hwnd_);
 				delete[] rawInput;
 			}
 			break;
@@ -132,7 +141,7 @@ namespace Quadbit {
 		case WM_RBUTTONUP:
 		case WM_MBUTTONUP:
 		case WM_MOUSEMOVE:
-			InputHandler::Instance().mousePos_ = POINT{ GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
+			window->inputHandler_->mousePos_ = POINT{ GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
 		}
 		return DefWindowProc(hwnd, uMsg, wParam, lParam);
 	}

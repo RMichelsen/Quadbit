@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Engine/Entities/EntityManager.h"
-#include "Engine/Entities/ComponentSystem.h"
 
 #include <FastNoiseSIMD/FastNoiseSIMD.h>
 
@@ -12,9 +11,7 @@
 
 struct VoxelGenerationSystem : Quadbit::ComponentSystem {
 	void Update(float dt, FastNoiseSIMD* fastnoiseTerrain, FastNoiseSIMD* fastnoiseRegion, FastNoiseSIMD* fastnoiseColours) {
-		auto& entityManager = Quadbit::EntityManager::Instance();
-
-		entityManager.ParForEachAddTag<Quadbit::RenderTransformComponent, VoxelBlockComponent, VoxelBlockUpdateTag>
+		entityManager_->ParForEachAddTag<Quadbit::RenderTransformComponent, VoxelBlockComponent, VoxelBlockUpdateTag>
 			([&](Quadbit::Entity entity, Quadbit::RenderTransformComponent& transform, VoxelBlockComponent& block, auto& tag) {
 			auto& voxels = block.voxels;
 

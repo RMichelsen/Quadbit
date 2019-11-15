@@ -161,7 +161,12 @@ namespace Quadbit {
 	};
 
 	class QbVkAllocator;
+	class EntityManager;
+	class InputHandler;
 	struct QbVkContext {
+		InputHandler* inputHandler;
+		EntityManager* entityManager;
+
 		std::unique_ptr<GPU> gpu;
 		std::unique_ptr<QbVkAllocator> allocator;
 		VkDevice device = VK_NULL_HANDLE;

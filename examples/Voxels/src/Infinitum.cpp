@@ -5,6 +5,7 @@
 #include "Engine/Application/InputHandler.h"
 #include "Engine/Entities/EntityManager.h"
 #include "Engine/Rendering/Renderer.h"
+#include "Engine/Entities/SystemDispatch.h"
 
 #include "Data/Components.h"
 #include "Systems/VoxelGenerationSystem.h"
@@ -16,30 +17,28 @@
 
 void Infinitum::Init() {
 	// Setup entities
-	auto& entityManager = EntityManager::Instance();
-	auto& renderer = QbVkRenderer::Instance();
-	entityManager.RegisterComponents<VoxelBlockComponent, VoxelBlockUpdateTag, MeshGenerationUpdateTag, MeshReadyTag, PlayerTag>();
+	entityManager_->RegisterComponents<VoxelBlockComponent, VoxelBlockUpdateTag, MeshGenerationUpdateTag, MeshReadyTag, PlayerTag>();
 
-	renderer.LoadSkyGradient(glm::vec3(1.0f, 1.0f, 1.0f), glm::vec3(0.1f, 0.4f, 0.8f));
+	renderer_->LoadSkyGradient(glm::vec3(1.0f, 1.0f, 1.0f), glm::vec3(0.1f, 0.4f, 0.8f));
 
 	//camera_ = entityManager->Create();
 	//camera_.AddComponent<Quadbit::RenderCamera>(Quadbit::RenderCamera(0.0f, 0.0f, glm::vec3(), renderer->GetAspectRatio(), 10000.0f));
 	//renderer->RegisterCamera(camera_);
 
-	Quadbit::QbVkShaderInstance shaderInstance = renderer.CreateShaderInstance();
+	Quadbit::QbVkShaderInstance shaderInstance = renderer_->CreateShaderInstance();
 	shaderInstance.AddShader("Resources/Shaders/Compiled/voxel_vert.spv", "main", VK_SHADER_STAGE_VERTEX_BIT);
 	shaderInstance.AddShader("Resources/Shaders/Compiled/voxel_frag.spv", "main", VK_SHADER_STAGE_FRAGMENT_BIT);
 
-	renderMeshInstance_ = renderer.CreateRenderMeshInstance({
+	renderMeshInstance_ = renderer_->CreateRenderMeshInstance({
 		Quadbit::QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_POSITION,
 		Quadbit::QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_COLOUR
 		}, shaderInstance
 	);
 
-	player_ = entityManager.Create();
-	player_.AddComponent<Quadbit::RenderTransformComponent>(Quadbit::RenderTransformComponent(1.0f, glm::vec3(16.0f, 30.0f, 16.0f), glm::quat()));
-	player_.AddComponent<Quadbit::RenderMeshComponent>(renderer.CreateMesh(cubeVertices, sizeof(VoxelVertex), cubeIndices, renderMeshInstance_));
-	player_.AddComponent<PlayerTag>();
+	player_ = entityManager_->Create();
+	entityManager_->AddComponent<Quadbit::RenderTransformComponent>(player_, Quadbit::RenderTransformComponent(1.0f, glm::vec3(16.0f, 30.0f, 16.0f), glm::quat()));
+	entityManager_->AddComponent<Quadbit::RenderMeshComponent>(player_, renderer_->CreateMesh(cubeVertices, sizeof(VoxelVertex), cubeIndices, renderMeshInstance_));
+	entityManager_->AddComponent<PlayerTag>(player_);
 
 	uint32_t globalSeed = 4646;
 
@@ -68,25 +67,22 @@ void Infinitum::Init() {
 	// Spawn base
 	for(auto i = 0; i < VOXEL_BLOCK_WIDTH * 10; i += VOXEL_BLOCK_WIDTH) {
 		for(auto j = 0; j < VOXEL_BLOCK_WIDTH * 10; j += VOXEL_BLOCK_WIDTH) {
-			auto entity = entityManager.Create();
-			entity.AddComponent<Quadbit::RenderTransformComponent>(Quadbit::RenderTransformComponent(1.0f, glm::vec3(i, 0.0f, j), glm::quat()));
-			entity.AddComponents<VoxelBlockComponent, VoxelBlockUpdateTag>();
+			auto entity = entityManager_->Create();
+			entityManager_->AddComponent<Quadbit::RenderTransformComponent>(entity, Quadbit::RenderTransformComponent(1.0f, glm::vec3(i, 0.0f, j), glm::quat()));
+			entityManager_->AddComponents<VoxelBlockComponent, VoxelBlockUpdateTag>(entity);
 			chunks_.push_back(entity);
 		}
 	}
 }
 
 void Infinitum::Simulate(float deltaTime) {
-	auto& entityManager = EntityManager::Instance();
-	auto& renderer = QbVkRenderer::Instance();
+	entityManager_->systemDispatch_->RunSystem<VoxelGenerationSystem>(deltaTime, fastnoiseTerrain_, fastnoiseRegions_, fastnoiseColours_);
+	entityManager_->systemDispatch_->RunSystem<MeshGenerationSystem>(deltaTime, renderer_, renderMeshInstance_);
 
-	entityManager.systemDispatch_->RunSystem<VoxelGenerationSystem>(deltaTime, fastnoiseTerrain_, fastnoiseRegions_, fastnoiseColours_);
-	entityManager.systemDispatch_->RunSystem<MeshGenerationSystem>(deltaTime, &renderer, renderMeshInstance_);
-
-	if(Quadbit::InputHandler::Instance().keyPressed_[0x47]) {
+	if(input_->keyPressed_[0x47]) {
 		for(auto&& entity : chunks_) {
-			renderer.DestroyMesh(*entity.GetComponentPtr<RenderMeshComponent>());
-			entity.RemoveComponent<RenderMeshComponent>();
+			renderer_->DestroyMesh(*entityManager_->GetComponentPtr<RenderMeshComponent>(entity));
+			entityManager_->RemoveComponent<RenderMeshComponent>(entity);
 
 			fastnoiseTerrain_->SetSeed(terrainSettings_.seed);
 			fastnoiseTerrain_->SetNoiseType(static_cast<FastNoiseSIMD::NoiseType>(terrainSettings_.noiseType));
@@ -107,14 +103,11 @@ void Infinitum::Simulate(float deltaTime) {
 			fastnoiseColours_->SetFractalGain(colourSettings_.fractalGain);
 			fastnoiseColours_->SetPerturbType(static_cast<FastNoiseSIMD::PerturbType>(colourSettings_.perturbType));
 
-			entity.AddComponents<VoxelBlockUpdateTag>();
+			entityManager_->AddComponent<VoxelBlockUpdateTag>(entity);
 		}
 	}
-}
 
-void Infinitum::DrawFrame() {
 	DrawImGui();
-	Quadbit::QbVkRenderer::Instance().DrawFrame();
 }
 
 void Infinitum::DrawImGui() {

@@ -6,12 +6,15 @@
 #include "Engine/Rendering/Renderer.h"
 
 int __stdcall WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nCmdShow) {
-	// Make a window
 	auto window = std::make_unique<Quadbit::Window>(hInstance, nCmdShow);
-	// Init the renderer
-	Quadbit::QbVkRenderer::Instance().Init(hInstance, window->hwnd_);
+	auto entityManager = std::make_unique<Quadbit::EntityManager>();
+	auto renderer = std::make_unique<Quadbit::QbVkRenderer>(hInstance, window->hwnd_, window->inputHandler_.get(), entityManager.get());
 
 	auto* game = Quadbit::CreateGame();
+	game->input_ = window->inputHandler_.get();
+	game->entityManager_ = entityManager.get();
+	game->renderer_ = renderer.get();
+
 	game->Init();
 	while (window->ProcessMessages()) {
 		// If the windows is minimized, skip rendering
@@ -21,12 +24,13 @@ int __stdcall WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		game->Simulate(Quadbit::Time::deltaTime);
 
 		// Render the frame
-		Quadbit::QbVkRenderer::Instance().DrawFrame();
+		renderer->DrawFrame();
 	}
 
 	delete game;
-	Quadbit::QbVkRenderer::Instance().Shutdown();
-	Quadbit::EntityManager::Instance().Shutdown();
+
+	renderer.reset();
+	entityManager.reset();
 	window.reset();
 	
 	return 0;

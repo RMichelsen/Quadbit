@@ -3,11 +3,10 @@
 #include "InputHandler.h"
 
 namespace Quadbit {
-	InputHandler& InputHandler::Instance() {
-		static InputHandler instance;
-		return instance;
-	}
-
+	//InputHandler& InputHandler::Instance() {
+	//	static InputHandler instance;
+	//	return instance;
+	//}
 	void InputHandler::NewFrame() {
 		// Reset per-frame key/button press
 		memset(&mouseDelta_, 0, sizeof(MouseDelta));

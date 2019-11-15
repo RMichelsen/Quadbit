@@ -12,5 +12,5 @@ void Testing::Simulate(float deltaTime) {
 }
 
 void Testing::DrawFrame() {
-	Quadbit::QbVkRenderer::Instance().DrawFrame();
+	renderer_->DrawFrame();
 }

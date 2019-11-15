@@ -5,7 +5,6 @@
 #include <glm/vec3.hpp>
 
 #include "Engine/Entities/EntityManager.h"
-#include "Engine/Entities/ComponentSystem.h"
 #include "Engine/Rendering/Renderer.h"
 
 #include "../Data/Components.h"

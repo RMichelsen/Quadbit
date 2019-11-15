@@ -16,10 +16,9 @@ namespace Quadbit {
 
 	class QbVkRenderer {
 	public:
-		static QbVkRenderer& Instance();
-
-		void Init(HINSTANCE hInstance, HWND hwnd);
-		void Shutdown();
+		//static QbVkRenderer& Instance();
+		QbVkRenderer(HINSTANCE hInstance, HWND hwnd, InputHandler* const inputHandler, EntityManager* const entityManager);
+		~QbVkRenderer();
 
 		// General
 		void DrawFrame();

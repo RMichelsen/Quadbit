@@ -5,7 +5,6 @@
 #include "Engine/Core/Time.h"
 #include "Engine/Rendering/VulkanTypes.h"
 #include "Engine/Rendering/RenderTypes.h"
-#include "Engine/Entities/ComponentSystem.h"
 #include "Engine/Entities/SystemDispatch.h"
 #include "Engine/Entities/EntityManager.h"
 #include "Engine/Rendering/VulkanUtils.h"
@@ -14,15 +13,14 @@
 
 namespace Quadbit {
 	MeshPipeline::MeshPipeline(QbVkContext& context) :
-		context_(context),
-		entityManager_(EntityManager::Instance()) {
+		context_(context) {
 
 		// Register the mesh component to be used by the ECS
-		entityManager_.RegisterComponents<RenderMeshComponent, RenderTexturedObjectComponent, RenderTransformComponent,
+		context.entityManager->RegisterComponents<RenderMeshComponent, RenderTexturedObjectComponent, RenderTransformComponent,
 			RenderMeshDeleteComponent, RenderCamera, CameraUpdateAspectRatioTag>();
 
-		fallbackCamera_ = entityManager_.Create();
-		fallbackCamera_.AddComponent<RenderCamera>(Quadbit::RenderCamera(145.0f, -42.0f, glm::vec3(130.0f, 190.0f, 25.0f), 16.0f / 9.0f, 10000.0f));
+		fallbackCamera_ = context.entityManager->Create();
+		context.entityManager->AddComponent<RenderCamera>(fallbackCamera_, Quadbit::RenderCamera(145.0f, -42.0f, glm::vec3(130.0f, 190.0f, 25.0f), 16.0f / 9.0f, 10000.0f));
 
 		CreateDescriptorPoolAndLayout();
 		CreatePipeline();
@@ -56,8 +54,8 @@ namespace Quadbit {
 		vkDestroyPipelineLayout(context_.device, pipelineLayout_, nullptr);
 		vkDestroyPipeline(context_.device, pipeline_, nullptr);
 
-		fallbackCamera_.AddComponent<CameraUpdateAspectRatioTag>();
-		if (userCamera_ != NULL_ENTITY && userCamera_.IsValid()) userCamera_.AddComponent<CameraUpdateAspectRatioTag>();
+		context_.entityManager->AddComponent<CameraUpdateAspectRatioTag>(fallbackCamera_);
+		if (userCamera_ != NULL_ENTITY && context_.entityManager->IsValid(userCamera_)) context_.entityManager->AddComponent<CameraUpdateAspectRatioTag>(userCamera_);
 
 		// Create new pipeline
 		CreatePipeline();
@@ -65,7 +63,7 @@ namespace Quadbit {
 
 	void MeshPipeline::DrawFrame(uint32_t resourceIndex, VkCommandBuffer commandbuffer) {
 		// Here we clean up meshes that are due for removal
-		entityManager_.ForEachWithCommandBuffer<RenderMeshDeleteComponent>([&](Entity entity, EntityCommandBuffer* cmdBuf, RenderMeshDeleteComponent& mesh) noexcept {
+		context_.entityManager->ForEachWithCommandBuffer<RenderMeshDeleteComponent>([&](Entity entity, EntityCommandBuffer* cmdBuf, RenderMeshDeleteComponent& mesh) noexcept {
 			if (mesh.count == 0) {
 				DestroyVertexBuffer(mesh.vertexHandle);
 				DestroyIndexBuffer(mesh.indexHandle);
@@ -76,22 +74,24 @@ namespace Quadbit {
 			}
 			});
 
-		entityManager_.ForEach<RenderCamera, CameraUpdateAspectRatioTag>([&](Entity entity, auto& camera, auto& tag) noexcept {
+		context_.entityManager->ForEach<RenderCamera, CameraUpdateAspectRatioTag>([&](Entity entity, auto& camera, auto& tag) noexcept {
 			camera.perspective =
 				glm::perspective(glm::radians(45.0f), static_cast<float>(context_.swapchain.extent.width) / static_cast<float>(context_.swapchain.extent.height), 0.1f, camera.viewDistance);
 			camera.perspective[1][1] *= -1;
 			});
 
-		if (userCamera_ == NULL_ENTITY || !userCamera_.IsValid()) {
-			entityManager_.systemDispatch_->RunSystem<NoClipCameraSystem>(Time::deltaTime);
+		if (userCamera_ == NULL_ENTITY || !context_.entityManager->IsValid(userCamera_)) {
+			context_.entityManager->systemDispatch_->RunSystem<NoClipCameraSystem>(Time::deltaTime, context_.inputHandler);
 		}
 
 		Quadbit::RenderCamera* camera;
-		(userCamera_ != NULL_ENTITY && userCamera_.IsValid()) ? camera = userCamera_.GetComponentPtr<RenderCamera>() : camera = fallbackCamera_.GetComponentPtr<RenderCamera>();
+		(userCamera_ != NULL_ENTITY && context_.entityManager->IsValid(userCamera_)) ? 
+			camera = context_.entityManager->GetComponentPtr<RenderCamera>(userCamera_) : 
+			camera = context_.entityManager->GetComponentPtr<RenderCamera>(fallbackCamera_);
 
 		// Update environment map if applicable, use camera stuff to do this
 		if (environmentMap_ != NULL_ENTITY) {
-			auto mesh = environmentMap_.GetComponentPtr<Quadbit::RenderMeshComponent>();
+			auto mesh = context_.entityManager->GetComponentPtr<Quadbit::RenderMeshComponent>(environmentMap_);
 			EnvironmentMapPushConstants* pc = mesh->GetSafePushConstPtr<EnvironmentMapPushConstants>();
 			pc->proj = camera->perspective;
 			pc->proj[1][1] *= -1;
@@ -114,7 +114,8 @@ namespace Quadbit {
 
 		VkDeviceSize offsets[]{ 0 };
 
-		entityManager_.ForEach<RenderTexturedObjectComponent, RenderTransformComponent>([&](Entity entity, RenderTexturedObjectComponent& obj, RenderTransformComponent& transform) noexcept {
+		context_.entityManager->ForEach<RenderTexturedObjectComponent, RenderTransformComponent>(
+			[&](Entity entity, RenderTexturedObjectComponent& obj, RenderTransformComponent& transform) noexcept {
 			if (!VkUtils::QueryAsyncBuffer(context_, meshBuffers_.vertexBuffers_[obj.vertexHandle]) ||
 				!VkUtils::QueryAsyncBuffer(context_, meshBuffers_.indexBuffers_[obj.indexHandle])) return;
 
@@ -137,7 +138,8 @@ namespace Quadbit {
 			vkCmdDrawIndexed(commandbuffer, obj.indexCount, 1, 0, 0, 0);
 			});
 
-		entityManager_.ForEach<RenderMeshComponent, RenderTransformComponent>([&](Entity entity, RenderMeshComponent& mesh, RenderTransformComponent& transform) noexcept {
+		context_.entityManager->ForEach<RenderMeshComponent, RenderTransformComponent>(
+			[&](Entity entity, RenderMeshComponent& mesh, RenderTransformComponent& transform) noexcept {
 			if (!VkUtils::QueryAsyncBuffer(context_, meshBuffers_.vertexBuffers_[mesh.vertexHandle]) ||
 				!VkUtils::QueryAsyncBuffer(context_, meshBuffers_.indexBuffers_[mesh.indexHandle])) return;
 
@@ -343,8 +345,8 @@ namespace Quadbit {
 	}
 
 	void MeshPipeline::DestroyMesh(RenderMeshComponent& renderMeshComponent) {
-		auto entity = entityManager_.Create();
-		entity.AddComponent<RenderMeshDeleteComponent>({ renderMeshComponent.vertexHandle, renderMeshComponent.indexHandle, MAX_FRAMES_IN_FLIGHT });
+		context_.entityManager->AddComponent<RenderMeshDeleteComponent>(context_.entityManager->Create(), 
+			{ renderMeshComponent.vertexHandle, renderMeshComponent.indexHandle, MAX_FRAMES_IN_FLIGHT });
 	}
 
 	void MeshPipeline::DestroyVertexBuffer(VertexBufHandle handle) {
@@ -704,8 +706,8 @@ namespace Quadbit {
 			6, 7, 3
 		};
 
-		environmentMap_ = EntityManager::Instance().Create();
-		environmentMap_.AddComponent<RenderMeshComponent>({
+		environmentMap_ = context_.entityManager->Create();
+		context_.entityManager->AddComponent<RenderMeshComponent>(environmentMap_, {
 			CreateVertexBuffer(cubeVertices.data(), sizeof(SkyGradientVertex), static_cast<uint32_t>(cubeVertices.size())),
 			CreateIndexBuffer(cubeIndices),
 			static_cast<uint32_t>(cubeIndices.size()),
@@ -713,6 +715,7 @@ namespace Quadbit {
 			sizeof(EnvironmentMapPushConstants),
 			instance
 			});
-		environmentMap_.AddComponent<Quadbit::RenderTransformComponent>(Quadbit::RenderTransformComponent(1.0f, { 0.0f, 0.0f, 0.0f }, { 0, 0, 0, 1 }));
+		context_.entityManager->AddComponent<Quadbit::RenderTransformComponent>(environmentMap_, 
+			Quadbit::RenderTransformComponent(1.0f, { 0.0f, 0.0f, 0.0f }, { 0, 0, 0, 1 }));
 	}
 }

@@ -4,12 +4,11 @@
 #include <any>
 
 #include "Engine/Entities/EntityTypes.h"
-#include "Engine/Entities/SystemDispatch.h"
 #include "Engine/Entities/SparseSet.h"
 #include "Engine/Rendering/RenderTypes.h"
 
 namespace Quadbit {
-	class EntityManager;
+	class SystemDispatch;
 	struct Entity {
 		EntityID id_;
 
@@ -18,9 +17,6 @@ namespace Quadbit {
 
 		bool operator == (const Entity& other) const { return (id_ == other.id_); }
 		bool operator != (const Entity& other) const { return (id_ != other.id_); }
-
-		void Destroy();
-		bool IsValid();
 
 		template<typename T>
 		void AddComponent();
@@ -44,36 +40,6 @@ namespace Quadbit {
 
 	const Entity NULL_ENTITY{ {0xFFFF'FFFF, 0xFFFF'FFFF} };
 
-	struct EntityDestroyCommand {
-		Entity entity;
-
-		void Play() {
-			entity.Destroy();
-		}
-	};
-
-	struct EntityCommandBuffer {
-	public:
-		std::vector<EntityDestroyCommand> destroyBuffer_;
-
-		void DestroyEntity(Entity entity) {
-			EntityDestroyCommand destroyCmd;
-			destroyCmd.entity = entity;
-			destroyBuffer_.push_back(destroyCmd);
-		}
-
-		void PlayCommands() {
-			for (auto&& cmd : destroyBuffer_) {
-				cmd.Play();
-			}
-		}
-	};
-
-	struct ComponentPool {
-		virtual ~ComponentPool() {};
-		virtual void RemoveIfExists(EntityID id) = 0;
-	};
-
 	/*
 	Note on entity manager behaviour:
 	On release builds registering a component twice, adding a component twice
@@ -85,7 +51,9 @@ namespace Quadbit {
 		std::unique_ptr<SystemDispatch> systemDispatch_;
 		std::array<std::unique_ptr<ComponentPool>, MAX_COMPONENTS> componentPools_;
 
-		static EntityManager& Instance();
+		//static EntityManager& Instance();
+		EntityManager();
+		~EntityManager();
 
 		Entity Create();
 		void Destroy(const Entity& entity);
@@ -93,7 +61,7 @@ namespace Quadbit {
 		void Shutdown();
 
 		template<typename C>
-		SparseSet<C>* GetComponentStoragePtr() {
+		SparseSet<C>* GetComponentStoragePtr() const {
 			size_t componentID = ComponentID::GetUnique<C>();
 			return reinterpret_cast<SparseSet<C>*>(componentPools_[componentID].get());
 		}
@@ -101,19 +69,19 @@ namespace Quadbit {
 		template<typename C>
 		void RegisterComponent() {
 			size_t componentID = ComponentID::GetUnique<C>();
-			auto componentStorage = Instance().GetComponentStoragePtr<C>();
+			auto componentStorage = GetComponentStoragePtr<C>();
 			assert(componentStorage == nullptr && "Failed to register component: Component is already registered with the entity manager\n");
 			componentPools_[componentID] = std::make_unique<SparseSet<C>>();
 		}
 
-		template<typename... C>
+		template<typename... Cs>
 		void RegisterComponents() {
-			(RegisterComponent<C>(), ...);
+			(RegisterComponent<Cs>(), ...);
 		}
 
 		template<typename C>
 		void AddComponent(const Entity& entity) const {
-			auto* componentStorage = Instance().GetComponentStoragePtr<C>();
+			auto* componentStorage = GetComponentStoragePtr<C>();
 			assert(componentStorage != nullptr && "Failed to add component: Component isn't registered with the entity manager\n");
 			componentStorage->Insert(entity.id_);
 		}
@@ -121,24 +89,29 @@ namespace Quadbit {
 		// Aggregate initialization
 		template<typename C>
 		void AddComponent(const Entity& entity, C&& t) const {
-			auto* componentStorage = Instance().GetComponentStoragePtr<C>();
+			auto* componentStorage = GetComponentStoragePtr<C>();
 			assert(componentStorage != nullptr && "Failed to add component: Component isn't registered with the entity manager\n");
 			componentStorage->Insert(entity.id_, std::move(t));
 		}
 
+		template<typename... Cs>
+		void AddComponents(const Entity& entity) const {
+			(AddComponent<Cs>(entity), ...);
+		}
+
 		template<typename C>
 		C* const GetComponentPtr(const Entity& entity) const {
-			return Instance().GetComponentStoragePtr<C>()->GetComponentPtr(entity.id_);
+			return GetComponentStoragePtr<C>()->GetComponentPtr(entity.id_);
 		}
 
 		template<typename C>
 		bool HasComponent(const Entity& entity) const {
-			return Instance().GetComponentStoragePtr<C>()->HasComponent(entity.id_);
+			return GetComponentStoragePtr<C>()->HasComponent(entity.id_);
 		}
 
 		template<typename C>
 		void RemoveComponent(const Entity& entity) const {
-			auto* componentStorage = Instance().GetComponentStoragePtr<C>();
+			auto* componentStorage = GetComponentStoragePtr<C>();
 			assert(componentStorage != nullptr && "Failed to remove component: Component isn't registered with the entity manager\n");
 			componentStorage->Remove(entity.id_);
 		}
@@ -181,7 +154,7 @@ namespace Quadbit {
 				});
 
 			// Command buffer passed to the lambda, for recording commands that has to run after the for loop
-			EntityCommandBuffer commandBuffer;
+			EntityCommandBuffer commandBuffer(this);
 
 			for (auto entityIndex : smallest) {
 				const bool allValid = ((std::get<SparseSet<Components>*>(pools)->sparse_[entityIndex] != 0xFFFF'FFFF) && ...);
@@ -232,7 +205,7 @@ namespace Quadbit {
 				});
 
 			// Command buffer passed to the lambda, for recording commands that has to run after the for loop
-			EntityCommandBuffer commandBuffer;
+			EntityCommandBuffer commandBuffer(this);
 
 			std::for_each(std::execution::par, smallest.begin(), smallest.end(), [&](auto entityIndex) {
 				const bool allValid = ((std::get<SparseSet<Components>*>(pools)->sparse_[entityIndex] != 0xFFFF'FFFF) && ...);
@@ -315,12 +288,6 @@ namespace Quadbit {
 		// Holds free entity indices
 		std::deque<uint32_t> entityFreeList_;
 
-		// Constructor
-		EntityManager();
-		// Delete copy constructor and assignment operator
-		EntityManager(const EntityManager&) = delete;
-		EntityManager& operator= (const EntityManager&) = delete;
-
 		template<typename C>
 		SparseSet<C>* const GetPool() {
 			size_t componentID = ComponentID::GetUnique<C>();
@@ -351,46 +318,64 @@ namespace Quadbit {
 		template<typename C>
 		void RemoveTag(Entity entity) {
 			if constexpr (std::is_base_of_v<EventTagComponent, C>) {
-				entity.RemoveComponent<C>();
+				RemoveComponent<C>(entity);
 			}
 		}
 
 		template<typename C>
 		void AddTag(Entity entity) {
 			if constexpr (std::is_base_of_v<EventTagComponent, C>) {
-				entity.AddComponent<C>();
+				AddComponent<C>(entity);
 			}
 		}
 	};
 
-	template<typename T>
-	inline void Entity::AddComponent() {
-		EntityManager::Instance().AddComponent<T>(*this);
-	}
+	struct EntityDestroyCommand {
+		Entity entity;
 
-	// Aggregate initialization
-	template<typename T>
-	inline void Entity::AddComponent(T&& t) {
-		EntityManager::Instance().AddComponent<T>(*this, std::move(t));
-	}
+		void Play(EntityManager* const entityManager) {
+			entityManager->Destroy(entity);
+		}
+	};
 
-	template<typename... T>
-	inline void Entity::AddComponents() {
-		(EntityManager::Instance().AddComponent<T>(*this), ...);
-	}
+	struct EntityCommandBuffer {
+		EntityCommandBuffer(EntityManager* const entityManager) : entityManager_(entityManager) {}
 
-	template<typename T>
-	inline T* const Entity::GetComponentPtr() {
-		return EntityManager::Instance().GetComponentPtr<T>(*this);
-	}
+		EntityManager* const entityManager_;
+		std::vector<EntityDestroyCommand> destroyBuffer_;
 
-	template<typename T>
-	bool Entity::HasComponent() {
-		return EntityManager::Instance().HasComponent<T>(*this);
-	}
+		void DestroyEntity(Entity entity) {
+			EntityDestroyCommand destroyCmd;
+			destroyCmd.entity = entity;
+			destroyBuffer_.push_back(destroyCmd);
+		}
 
-	template<typename T>
-	inline void Entity::RemoveComponent() {
-		EntityManager::Instance().RemoveComponent<T>(*this);
-	}
+		void PlayCommands() {
+			for (auto&& cmd : destroyBuffer_) {
+				cmd.Play(entityManager_);
+			}
+		}
+	};
+
+	struct ComponentSystem {
+		using clock = std::chrono::high_resolution_clock;
+		float deltaTime = 0.0f;
+		std::chrono::time_point<clock> tStart;
+		const char* name = nullptr;
+
+		EntityManager* entityManager_;
+
+		virtual ~ComponentSystem() {}
+
+		void UpdateStart() {
+			tStart = clock::now();
+		}
+
+		void UpdateEnd() {
+			auto tEnd = clock::now();
+
+			// Update deltatime
+			deltaTime = static_cast<std::chrono::duration<float, std::ratio<1>>>(tEnd - tStart).count();
+		}
+	};
 }

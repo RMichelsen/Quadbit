@@ -5,8 +5,8 @@
 #include <deque>
 
 #include "Engine/Entities/EntityManager.h"
-#include "Engine/Rendering/ShaderInstance.h"
 #include "Engine/Rendering/RenderTypes.h"
+#include "Engine/Rendering/ShaderInstance.h"
 #include "Engine/Rendering/VulkanTypes.h"
 
 namespace Quadbit {
@@ -22,7 +22,6 @@ namespace Quadbit {
 		friend class QbVkRenderer;
 
 		QbVkContext& context_;
-		EntityManager& entityManager_;
 
 		VkPipelineLayout pipelineLayout_ = VK_NULL_HANDLE;
 		VkPipeline pipeline_ = VK_NULL_HANDLE;
