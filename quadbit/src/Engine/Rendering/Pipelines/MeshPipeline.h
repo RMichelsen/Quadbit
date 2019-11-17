@@ -18,6 +18,21 @@ namespace Quadbit {
 
 		void DrawFrame(uint32_t resourceIndex, VkCommandBuffer commandbuffer);
 
+		Entity GetActiveCamera();
+		void SetCamera(Entity entity);
+		void LoadSkyGradient(glm::vec3 botColour, glm::vec3 topColour);
+
+		const QbVkRenderMeshInstance* CreateInstance(std::vector<QbVkRenderDescriptor>& descriptors, std::vector<QbVkVertexInputAttribute> vertexAttribs,
+			QbVkShaderInstance& shaderInstance, int pushConstantStride = -1, VkShaderStageFlags pushConstantShaderStage = VK_SHADER_STAGE_VERTEX_BIT,
+			VkBool32 depthTestingEnabled = VK_TRUE);
+		QbVkBufferHandle CreateVertexBuffer(const void* vertices, uint32_t vertexStride, uint32_t vertexCount);
+		QbVkBufferHandle CreateIndexBuffer(const std::vector<uint32_t>& indices);
+
+		void DestroyMesh(RenderMeshComponent& renderMeshComponent);
+		void DestroyInstance(const QbVkRenderMeshInstance* instance);
+
+		RenderTexturedObjectComponent CreateObject(const char* objPath, const char* texturePath, VkFormat textureFormat);
+
 	private:
 		friend class QbVkRenderer;
 
@@ -27,10 +42,8 @@ namespace Quadbit {
 		VkPipeline pipeline_ = VK_NULL_HANDLE;
 		VkDescriptorPool descriptorPool_;
 		VkDescriptorSetLayout descriptorSetLayout_;
-		std::array<std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT>, MAX_TEXTURES> descriptorSets_{};
+		std::array<std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT>, 512> descriptorSets_{};
 		uint32_t textureCount = 0;
-
-		MeshBuffers meshBuffers_{};
 
 		std::vector<std::unique_ptr<QbVkRenderMeshInstance>> externalInstances_;
 
@@ -39,26 +52,7 @@ namespace Quadbit {
 
 		Entity environmentMap_ = NULL_ENTITY;
 
-		std::vector<VertexBufHandle> vertexHandleDeleteQueue_;
-		std::vector<IndexBufHandle> indexHandleDeleteQueue_;
-
 		void CreateDescriptorPoolAndLayout();
 		void CreatePipeline();
-
-		void DestroyMesh(RenderMeshComponent& renderMeshComponent);
-		void DestroyVertexBuffer(VertexBufHandle handle);
-		void DestroyIndexBuffer(IndexBufHandle handle);
-		VertexBufHandle CreateVertexBuffer(const void* vertices, uint32_t vertexStride, uint32_t vertexCount);
-		IndexBufHandle CreateIndexBuffer(const std::vector<uint32_t>& indices);
-
-		const QbVkRenderMeshInstance* CreateInstance(std::vector<QbVkRenderDescriptor>& descriptors, std::vector<QbVkVertexInputAttribute> vertexAttribs,
-			QbVkShaderInstance& shaderInstance, int pushConstantStride = -1, VkShaderStageFlags pushConstantShaderStage = VK_SHADER_STAGE_VERTEX_BIT, 
-			VkBool32 depthTestingEnabled = VK_TRUE);
-		void DestroyInstance(const QbVkRenderMeshInstance* instance);
-
-		Entity GetActiveCamera();
-		RenderTexturedObjectComponent CreateObject(const char* objPath, const char* texturePath, VkFormat textureFormat);
-
-		void LoadSkyGradient(glm::vec3 botColour, glm::vec3 topColour);
 	};
 }

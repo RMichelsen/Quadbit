@@ -10,7 +10,3 @@ void Testing::Init() {
 void Testing::Simulate(float deltaTime) {
 
 }
-
-void Testing::DrawFrame() {
-	renderer_->DrawFrame();
-}

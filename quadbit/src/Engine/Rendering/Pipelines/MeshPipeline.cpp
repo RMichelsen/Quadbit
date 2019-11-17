@@ -10,6 +10,7 @@
 #include "Engine/Rendering/VulkanUtils.h"
 #include "Engine/Rendering/Systems/NoClipCameraSystem.h"
 #include "Engine/Rendering/ShaderBytecode.h"
+#include "Engine/Rendering/Memory/ResourceManager.h"
 
 namespace Quadbit {
 	MeshPipeline::MeshPipeline(QbVkContext& context) :
@@ -34,16 +35,34 @@ namespace Quadbit {
 		vkDestroyDescriptorPool(context_.device, descriptorPool_, nullptr);
 		vkDestroyDescriptorSetLayout(context_.device, descriptorSetLayout_, nullptr);
 
-		for (auto i = 0; i < meshBuffers_.vertexBufferIdx_; i++) {
-			if (std::find(meshBuffers_.vertexBufferFreeList_.begin(), meshBuffers_.vertexBufferFreeList_.end(), i) == meshBuffers_.vertexBufferFreeList_.end()) {
-				DestroyVertexBuffer(i);
-			}
-		}
-		for (auto i = 0; i < meshBuffers_.indexBufferIdx_; i++) {
-			if (std::find(meshBuffers_.indexBufferFreeList_.begin(), meshBuffers_.indexBufferFreeList_.end(), i) == meshBuffers_.indexBufferFreeList_.end()) {
-				DestroyIndexBuffer(i);
-			}
-		}
+		//for (auto i = 0; i < meshBuffers_.vertexBufferIdx_; i++) {
+		//	if (std::find(meshBuffers_.vertexBufferFreeList_.begin(), meshBuffers_.vertexBufferFreeList_.end(), i) == meshBuffers_.vertexBufferFreeList_.end()) {
+		//		DestroyVertexBuffer(i);
+		//	}
+		//}
+		//for (auto i = 0; i < meshBuffers_.indexBufferIdx_; i++) {
+		//	if (std::find(meshBuffers_.indexBufferFreeList_.begin(), meshBuffers_.indexBufferFreeList_.end(), i) == meshBuffers_.indexBufferFreeList_.end()) {
+		//		DestroyIndexBuffer(i);
+		//	}
+		//}
+
+		//for (uint32_t i = 0; i < context_.resourceManager->vertexBuffers.resourceIndex; i++) {
+		//	if (std::find(context_.resourceManager->vertexBuffers.freeList.begin(), context_.resourceManager->vertexBuffers.freeList.end(), i) == context_.resourceManager->vertexBuffers.freeList.end()) {
+		//		DestroyVertexBuffer(i);
+		//	}
+		//}
+		//for (uint32_t i = 0; i < context_.resourceManager->indexBuffers.resourceIndex; i++) {
+		//	if (std::find(context_.resourceManager->indexBuffers.freeList.begin(), context_.resourceManager->indexBuffers.freeList.end(), i) == context_.resourceManager->indexBuffers.freeList.end()) {
+		//		DestroyIndexBuffer(i);
+		//	}
+		//}
+
+		//for (uint16_t i = 0; i < context_.resourceManager->buffers.resourceIndex; i++) {
+		//	if (std::find(context_.resourceManager->buffers.freeList.begin(), context_.resourceManager->buffers.freeList.end(), i) == context_.resourceManager->buffers.freeList.end()) {
+		//		DestroyIndexBuffer(QbVkResourceHandle<QbVkBuffer>{i, context_.resourceManager->buffers.versions[i]});
+		//	}
+		//}
+
 		for (auto&& instance : externalInstances_) {
 			DestroyInstance(instance.get());
 		}
@@ -64,13 +83,13 @@ namespace Quadbit {
 	void MeshPipeline::DrawFrame(uint32_t resourceIndex, VkCommandBuffer commandbuffer) {
 		// Here we clean up meshes that are due for removal
 		context_.entityManager->ForEachWithCommandBuffer<RenderMeshDeleteComponent>([&](Entity entity, EntityCommandBuffer* cmdBuf, RenderMeshDeleteComponent& mesh) noexcept {
-			if (mesh.count == 0) {
-				DestroyVertexBuffer(mesh.vertexHandle);
-				DestroyIndexBuffer(mesh.indexHandle);
+			if (mesh.deletionDelay == 0) {
+				context_.resourceManager->DestroyResource(mesh.vertexHandle);
+				context_.resourceManager->DestroyResource(mesh.indexHandle);
 				cmdBuf->DestroyEntity(entity);
 			}
 			else {
-				mesh.count--;
+				mesh.deletionDelay--;
 			}
 			});
 
@@ -116,9 +135,6 @@ namespace Quadbit {
 
 		context_.entityManager->ForEach<RenderTexturedObjectComponent, RenderTransformComponent>(
 			[&](Entity entity, RenderTexturedObjectComponent& obj, RenderTransformComponent& transform) noexcept {
-			if (!VkUtils::QueryAsyncBuffer(context_, meshBuffers_.vertexBuffers_[obj.vertexHandle]) ||
-				!VkUtils::QueryAsyncBuffer(context_, meshBuffers_.indexBuffers_[obj.indexHandle])) return;
-
 			vkCmdBindPipeline(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
 
 			if (obj.pushConstantStride == -1) {
@@ -131,8 +147,8 @@ namespace Quadbit {
 				vkCmdPushConstants(commandbuffer, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, obj.pushConstantStride, obj.pushConstants.data());
 			}
 
-			vkCmdBindVertexBuffers(commandbuffer, 0, 1, &meshBuffers_.vertexBuffers_[obj.vertexHandle].buf, offsets);
-			vkCmdBindIndexBuffer(commandbuffer, meshBuffers_.indexBuffers_[obj.indexHandle].buf, 0, VK_INDEX_TYPE_UINT32);
+			vkCmdBindVertexBuffers(commandbuffer, 0, 1, &context_.resourceManager->buffers[obj.vertexHandle].buf, offsets);
+			vkCmdBindIndexBuffer(commandbuffer, context_.resourceManager->buffers[obj.indexHandle].buf, 0, VK_INDEX_TYPE_UINT32);
 
 			vkCmdBindDescriptorSets(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 0, 1, &descriptorSets_[obj.descriptorIndex][resourceIndex], 0, nullptr);
 			vkCmdDrawIndexed(commandbuffer, obj.indexCount, 1, 0, 0, 0);
@@ -140,9 +156,6 @@ namespace Quadbit {
 
 		context_.entityManager->ForEach<RenderMeshComponent, RenderTransformComponent>(
 			[&](Entity entity, RenderMeshComponent& mesh, RenderTransformComponent& transform) noexcept {
-			if (!VkUtils::QueryAsyncBuffer(context_, meshBuffers_.vertexBuffers_[mesh.vertexHandle]) ||
-				!VkUtils::QueryAsyncBuffer(context_, meshBuffers_.indexBuffers_[mesh.indexHandle])) return;
-
 			vkCmdBindPipeline(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh.instance->pipeline);
 			// Dynamic update viewport and scissor for user-defined pipelines (also doesn't necessitate rebuilding the pipeline on window resize)
 			VkViewport viewport{};
@@ -168,14 +181,75 @@ namespace Quadbit {
 				vkCmdPushConstants(commandbuffer, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, mesh.pushConstantStride, mesh.pushConstants.data());
 			}
 
-			vkCmdBindVertexBuffers(commandbuffer, 0, 1, &meshBuffers_.vertexBuffers_[mesh.vertexHandle].buf, offsets);
-			vkCmdBindIndexBuffer(commandbuffer, meshBuffers_.indexBuffers_[mesh.indexHandle].buf, 0, VK_INDEX_TYPE_UINT32);
+			vkCmdBindVertexBuffers(commandbuffer, 0, 1, &context_.resourceManager->buffers[mesh.vertexHandle].buf, offsets);
+			vkCmdBindIndexBuffer(commandbuffer, context_.resourceManager->buffers[mesh.indexHandle].buf, 0, VK_INDEX_TYPE_UINT32);
 
 			if (mesh.instance->descriptorSetLayout != VK_NULL_HANDLE) {
 				vkCmdBindDescriptorSets(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mesh.instance->pipelineLayout, 0, 1, &mesh.instance->descriptorSets[resourceIndex], 0, nullptr);
 			}
 			vkCmdDrawIndexed(commandbuffer, mesh.indexCount, 1, 0, 0, 0);
 			});
+	}
+
+	Entity MeshPipeline::GetActiveCamera() {
+		return (userCamera_ == NULL_ENTITY) ? fallbackCamera_ : userCamera_;
+	}
+
+	void MeshPipeline::SetCamera(Entity entity) {
+		if(entity != NULL_ENTITY) userCamera_ = entity;
+	}
+
+	void MeshPipeline::LoadSkyGradient(glm::vec3 botColour, glm::vec3 topColour) {
+		std::vector<Quadbit::QbVkVertexInputAttribute> vertexModel{
+			Quadbit::QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_POSITION,
+			Quadbit::QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_COLOUR
+		};
+
+		QbVkShaderInstance shaderInstance(context_);
+		shaderInstance.AddShader(gradientSkyboxVert.data(), static_cast<uint32_t>(gradientSkyboxVert.size()), "main", VK_SHADER_STAGE_VERTEX_BIT);
+		shaderInstance.AddShader(gradientSkyboxFrag.data(), static_cast<uint32_t>(gradientSkyboxFrag.size()), "main", VK_SHADER_STAGE_FRAGMENT_BIT);
+
+		std::vector<QbVkRenderDescriptor> empty{};
+		const QbVkRenderMeshInstance* instance = CreateInstance(empty, vertexModel, shaderInstance, sizeof(EnvironmentMapPushConstants), VK_SHADER_STAGE_VERTEX_BIT, VK_FALSE);
+
+		const std::vector<SkyGradientVertex> cubeVertices = {
+			{{-1.0f, -1.0f, 1.0f},	topColour},
+			{{1.0f, -1.0f, 1.0f},	topColour},
+			{{1.0f, 1.0f, 1.0f},	botColour},
+			{{-1.0f, 1.0f, 1.0f},	botColour},
+
+			{{-1.0f, -1.0f, -1.0f}, topColour},
+			{{1.0f, -1.0f, -1.0f},	topColour},
+			{{1.0f, 1.0f, -1.0f},	botColour},
+			{{-1.0f, 1.0f, -1.0f},	botColour}
+		};
+
+		const std::vector<uint32_t> cubeIndices = {
+			0, 1, 2,
+			2, 3, 0,
+			1, 5, 6,
+			6, 2, 1,
+			7, 6, 5,
+			5, 4, 7,
+			4, 0, 3,
+			3, 7, 4,
+			4, 5, 1,
+			1, 0, 4,
+			3, 2, 6,
+			6, 7, 3
+		};
+
+		environmentMap_ = context_.entityManager->Create();
+		context_.entityManager->AddComponent<RenderMeshComponent>(environmentMap_, {
+			CreateVertexBuffer(cubeVertices.data(), sizeof(SkyGradientVertex), static_cast<uint32_t>(cubeVertices.size())),
+			CreateIndexBuffer(cubeIndices),
+			static_cast<uint32_t>(cubeIndices.size()),
+			std::array<float, 32>(),
+			sizeof(EnvironmentMapPushConstants),
+			instance
+			});
+		context_.entityManager->AddComponent<Quadbit::RenderTransformComponent>(environmentMap_,
+			Quadbit::RenderTransformComponent(1.0f, { 0.0f, 0.0f, 0.0f }, { 0, 0, 0, 1 }));
 	}
 
 	void MeshPipeline::CreateDescriptorPoolAndLayout() {
@@ -185,7 +259,7 @@ namespace Quadbit {
 		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 		poolInfo.poolSizeCount = 1;
 		poolInfo.pPoolSizes = &poolSize;
-		poolInfo.maxSets = MAX_TEXTURES;
+		poolInfo.maxSets = 512; // MAX_TEXTURES
 
 		VK_CHECK(vkCreateDescriptorPool(context_.device, &poolInfo, nullptr, &descriptorPool_));
 
@@ -342,41 +416,6 @@ namespace Quadbit {
 
 		// Finally we can create the pipeline
 		VK_CHECK(vkCreateGraphicsPipelines(context_.device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline_));
-	}
-
-	void MeshPipeline::DestroyMesh(RenderMeshComponent& renderMeshComponent) {
-		context_.entityManager->AddComponent<RenderMeshDeleteComponent>(context_.entityManager->Create(), 
-			{ renderMeshComponent.vertexHandle, renderMeshComponent.indexHandle, MAX_FRAMES_IN_FLIGHT });
-	}
-
-	void MeshPipeline::DestroyVertexBuffer(VertexBufHandle handle) {
-		context_.allocator->DestroyBuffer(meshBuffers_.vertexBuffers_[handle], context_.commandPool);
-		meshBuffers_.vertexBuffers_[handle] = QbVkAsyncBuffer{};
-		meshBuffers_.vertexBufferFreeList_.push_front(handle);
-	}
-
-	void MeshPipeline::DestroyIndexBuffer(IndexBufHandle handle) {
-		context_.allocator->DestroyBuffer(meshBuffers_.indexBuffers_[handle], context_.commandPool);
-		meshBuffers_.indexBuffers_[handle] = QbVkAsyncBuffer{};
-		meshBuffers_.indexBufferFreeList_.push_front(handle);
-	}
-
-	VertexBufHandle MeshPipeline::CreateVertexBuffer(const void* vertices, uint32_t vertexStride, uint32_t vertexCount) {
-		VertexBufHandle handle = meshBuffers_.GetNextVertexHandle();
-		VkDeviceSize bufferSize = static_cast<uint64_t>(vertexCount) * vertexStride;
-
-		VkUtils::CreateAsyncBuffer(context_, meshBuffers_.vertexBuffers_[handle], bufferSize, vertices, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-
-		return handle;
-	}
-
-	IndexBufHandle MeshPipeline::CreateIndexBuffer(const std::vector<uint32_t>& indices) {
-		IndexBufHandle handle = meshBuffers_.GetNextIndexHandle();
-		VkDeviceSize bufferSize = static_cast<uint32_t>(indices.size()) * sizeof(uint32_t);
-
-		VkUtils::CreateAsyncBuffer(context_, meshBuffers_.indexBuffers_[handle], bufferSize, indices.data(), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-
-		return handle;
 	}
 
 	const QbVkRenderMeshInstance* MeshPipeline::CreateInstance(std::vector<QbVkRenderDescriptor>& descriptors, std::vector<QbVkVertexInputAttribute> vertexAttribs,
@@ -574,6 +613,29 @@ namespace Quadbit {
 		return renderMeshInstance;
 	}
 
+	QbVkBufferHandle MeshPipeline::CreateVertexBuffer(const void* vertices, uint32_t vertexStride, uint32_t vertexCount) {
+		VkDeviceSize bufferSize = static_cast<uint64_t>(vertexCount)* vertexStride;
+
+		auto buffer = VkUtils::CreateGPUBuffer(context_, bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, QbVkMemoryUsage::QBVK_MEMORY_USAGE_GPU_ONLY);
+		context_.resourceManager->TransferDataToGPU(vertices, bufferSize, buffer.handle);
+
+		return buffer.handle;
+	}
+
+	QbVkBufferHandle MeshPipeline::CreateIndexBuffer(const std::vector<uint32_t>& indices) {
+		VkDeviceSize bufferSize = static_cast<uint32_t>(indices.size()) * sizeof(uint32_t);
+
+		auto buffer = VkUtils::CreateGPUBuffer(context_, bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, QbVkMemoryUsage::QBVK_MEMORY_USAGE_GPU_ONLY);
+		context_.resourceManager->TransferDataToGPU(indices.data(), bufferSize, buffer.handle);
+
+		return buffer.handle;
+	}
+
+	void MeshPipeline::DestroyMesh(RenderMeshComponent& renderMeshComponent) {
+		context_.entityManager->AddComponent<RenderMeshDeleteComponent>(context_.entityManager->Create(),
+			{ renderMeshComponent.vertexHandle, renderMeshComponent.indexHandle });
+	}
+
 	void MeshPipeline::DestroyInstance(const QbVkRenderMeshInstance* instance) {
 		// Destroy pipeline
 		vkDestroyPipelineLayout(context_.device, instance->pipelineLayout, nullptr);
@@ -584,16 +646,12 @@ namespace Quadbit {
 		if (instance->descriptorSetLayout != VK_NULL_HANDLE) vkDestroyDescriptorSetLayout(context_.device, instance->descriptorSetLayout, nullptr);
 	}
 
-	Entity MeshPipeline::GetActiveCamera() {
-		return (userCamera_ == NULL_ENTITY) ? fallbackCamera_ : userCamera_;
-	}
-
 	RenderTexturedObjectComponent MeshPipeline::CreateObject(const char* objPath, const char* texturePath, VkFormat textureFormat) {
 		// First load the texture
 		VkSamplerCreateInfo samplerInfo = VkUtils::Init::SamplerCreateInfo(VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
 			VK_TRUE, 16.0f, VK_COMPARE_OP_ALWAYS, VK_SAMPLER_MIPMAP_MODE_LINEAR);
 
-		QbVkTexture texture = VkUtils::LoadTexture(context_, texturePath, textureFormat, VK_IMAGE_TILING_OPTIMAL,
+		QbTexture texture = VkUtils::LoadTexture(context_, texturePath, textureFormat, VK_IMAGE_TILING_OPTIMAL,
 			VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 			VK_IMAGE_ASPECT_COLOR_BIT, QbVkMemoryUsage::QBVK_MEMORY_USAGE_GPU_ONLY, &samplerInfo);
 
@@ -664,58 +722,5 @@ namespace Quadbit {
 			std::array<float, 32>(),
 			-1
 		};
-	}
-
-	void MeshPipeline::LoadSkyGradient(glm::vec3 botColour, glm::vec3 topColour) {
-		std::vector<Quadbit::QbVkVertexInputAttribute> vertexModel{
-			Quadbit::QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_POSITION,
-			Quadbit::QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_COLOUR
-		};
-
-		QbVkShaderInstance shaderInstance(context_);
-		shaderInstance.AddShader(gradientSkyboxVert.data(), static_cast<uint32_t>(gradientSkyboxVert.size()), "main", VK_SHADER_STAGE_VERTEX_BIT);
-		shaderInstance.AddShader(gradientSkyboxFrag.data(), static_cast<uint32_t>(gradientSkyboxFrag.size()), "main", VK_SHADER_STAGE_FRAGMENT_BIT);
-
-		std::vector<QbVkRenderDescriptor> empty{};
-		const QbVkRenderMeshInstance* instance = CreateInstance(empty, vertexModel, shaderInstance, sizeof(EnvironmentMapPushConstants), VK_SHADER_STAGE_VERTEX_BIT, VK_FALSE);
-
-		const std::vector<SkyGradientVertex> cubeVertices = {
-			{{-1.0f, -1.0f, 1.0f},	topColour},
-			{{1.0f, -1.0f, 1.0f},	topColour},
-			{{1.0f, 1.0f, 1.0f},	botColour},
-			{{-1.0f, 1.0f, 1.0f},	botColour},
-
-			{{-1.0f, -1.0f, -1.0f}, topColour},
-			{{1.0f, -1.0f, -1.0f},	topColour},
-			{{1.0f, 1.0f, -1.0f},	botColour},
-			{{-1.0f, 1.0f, -1.0f},	botColour}
-		};
-
-		const std::vector<uint32_t> cubeIndices = {
-			0, 1, 2,
-			2, 3, 0,
-			1, 5, 6,
-			6, 2, 1,
-			7, 6, 5,
-			5, 4, 7,
-			4, 0, 3,
-			3, 7, 4,
-			4, 5, 1,
-			1, 0, 4,
-			3, 2, 6,
-			6, 7, 3
-		};
-
-		environmentMap_ = context_.entityManager->Create();
-		context_.entityManager->AddComponent<RenderMeshComponent>(environmentMap_, {
-			CreateVertexBuffer(cubeVertices.data(), sizeof(SkyGradientVertex), static_cast<uint32_t>(cubeVertices.size())),
-			CreateIndexBuffer(cubeIndices),
-			static_cast<uint32_t>(cubeIndices.size()),
-			std::array<float, 32>(),
-			sizeof(EnvironmentMapPushConstants),
-			instance
-			});
-		context_.entityManager->AddComponent<Quadbit::RenderTransformComponent>(environmentMap_, 
-			Quadbit::RenderTransformComponent(1.0f, { 0.0f, 0.0f, 0.0f }, { 0, 0, 0, 1 }));
 	}
 }

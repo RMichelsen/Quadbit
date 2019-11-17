@@ -38,13 +38,13 @@ namespace Quadbit {
 
 	bool Window::ProcessMessages() {
 		// Start a new ImGui frame
-		ImGui::NewFrame();
 		ImGuiIO& io = ImGui::GetIO();
 		io.DeltaTime = Time::deltaTime;
 		io.MousePos = ImVec2(static_cast<float>(inputHandler_->mousePos_.x), static_cast<float>(inputHandler_->mousePos_.y));
 		io.MouseDown[0] = inputHandler_->mouseButtonActive_.left;
 		io.MouseDown[1] = inputHandler_->mouseButtonActive_.right;
 
+		ImGui::NewFrame();
 		Time::UpdateTimer();
 		inputHandler_->NewFrame();
 		MSG msg;

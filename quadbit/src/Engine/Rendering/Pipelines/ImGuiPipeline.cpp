@@ -29,11 +29,6 @@ namespace Quadbit {
 			vkDestroyPipelineLayout(context_.device, pipelineLayout_, nullptr);
 		}
 
-		// Destroy font resources
-		context_.allocator->DestroyImage(fontTexture_.image);
-		vkDestroyImageView(context_.device, fontTexture_.imageView, nullptr);
-		vkDestroySampler(context_.device, fontTexture_.sampler, nullptr);
-
 		// Since both the pipeline and pipeline layout are destroyed by the swapchain we ignore them here.
 		vkDestroyDescriptorPool(context_.device, descriptorPool_, nullptr);
 

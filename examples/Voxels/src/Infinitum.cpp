@@ -19,17 +19,17 @@ void Infinitum::Init() {
 	// Setup entities
 	entityManager_->RegisterComponents<VoxelBlockComponent, VoxelBlockUpdateTag, MeshGenerationUpdateTag, MeshReadyTag, PlayerTag>();
 
-	renderer_->LoadSkyGradient(glm::vec3(1.0f, 1.0f, 1.0f), glm::vec3(0.1f, 0.4f, 0.8f));
+	graphics_->LoadSkyGradient(glm::vec3(1.0f, 1.0f, 1.0f), glm::vec3(0.1f, 0.4f, 0.8f));
 
 	//camera_ = entityManager->Create();
 	//camera_.AddComponent<Quadbit::RenderCamera>(Quadbit::RenderCamera(0.0f, 0.0f, glm::vec3(), renderer->GetAspectRatio(), 10000.0f));
 	//renderer->RegisterCamera(camera_);
 
-	Quadbit::QbVkShaderInstance shaderInstance = renderer_->CreateShaderInstance();
+	Quadbit::QbVkShaderInstance shaderInstance = graphics_->CreateShaderInstance();
 	shaderInstance.AddShader("Resources/Shaders/Compiled/voxel_vert.spv", "main", VK_SHADER_STAGE_VERTEX_BIT);
 	shaderInstance.AddShader("Resources/Shaders/Compiled/voxel_frag.spv", "main", VK_SHADER_STAGE_FRAGMENT_BIT);
 
-	renderMeshInstance_ = renderer_->CreateRenderMeshInstance({
+	renderMeshInstance_ = graphics_->CreateRenderMeshInstance({
 		Quadbit::QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_POSITION,
 		Quadbit::QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_COLOUR
 		}, shaderInstance
@@ -37,7 +37,7 @@ void Infinitum::Init() {
 
 	player_ = entityManager_->Create();
 	entityManager_->AddComponent<Quadbit::RenderTransformComponent>(player_, Quadbit::RenderTransformComponent(1.0f, glm::vec3(16.0f, 30.0f, 16.0f), glm::quat()));
-	entityManager_->AddComponent<Quadbit::RenderMeshComponent>(player_, renderer_->CreateMesh(cubeVertices, sizeof(VoxelVertex), cubeIndices, renderMeshInstance_));
+	entityManager_->AddComponent<Quadbit::RenderMeshComponent>(player_, graphics_->CreateMesh(cubeVertices, sizeof(VoxelVertex), cubeIndices, renderMeshInstance_));
 	entityManager_->AddComponent<PlayerTag>(player_);
 
 	uint32_t globalSeed = 4646;
@@ -77,11 +77,11 @@ void Infinitum::Init() {
 
 void Infinitum::Simulate(float deltaTime) {
 	entityManager_->systemDispatch_->RunSystem<VoxelGenerationSystem>(deltaTime, fastnoiseTerrain_, fastnoiseRegions_, fastnoiseColours_);
-	entityManager_->systemDispatch_->RunSystem<MeshGenerationSystem>(deltaTime, renderer_, renderMeshInstance_);
+	entityManager_->systemDispatch_->RunSystem<MeshGenerationSystem>(deltaTime, graphics_, renderMeshInstance_);
 
 	if(input_->keyPressed_[0x47]) {
 		for(auto&& entity : chunks_) {
-			renderer_->DestroyMesh(*entityManager_->GetComponentPtr<RenderMeshComponent>(entity));
+			graphics_->DestroyMesh(*entityManager_->GetComponentPtr<RenderMeshComponent>(entity));
 			entityManager_->RemoveComponent<RenderMeshComponent>(entity);
 
 			fastnoiseTerrain_->SetSeed(terrainSettings_.seed);

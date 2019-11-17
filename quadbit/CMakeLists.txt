@@ -12,6 +12,8 @@ add_subdirectory(dependencies/imgui)
 add_subdirectory(dependencies/tinyobjloader)
 
 add_library(Quadbit STATIC
+    src/Engine/API/Compute.cpp
+    src/Engine/API/Graphics.cpp
     src/Engine/Application/Window.cpp
     src/Engine/Application/InputHandler.cpp
     src/Engine/Core/Entry.cpp
@@ -20,6 +22,7 @@ add_library(Quadbit STATIC
     src/Engine/Rendering/ShaderInstance.cpp
     src/Engine/Rendering/Memory/Allocator.cpp
     src/Engine/Rendering/Memory/Pool.cpp
+    src/Engine/Rendering/Memory/ResourceManager.cpp
     src/Engine/Rendering/Pipelines/ComputePipeline.cpp
     src/Engine/Rendering/Pipelines/ImGuiPipeline.cpp
     src/Engine/Rendering/Pipelines/MeshPipeline.cpp

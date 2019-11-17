@@ -11,6 +11,7 @@
 #include "Engine/Rendering/VulkanTypes.h"
 #include "Engine/Core/Logging.h"
 #include "Engine/Rendering/Memory/Allocator.h"
+#include "Engine/Rendering/Memory/ResourceManager.h"
 
 #define VK_ERROR_STRING(x) case (int)x: return #x;
 
@@ -761,7 +762,15 @@ namespace Quadbit::VkUtils {
 		return imageView;
 	}
 
-	inline VkCommandBuffer InitSingleTimeCommandBuffer(const QbVkContext& context) {
+	inline VkCommandBuffer CreatePersistentCommandBuffer(const QbVkContext& context) {
+		VkCommandBuffer commandbuffer;
+		VkCommandBufferAllocateInfo commandBufferAllocateInfo = VkUtils::Init::CommandBufferAllocateInfo(context.commandPool,
+			VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
+		VK_CHECK(vkAllocateCommandBuffers(context.device, &commandBufferAllocateInfo, &commandbuffer));
+		return commandbuffer;
+	}
+
+	inline VkCommandBuffer CreateSingleTimeCommandBuffer(const QbVkContext& context) {
 		VkCommandBufferAllocateInfo allocInfo = Init::CommandBufferAllocateInfo(context.commandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
 
 		// Create command buffer
@@ -798,60 +807,8 @@ namespace Quadbit::VkUtils {
 		vkDestroyFence(context.device, fence, nullptr);
 	}
 
-	inline bool QueryAsyncBuffer(const QbVkContext& context, QbVkAsyncBuffer& buffer) {
-		if (!buffer.ready) {
-			VkResult result = vkGetFenceStatus(context.device, buffer.fence);
-			if (result == VK_SUCCESS) {
-				// Destroy the staging buffer 
-				// (we don't need to hang on to these resources on the CPU after they've been copied and the buffer is ready)
-				context.allocator->DestroyBuffer(buffer.stagingBuffer);
-				buffer.ready = true;
-			}
-		}
-		return buffer.ready;
-	}
-
-	inline void AsyncBufferIssueCopy(const QbVkContext& context, QbVkAsyncBuffer& buffer, VkDeviceSize bufferSize) {
-		// Begin recording
-		VkCommandBufferBeginInfo cmdBeginInfo = Init::CommandBufferBeginInfo();
-		cmdBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-		VK_CHECK(vkBeginCommandBuffer(buffer.copyCommandBuffer, &cmdBeginInfo));
-
-		// Issue copy command
-		VkBufferCopy copyRegion{};
-		copyRegion.srcOffset = 0;
-		copyRegion.dstOffset = 0;
-		copyRegion.size = bufferSize;
-		vkCmdCopyBuffer(buffer.copyCommandBuffer, buffer.stagingBuffer.buf, buffer.buf, 1, &copyRegion);
-
-		// End recording
-		VK_CHECK(vkEndCommandBuffer(buffer.copyCommandBuffer));
-
-		VkSubmitInfo submitInfo = Init::SubmitInfo();
-		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &buffer.copyCommandBuffer;
-
-		// Submit to queue
-		VK_CHECK(vkQueueSubmit(context.graphicsQueue, 1, &submitInfo, buffer.fence));
-	}
-
-	inline void CreateAsyncBuffer(const QbVkContext& context, QbVkAsyncBuffer& buffer, VkDeviceSize bufferSize, const void* data, VkBufferUsageFlags bufferUsage) {
-		context.allocator->CreateStagingBuffer(buffer.stagingBuffer, bufferSize, data);
-
-		VkBufferCreateInfo bufferInfo = VkUtils::Init::BufferCreateInfo(bufferSize, bufferUsage);
-		context.allocator->CreateBuffer(buffer, bufferInfo, QbVkMemoryUsage::QBVK_MEMORY_USAGE_GPU_ONLY);
-
-		// Allocate and create commandbuffer and fence for the mesh vertex buffer
-		VkCommandBufferAllocateInfo allocInfo = VkUtils::Init::CommandBufferAllocateInfo(context.commandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
-		VK_CHECK(vkAllocateCommandBuffers(context.device, &allocInfo, &buffer.copyCommandBuffer));
-		VkFenceCreateInfo fenceCreateInfo = VkUtils::Init::FenceCreateInfo();
-		VK_CHECK(vkCreateFence(context.device, &fenceCreateInfo, nullptr, &buffer.fence));
-
-		VkUtils::AsyncBufferIssueCopy(context, buffer, bufferSize);
-	}
-
 	inline void CopyBuffer(const QbVkContext& context, VkBuffer src, VkBuffer dst, VkDeviceSize size) {
-		VkCommandBuffer commandBuffer = InitSingleTimeCommandBuffer(context);
+		VkCommandBuffer commandBuffer = CreateSingleTimeCommandBuffer(context);
 		// Issue copy command
 		VkBufferCopy copyRegion{};
 		copyRegion.srcOffset = 0;
@@ -864,7 +821,7 @@ namespace Quadbit::VkUtils {
 	}
 
 	inline void CopyBufferToImage(const QbVkContext& context, VkBuffer src, VkImage dst, uint32_t width, uint32_t height) {
-		VkCommandBuffer commandBuffer = InitSingleTimeCommandBuffer(context);
+		VkCommandBuffer commandBuffer = CreateSingleTimeCommandBuffer(context);
 		// Issue copy command
 		VkBufferImageCopy copyRegion{};
 		copyRegion.bufferOffset = 0;
@@ -879,21 +836,23 @@ namespace Quadbit::VkUtils {
 		FlushCommandBuffer(context, commandBuffer);
 	}
 
-	inline void CreateGPUBuffer(const QbVkContext& context, QbVkBuffer& buffer, VkDeviceSize size, VkBufferUsageFlags bufferUsage, QbVkMemoryUsage memoryUsage) {
+	inline QbGPUBuffer CreateGPUBuffer(const QbVkContext& context, VkDeviceSize size, VkBufferUsageFlags bufferUsage, QbVkMemoryUsage memoryUsage) {
 		auto bufferInfo = VkUtils::Init::BufferCreateInfo(size, bufferUsage);
+		auto handle = context.resourceManager->buffers.GetNextHandle();
+		auto& buffer = context.resourceManager->buffers[handle];
+
 		context.allocator->CreateBuffer(buffer, bufferInfo, memoryUsage);
+
+		VkDescriptorBufferInfo descriptor = { buffer.buf, 0, VK_WHOLE_SIZE };
+		return { handle, descriptor };
 	}
 
-	inline void TransferDataToGPUBuffer(const QbVkContext& context, QbVkBuffer& buffer, VkDeviceSize size, const void* data) {
+	inline void TransferDataToGPUBuffer(const QbVkContext& context, const void* data, VkDeviceSize size, QbVkBuffer& destination) {
 		// Utilize a staging buffer to transfer the data onto the GPU
 		QbVkBuffer stagingBuffer;
 		context.allocator->CreateStagingBuffer(stagingBuffer, size, data);
-		CopyBuffer(context, stagingBuffer.buf, buffer.buf, size);
+		CopyBuffer(context, stagingBuffer.buf, destination.buf, size);
 		context.allocator->DestroyBuffer(stagingBuffer);
-	}
-
-	inline void DestroyBuffer(const QbVkContext& context, QbVkBuffer& buffer) {
-		context.allocator->DestroyBuffer(buffer);
 	}
 
 	inline void CreateFrameBuffer(const QbVkContext& context, VkFramebuffer& framebuffer, VkImageView imageView) {
@@ -920,7 +879,7 @@ namespace Quadbit::VkUtils {
 	inline void TransitionImageLayout(const QbVkContext& context, VkImage image, VkImageAspectFlags aspectFlags,
 		VkImageLayout oldLayout, VkImageLayout newLayout, VkPipelineStageFlags srcStage, VkPipelineStageFlags dstStage, uint32_t levelCount = 1, uint32_t layerCount = 1) {
 
-		VkCommandBuffer commandBuffer = InitSingleTimeCommandBuffer(context);
+		VkCommandBuffer commandBuffer = CreateSingleTimeCommandBuffer(context);
 
 		VkImageMemoryBarrier memoryBarrier = Init::ImageMemoryBarrier();
 		memoryBarrier.oldLayout = oldLayout;
@@ -1071,10 +1030,11 @@ namespace Quadbit::VkUtils {
 		return bindingDescription;
 	}
 
-	inline QbVkTexture LoadTexture(const QbVkContext& context, const char* imagePath, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage, VkImageLayout imageLayout,
+	inline QbTexture LoadTexture(const QbVkContext& context, const char* imagePath, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage, VkImageLayout imageLayout,
 		VkImageAspectFlags imageAspectFlags, QbVkMemoryUsage memoryUsage, VkSamplerCreateInfo* samplerCreateInfo = nullptr, VkSampleCountFlagBits numSamples = VK_SAMPLE_COUNT_1_BIT) {
 
-		QbVkTexture texture{};
+		auto handle = context.resourceManager->textures.GetNextHandle();
+		auto& texture = context.resourceManager->textures[handle];
 
 		int width, height, channels;
 		stbi_uc* pixels = stbi_load(imagePath, &width, &height, &channels, STBI_rgb_alpha);
@@ -1089,8 +1049,7 @@ namespace Quadbit::VkUtils {
 
 		// Create buffer and copy data
 		QbVkBuffer pixelBuffer;
-		CreateGPUBuffer(context, pixelBuffer, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, QbVkMemoryUsage::QBVK_MEMORY_USAGE_CPU_TO_GPU);
-		memcpy(pixelBuffer.alloc.data, data, size);
+		context.allocator->CreateStagingBuffer(pixelBuffer, size, data);
 
 		// Transition the image layout to the desired layout
 		TransitionImageLayout(context, texture.image.imgHandle, imageAspectFlags, VK_IMAGE_LAYOUT_UNDEFINED,
@@ -1107,20 +1066,22 @@ namespace Quadbit::VkUtils {
 		texture.imageLayout = imageLayout;
 		texture.format = imageFormat;
 		if (samplerCreateInfo != nullptr) VK_CHECK(vkCreateSampler(context.device, samplerCreateInfo, nullptr, &texture.sampler));
-		texture.descriptor = { texture.sampler, texture.imageView, imageLayout };
 
 		// Destroy the buffer and free the image
-		DestroyBuffer(context, pixelBuffer);
+		context.allocator->DestroyBuffer(pixelBuffer);
 		if (pixels != nullptr) stbi_image_free(pixels);
 
-		return texture;
+		VkDescriptorImageInfo descriptor = { texture.sampler, texture.imageView, imageLayout };
+
+		return { handle, descriptor };
 	}
 
-	inline QbVkTexture LoadTexture(const QbVkContext& context, uint32_t width, uint32_t height, void* pixels, VkFormat imageFormat, VkImageTiling imageTiling,
+	inline QbTexture LoadTexture(const QbVkContext& context, uint32_t width, uint32_t height, void* pixels, VkFormat imageFormat, VkImageTiling imageTiling,
 		VkImageUsageFlags imageUsage, VkImageLayout imageLayout, VkImageAspectFlags imageAspectFlags, QbVkMemoryUsage memoryUsage,
 		VkSamplerCreateInfo* samplerCreateInfo = nullptr, VkSampleCountFlagBits numSamples = VK_SAMPLE_COUNT_1_BIT) {
 
-		QbVkTexture texture{};
+		auto handle = context.resourceManager->textures.GetNextHandle();
+		auto& texture = context.resourceManager->textures[handle];
 
 		auto imageCreateInfo = VkUtils::Init::ImageCreateInfo(width, height, imageFormat, imageTiling, imageUsage, numSamples);
 		context.allocator->CreateImage(texture.image, imageCreateInfo, memoryUsage);
@@ -1132,14 +1093,13 @@ namespace Quadbit::VkUtils {
 		// Create buffer and copy data
 		QbVkBuffer pixelBuffer;
 		VkDeviceSize bufferSize = static_cast<uint64_t>(width)* static_cast<uint64_t>(height) * 4;
-		CreateGPUBuffer(context, pixelBuffer, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, QbVkMemoryUsage::QBVK_MEMORY_USAGE_CPU_TO_GPU);
-		memcpy(pixelBuffer.alloc.data, pixels, bufferSize);
+		context.allocator->CreateStagingBuffer(pixelBuffer, bufferSize, pixels);
 
 		// Copy the pixel data to the image
 		CopyBufferToImage(context, pixelBuffer.buf, texture.image.imgHandle, width, height);
 
 		// Destroy the buffer
-		DestroyBuffer(context, pixelBuffer);
+		context.allocator->DestroyBuffer(pixelBuffer);
 
 		// Transition the image to be read in shader
 		TransitionImageLayout(context, texture.image.imgHandle, imageAspectFlags, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -1150,14 +1110,17 @@ namespace Quadbit::VkUtils {
 		texture.imageLayout = imageLayout;
 		texture.format = imageFormat;
 		if (samplerCreateInfo != nullptr) VK_CHECK(vkCreateSampler(context.device, samplerCreateInfo, nullptr, &texture.sampler));
-		texture.descriptor = { texture.sampler, texture.imageView, imageLayout };
-
-		return texture;
+		
+		VkDescriptorImageInfo descriptor = { texture.sampler, texture.imageView, imageLayout };
+		return { handle, descriptor };
 	}
 
-	inline void CreateTexture(const QbVkContext& context, QbVkTexture& texture, uint32_t width, uint32_t height, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage,
+	inline QbTexture CreateTexture(const QbVkContext& context, uint32_t width, uint32_t height, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage,
 		VkImageLayout imageLayout, VkImageAspectFlags imageAspectFlags, VkPipelineStageFlagBits srcStage, VkPipelineStageFlagBits dstStage, QbVkMemoryUsage memoryUsage,
 		VkSampler sampler, VkSampleCountFlagBits numSamples) {
+
+		auto handle = context.resourceManager->textures.GetNextHandle();
+		auto& texture = context.resourceManager->textures[handle];
 
 		auto imageCreateInfo = VkUtils::Init::ImageCreateInfo(width, height, imageFormat, imageTiling, imageUsage, numSamples);
 		context.allocator->CreateImage(texture.image, imageCreateInfo, memoryUsage);
@@ -1165,11 +1128,12 @@ namespace Quadbit::VkUtils {
 		texture.imageLayout = imageLayout;
 		texture.format = imageFormat;
 		texture.sampler = sampler;
-		texture.descriptor = { texture.sampler, texture.imageView, imageLayout };
-
 
 		// Transition the image layout to the desired layout
 		TransitionImageLayout(context, texture.image.imgHandle, imageAspectFlags, VK_IMAGE_LAYOUT_UNDEFINED, imageLayout, srcStage, dstStage);
+
+		VkDescriptorImageInfo descriptor = { texture.sampler, texture.imageView, imageLayout };
+		return { handle, descriptor };
 	}
 
 	inline QbVkModel LoadModel(const char* objPath, std::vector<QbVkVertexInputAttribute> vertexModel) {

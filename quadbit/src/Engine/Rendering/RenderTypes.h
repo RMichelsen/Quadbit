@@ -13,56 +13,7 @@
 #include "Engine/Rendering/VulkanTypes.h"
 #include "Engine/Core/Logging.h"
 
-inline constexpr int MAX_MESH_COUNT = 65536;
-inline constexpr int MAX_TEXTURES = 50;
-
 namespace Quadbit {
-	struct UserAllocations {
-		std::unordered_set<VkImageView> imageViews;
-		std::unordered_set<VkImage> images;
-		std::unordered_set<VkBuffer> buffers;
-		std::unordered_set<VkSampler> samplers;
-	};
-
-	struct MeshBuffers {
-		VertexBufHandle vertexBufferIdx_;
-		IndexBufHandle indexBufferIdx_;
-		std::array<QbVkAsyncBuffer, MAX_MESH_COUNT> vertexBuffers_;
-		std::array<QbVkAsyncBuffer, MAX_MESH_COUNT> indexBuffers_;
-		std::deque<VertexBufHandle> vertexBufferFreeList_;
-		std::deque<IndexBufHandle> indexBufferFreeList_;
-
-		VertexBufHandle GetNextVertexHandle() {
-			VertexBufHandle next = vertexBufferIdx_;
-			if (vertexBufferFreeList_.empty()) {
-				vertexBufferIdx_++;
-				assert(next < (MAX_MESH_COUNT - 1) && "Cannot get next vertex buffer handle for mesh, max number of handles in use!");
-				return next;
-			}
-			else {
-				next = vertexBufferFreeList_.front();
-				vertexBufferFreeList_.pop_front();
-				assert(next < (MAX_MESH_COUNT - 1) && "Cannot get next vertex buffer handle for mesh, max number of handles in use!");
-				return next;
-			}
-		}
-
-		IndexBufHandle GetNextIndexHandle() {
-			IndexBufHandle next = indexBufferIdx_;
-			if (indexBufferFreeList_.empty()) {
-				indexBufferIdx_++;
-				assert(next < (MAX_MESH_COUNT - 1) && "Cannot get next index buffer handle for mesh, max number of handles in use!");
-				return next;
-			}
-			else {
-				next = indexBufferFreeList_.front();
-				indexBufferFreeList_.pop_front();
-				assert(next < (MAX_MESH_COUNT - 1) && "Cannot get next index buffer handle for mesh, max number of handles in use!");
-				return next;
-			}
-		}
-	};
-
 	struct SkyGradientVertex {
 		glm::vec3 position;
 		glm::vec3 colour;
@@ -164,8 +115,8 @@ namespace Quadbit {
 	};
 
 	struct RenderTexturedObjectComponent {
-		VertexBufHandle vertexHandle;
-		IndexBufHandle indexHandle;
+		QbVkResourceHandle<QbVkBuffer> vertexHandle;
+		QbVkResourceHandle<QbVkBuffer> indexHandle;
 		uint32_t indexCount;
 		uint32_t descriptorIndex;
 		std::array<float, 32> pushConstants;
@@ -179,8 +130,8 @@ namespace Quadbit {
 	};
 
 	struct RenderMeshComponent {
-		VertexBufHandle vertexHandle;
-		IndexBufHandle indexHandle;
+		QbVkResourceHandle<QbVkBuffer> vertexHandle;
+		QbVkResourceHandle<QbVkBuffer> indexHandle;
 		uint32_t indexCount;
 		std::array<float, 32> pushConstants;
 		int pushConstantStride;
@@ -193,10 +144,13 @@ namespace Quadbit {
 		}
 	};
 
+
+	// The deletion delay should be the number of potential frames 
+	// in a row that the mesh could be used by the rendering system
 	struct RenderMeshDeleteComponent {
-		VertexBufHandle vertexHandle;
-		IndexBufHandle indexHandle;
-		uint32_t count;
+		QbVkBufferHandle vertexHandle;
+		QbVkBufferHandle indexHandle;
+		uint32_t deletionDelay = MAX_FRAMES_IN_FLIGHT;
 	};
 
 	// Just a tag, the tag is automatically removed when an entity with the tag is iterated over

@@ -289,9 +289,9 @@ namespace Quadbit {
 		std::deque<uint32_t> entityFreeList_;
 
 		template<typename C>
-		SparseSet<C>* const GetPool() {
+		SparseSet<C>* const GetPool() const {
 			size_t componentID = ComponentID::GetUnique<C>();
-			assert(componentPools_[componentID].sparseSet != nullptr && "Failed to get pool: Component isn't registered with the entity manager\n");
+			assert(componentPools_[componentID] != nullptr && "Failed to get pool: Component isn't registered with the entity manager\n");
 			return reinterpret_cast<SparseSet<C>*>(componentPools_[componentID].get());
 		}
 

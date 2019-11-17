@@ -4,6 +4,7 @@
 #include "Engine/Core/Time.h"
 #include "Engine/Entities/EntityManager.h"
 #include "Engine/Rendering/Renderer.h"
+#include "Engine/API/Compute.h"
 
 int __stdcall WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nCmdShow) {
 	auto window = std::make_unique<Quadbit::Window>(hInstance, nCmdShow);
@@ -13,7 +14,8 @@ int __stdcall WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	auto* game = Quadbit::CreateGame();
 	game->input_ = window->inputHandler_.get();
 	game->entityManager_ = entityManager.get();
-	game->renderer_ = renderer.get();
+	game->compute_ = new Quadbit::Compute(renderer.get());
+	game->graphics_ = new Quadbit::Graphics(renderer.get());
 
 	game->Init();
 	while (window->ProcessMessages()) {

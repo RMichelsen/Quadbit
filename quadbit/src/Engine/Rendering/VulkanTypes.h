@@ -4,10 +4,63 @@
 #include <vector>
 #include <array>
 #include <variant>
+#include <functional>
+#include <unordered_set>
+#include <type_traits>
+#include <deque>
+#include <cassert>
 
 inline constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
 namespace Quadbit {
+	template<typename T>
+	struct QbVkResourceHandle {
+		uint32_t index : 16;
+		uint32_t version : 16;
+	};
+
+	template<typename T, size_t Size>
+	struct QbVkResource {
+		uint32_t resourceIndex = 0;
+		std::array<T, Size> elements{};
+		std::array<uint16_t, Size> versions{};
+		std::deque<uint16_t> freeList;
+
+		template<typename U>
+		T& operator[](QbVkResourceHandle<U> handle) {
+			static_assert(std::is_same<T, U>::value, "Resource has a different type than the resource handle passed!");
+			assert(handle.index < Size && "Resource array out of bounds!");
+			assert(handle.version == versions[handle.index] && "Handle passed does not match internal handle!");
+			return elements[handle.index];
+		}
+
+		template<typename U>
+		void DestroyResource(QbVkResourceHandle<U> handle) {
+			static_assert(std::is_same<T, U>::value, "Resource has a different type than the resource handle passed!");
+			assert(handle.index < Size && "Resource array out of bounds!");
+			assert(handle.version == versions[handle.index] && "Handle passed does not match internal handle!");
+			versions[handle.index]++;
+			freeList.push_back(handle.index);
+		}
+
+		QbVkResourceHandle<T> GetHandle(uint16_t index) {
+			return QbVkResourceHandle<T> { index, versions[index] };
+		}
+
+		QbVkResourceHandle<T> GetNextHandle() {
+			uint16_t next = resourceIndex;
+			if (freeList.empty()) {
+				resourceIndex++;
+			}
+			else {
+				next = freeList.front();
+				freeList.pop_front();
+			}
+			assert(next < (Size - 1) && "Resource array full, too many elements!");
+			return QbVkResourceHandle<T> {next, versions[next]};
+		}
+	};
+
 	// VULKAN DEFINITIONS
 	using VertexBufHandle = uint16_t;
 	using IndexBufHandle = uint16_t;
@@ -39,24 +92,10 @@ namespace Quadbit {
 		unsigned char* data = nullptr;
 	};
 
+	class QbVkRenderer;
 	struct QbVkBuffer {
 		VkBuffer buf = VK_NULL_HANDLE;
 		QbVkAllocation alloc{};
-		VkDescriptorBufferInfo descriptor{};
-	};
-
-	// Async buffers are like normal buffers but
-	// does not wait for fence immediately.
-	// They can be queried after async buffer creation to check whether
-	// content has been transferred.
-	struct QbVkAsyncBuffer {
-		VkBuffer buf = VK_NULL_HANDLE;
-		QbVkAllocation alloc{};
-		VkDescriptorBufferInfo descriptor{};
-		VkCommandBuffer copyCommandBuffer = VK_NULL_HANDLE;
-		QbVkBuffer stagingBuffer{};
-		VkFence fence = VK_NULL_HANDLE;
-		bool ready;
 	};
 
 	struct QbVkImage {
@@ -69,7 +108,6 @@ namespace Quadbit {
 		VkImageLayout imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		VkImageView imageView = VK_NULL_HANDLE;
 		VkSampler sampler = VK_NULL_HANDLE;
-		VkDescriptorImageInfo descriptor;
 		VkFormat format = VK_FORMAT_UNDEFINED;
 	};
 
@@ -153,14 +191,16 @@ namespace Quadbit {
 	};
 
 	struct RenderingResources {
-		VkFramebuffer framebuffer = VK_NULL_HANDLE;
-		VkCommandBuffer commandbuffer = VK_NULL_HANDLE;
+		VkFramebuffer frameBuffer = VK_NULL_HANDLE;
+		VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
 		VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
 		VkSemaphore renderFinishedSemaphore = VK_NULL_HANDLE;
+		VkSemaphore transferSemaphore = VK_NULL_HANDLE;
 		VkFence fence = VK_NULL_HANDLE;
 	};
 
 	class QbVkAllocator;
+	class QbVkResourceManager;
 	class EntityManager;
 	class InputHandler;
 	struct QbVkContext {
@@ -169,6 +209,7 @@ namespace Quadbit {
 
 		std::unique_ptr<GPU> gpu;
 		std::unique_ptr<QbVkAllocator> allocator;
+		std::unique_ptr<QbVkResourceManager> resourceManager;
 		VkDevice device = VK_NULL_HANDLE;
 		VkSurfaceKHR surface = VK_NULL_HANDLE;
 		VkQueue graphicsQueue = VK_NULL_HANDLE;
@@ -192,5 +233,34 @@ namespace Quadbit {
 		VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
 		VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
 		std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> descriptorSets{};
+	};
+
+	using QbVkTextureHandle = QbVkResourceHandle<QbVkTexture>;
+	using QbVkBufferHandle = QbVkResourceHandle<QbVkBuffer>;
+
+	struct QbVkTransfer {
+		VkDeviceSize size;
+		QbVkBufferHandle destinationBuffer;
+	};
+
+	template<typename T>
+	struct QbMappedGPUBuffer {
+		QbVkBufferHandle handle;
+		T* data;
+		VkDescriptorBufferInfo descriptor{};
+
+		T* operator->() {
+			return data;
+		}
+	};
+
+	struct QbGPUBuffer {
+		QbVkBufferHandle handle;
+		VkDescriptorBufferInfo descriptor{};
+	};
+
+	struct QbTexture {
+		QbVkTextureHandle handle;
+		VkDescriptorImageInfo descriptor{};
 	};
 }

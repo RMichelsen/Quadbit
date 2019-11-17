@@ -27,7 +27,7 @@ namespace Quadbit {
 		float currentFrametime_;
 		std::vector<float> frametimeCache_;
 
-		QbVkTexture fontTexture_{};
+		QbTexture fontTexture_{};
 
 		VkDescriptorPool descriptorPool_ = VK_NULL_HANDLE;
 		VkDescriptorSetLayout descriptorSetLayout_ = VK_NULL_HANDLE;

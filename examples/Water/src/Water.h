@@ -36,21 +36,21 @@ struct alignas(16) TogglesUBO {
 struct PreCalculatedResources {
 	std::vector<glm::float4> precalcUniformRandoms;
 
-	Quadbit::QbVkBuffer ubo;
-	Quadbit::QbVkBuffer uniformRandomsStorageBuffer;
+	Quadbit::QbMappedGPUBuffer<PrecalcUBO> ubo;
+	Quadbit::QbGPUBuffer uniformRandomsStorageBuffer;
 
-	Quadbit::QbVkTexture h0Tilde;
-	Quadbit::QbVkTexture h0TildeConj;
+	Quadbit::QbTexture h0Tilde;
+	Quadbit::QbTexture h0TildeConj;
 };
 
 struct WaveheightResources {
-	Quadbit::QbVkBuffer ubo;
+	Quadbit::QbMappedGPUBuffer<WaveheightUBO> ubo;
 
-	Quadbit::QbVkTexture h0TildeTx;
-	Quadbit::QbVkTexture h0TildeTy;
-	Quadbit::QbVkTexture h0TildeTz;
-	Quadbit::QbVkTexture h0TildeSlopeX;
-	Quadbit::QbVkTexture h0TildeSlopeZ;
+	Quadbit::QbTexture h0TildeTx;
+	Quadbit::QbTexture h0TildeTy;
+	Quadbit::QbTexture h0TildeTz;
+	Quadbit::QbTexture h0TildeSlopeX;
+	Quadbit::QbTexture h0TildeSlopeZ;
 };
 
 struct IFFTPushConstants {
@@ -58,11 +58,11 @@ struct IFFTPushConstants {
 };
 
 struct InverseFFTResources {
-	Quadbit::QbVkTexture dX{};
-	Quadbit::QbVkTexture dY{};
-	Quadbit::QbVkTexture dZ{};
-	Quadbit::QbVkTexture dSlopeX{};
-	Quadbit::QbVkTexture dSlopeZ{};
+	Quadbit::QbTexture dX{};
+	Quadbit::QbTexture dY{};
+	Quadbit::QbTexture dZ{};
+	Quadbit::QbTexture dSlopeX{};
+	Quadbit::QbTexture dSlopeZ{};
 
 	std::array<int, 6> specData;
 
@@ -70,8 +70,8 @@ struct InverseFFTResources {
 };
 
 struct DisplacementResources {
-	Quadbit::QbVkTexture displacementMap;
-	Quadbit::QbVkTexture normalMap;
+	Quadbit::QbTexture displacementMap;
+	Quadbit::QbTexture normalMap;
 };
 
 class Water : public Quadbit::Game {
@@ -80,7 +80,6 @@ public:
 	void InitializeCompute();
 	void RecordComputeCommands();
 	void Simulate(float deltaTime) override;
-	void DrawFrame();
 
 private:
 	float step_ = 1.0f;
@@ -106,7 +105,7 @@ private:
 	Quadbit::QbVkComputeInstance* verticalIFFTInstance_ = nullptr;
 	Quadbit::QbVkComputeInstance* displacementInstance_ = nullptr;
 
-	Quadbit::QbVkBuffer togglesUBO_;
+	Quadbit::QbMappedGPUBuffer<TogglesUBO> togglesUBO_;
 
 	void InitPrecalcComputeInstance();
 	void InitWaveheightComputeInstance();

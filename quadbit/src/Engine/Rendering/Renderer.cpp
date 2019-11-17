@@ -9,7 +9,7 @@
 #include "Engine/Entities/SystemDispatch.h"
 #include "Engine/Rendering/RenderTypes.h"
 #include "Engine/Rendering/VulkanUtils.h"
-#include "Engine/Rendering/Memory/Allocator.h"
+#include "Engine/Rendering/Memory/ResourceManager.h"
 #include "Engine/Rendering/Pipelines/ComputePipeline.h"
 #include "Engine/Rendering/Pipelines/MeshPipeline.h"
 #include "Engine/Rendering/Pipelines/ImGuiPipeline.h"
@@ -81,13 +81,12 @@ namespace Quadbit {
 		CreateDepthResources();
 		CreateMainRenderPass();
 
-		// Mesh Pipeline
+		// Resource Manager
+		context_->resourceManager = std::make_unique<QbVkResourceManager>(*context_);
+
+		// Pipelines
 		meshPipeline_ = std::make_unique<MeshPipeline>(*context_);
-
-		// ImGui Pipeline (Debug build only)
 		imGuiPipeline_ = std::make_unique<ImGuiPipeline>(*context_);
-
-		// Compute Pipeline
 		computePipeline_ = std::make_unique<ComputePipeline>(*context_);
 	}
 
@@ -96,10 +95,9 @@ namespace Quadbit {
 		VK_CHECK(vkDeviceWaitIdle(context_->device));
 
 		// Destroy user-created images and buffers
-		for (const auto& imageView : userAllocations_.imageViews) vkDestroyImageView(context_->device, imageView, nullptr);
-		for (const auto& image : userAllocations_.images) vkDestroyImage(context_->device, image, nullptr);
-		for (const auto& buffer : userAllocations_.buffers) vkDestroyBuffer(context_->device, buffer, nullptr);
-		for (const auto& sampler : userAllocations_.samplers) vkDestroySampler(context_->device, sampler, nullptr);
+		//for (const auto& texture : userAllocations_.textures) DestroyResource(texture);
+		//for (const auto& buffer : userAllocations_.buffers) DestroyResource(buffer);
+		//for (const auto& sampler : userAllocations_.samplers) vkDestroySampler(context_->device, sampler, nullptr);
 
 		// Destroy pipelines
 		meshPipeline_.reset();
@@ -108,12 +106,13 @@ namespace Quadbit {
 
 		// Destroy rendering resources
 		for (const auto& renderingResource : context_->renderingResources) {
-			if (renderingResource.framebuffer != VK_NULL_HANDLE) {
-				vkDestroyFramebuffer(context_->device, renderingResource.framebuffer, nullptr);
+			if (renderingResource.frameBuffer != VK_NULL_HANDLE) {
+				vkDestroyFramebuffer(context_->device, renderingResource.frameBuffer, nullptr);
 			}
-			vkFreeCommandBuffers(context_->device, context_->commandPool, 1, &renderingResource.commandbuffer);
+			vkFreeCommandBuffers(context_->device, context_->commandPool, 1, &renderingResource.commandBuffer);
 			vkDestroySemaphore(context_->device, renderingResource.imageAvailableSemaphore, nullptr);
 			vkDestroySemaphore(context_->device, renderingResource.renderFinishedSemaphore, nullptr);
+			vkDestroySemaphore(context_->device, renderingResource.transferSemaphore, nullptr);
 			vkDestroyFence(context_->device, renderingResource.fence, nullptr);
 		}
 
@@ -135,7 +134,11 @@ namespace Quadbit {
 		// Destroy render passes
 		vkDestroyRenderPass(context_->device, context_->mainRenderPass, nullptr);
 
-		// Destroy allocator
+		// Destroy persistent buffers and textures from the resource manager
+		context_->resourceManager.reset();
+
+		// Empty garbage and destroy allocator
+		context_->allocator->EmptyGarbage();
 		context_->allocator.reset();
 
 		// Destroy device
@@ -157,10 +160,15 @@ namespace Quadbit {
 	}
 
 	void QbVkRenderer::DrawFrame() {
+		static uint32_t resourceIndex = 0;
+
 		// Return early if we cannot render (if swapchain is being recreated)
 		if (!canRender_) return;
 
-		static uint32_t resourceIndex = 0;
+		// Before we render, we transfer all queued data to buffers on the GPU
+		// we make sure we only wait on the transfer if there was any data transferred
+		const bool transferActive = context_->resourceManager->TransferQueuedDataToGPU(resourceIndex);
+
 		RenderingResources& currentRenderingResources = context_->renderingResources[resourceIndex];
 		// First we need to wait for the frame to be finished then rebuild command buffer and go
 		VK_CHECK(vkWaitForFences(context_->device, 1, &currentRenderingResources.fence, VK_TRUE, UINT64_MAX));
@@ -177,20 +185,24 @@ namespace Quadbit {
 		VK_CHECK(result);
 
 		// Prepare the frame for rendering
-		PrepareFrame(resourceIndex, currentRenderingResources.commandbuffer, currentRenderingResources.framebuffer, context_->swapchain.imageViews[imageIndex]);
+		PrepareFrame(resourceIndex, currentRenderingResources.commandBuffer, currentRenderingResources.frameBuffer, context_->swapchain.imageViews[imageIndex]);
 
 		// We will now submit the command buffer
 		VkSubmitInfo submitInfo = VkUtils::Init::SubmitInfo();
 		// Here we specify the semaphores to wait for and the stage in which to wait
 		// The semaphores and stages are matched to eachother by index
-		VkSemaphore waitSemaphores[] = { currentRenderingResources.imageAvailableSemaphore };
-		VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-		submitInfo.waitSemaphoreCount = 1;
-		submitInfo.pWaitSemaphores = waitSemaphores;
-		submitInfo.pWaitDstStageMask = waitStages;
+		auto waitSemaphores = transferActive ? 
+			std::vector{ currentRenderingResources.imageAvailableSemaphore, currentRenderingResources.transferSemaphore } :
+			std::vector{ currentRenderingResources.imageAvailableSemaphore };
+		auto waitStages = transferActive ? 
+			std::vector<VkPipelineStageFlags> { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,  VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT} :
+			std::vector<VkPipelineStageFlags> { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+		submitInfo.waitSemaphoreCount = transferActive ? 2 : 1;
+		submitInfo.pWaitSemaphores = waitSemaphores.data();
+		submitInfo.pWaitDstStageMask = waitStages.data();
 		// Here we specify the appropriate command buffer for the swapchain image received earlier
 		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &currentRenderingResources.commandbuffer;
+		submitInfo.pCommandBuffers = &currentRenderingResources.commandBuffer;
 		// Here we will specify which semaphores to signal once execution completes
 		VkSemaphore signalSemaphores[] = { currentRenderingResources.renderFinishedSemaphore };
 		submitInfo.signalSemaphoreCount = 1;
@@ -224,27 +236,14 @@ namespace Quadbit {
 		resourceIndex = (resourceIndex + 1) % MAX_FRAMES_IN_FLIGHT;
 	}
 
-	float QbVkRenderer::GetAspectRatio() {
-		return static_cast<float>(context_->swapchain.extent.width) / static_cast<float>(context_->swapchain.extent.height);
+	void QbVkRenderer::DestroyResource(QbVkBuffer buffer) {
+		context_->allocator->DestroyBuffer(buffer);
 	}
 
-	QbVkBuffer QbVkRenderer::CreateGPUBuffer(VkDeviceSize size, VkBufferUsageFlags bufferUsage, QbVkMemoryUsage memoryUsage) {
-		QbVkBuffer buffer{};
-		VkUtils::CreateGPUBuffer(*context_, buffer, size, bufferUsage, memoryUsage);
-		userAllocations_.buffers.insert(buffer.buf);
-		return buffer;
-	}
-
-	void QbVkRenderer::TransferDataToGPUBuffer(QbVkBuffer& buffer, VkDeviceSize size, const void* data) {
-		VkUtils::TransferDataToGPUBuffer(*context_, buffer, size, data);
-	}
-
-	VkMemoryBarrier QbVkRenderer::CreateMemoryBarrier(VkAccessFlags srcMask, VkAccessFlags dstMask) {
-		return VkUtils::Init::MemoryBarrierVk(srcMask, dstMask);
-	}
-
-	QbVkShaderInstance QbVkRenderer::CreateShaderInstance() {
-		return QbVkShaderInstance(*context_);
+	void QbVkRenderer::DestroyResource(QbVkTexture texture) {
+		if (texture.imageView != VK_NULL_HANDLE) vkDestroyImageView(context_->device, texture.imageView, nullptr);
+		if (texture.sampler != VK_NULL_HANDLE) vkDestroySampler(context_->device, texture.sampler, nullptr);
+		context_->allocator->DestroyImage(texture.image);
 	}
 
 	//void QbVkRenderer::LoadEnvironmentMap(const char* environmentTexture, VkFormat textureFormat) {
@@ -258,115 +257,6 @@ namespace Quadbit {
 	//QbVkTexture QbVkRenderer::LoadCubemap(const char* imagePath, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage, VkImageLayout imageLayout, VkImageAspectFlags imageAspectFlags, QbVkMemoryUsage memoryUsage) {
 	//	return VkUtils::LoadCubemap(*context_, imagePath, imageFormat, imageTiling, imageUsage, imageLayout, imageAspectFlags, memoryUsage);
 	//}
-
-	QbVkTexture QbVkRenderer::LoadTexture(const char* imagePath, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage, VkImageLayout imageLayout,
-		VkImageAspectFlags imageAspectFlags, QbVkMemoryUsage memoryUsage, VkSamplerCreateInfo* samplerCreateInfo, VkSampleCountFlagBits numSamples) {
-		QbVkTexture texture = VkUtils::LoadTexture(*context_, imagePath, imageFormat, imageTiling, imageUsage, imageLayout, imageAspectFlags, memoryUsage, samplerCreateInfo, numSamples);
-		userAllocations_.imageViews.insert(texture.imageView);
-		userAllocations_.images.insert(texture.image.imgHandle);
-		return texture;
-	}
-
-	QbVkTexture QbVkRenderer::CreateTexture(uint32_t width, uint32_t height, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage,
-		VkImageLayout imageLayout, VkImageAspectFlags imageAspectFlags, VkPipelineStageFlagBits srcStage, VkPipelineStageFlagBits dstStage, QbVkMemoryUsage memoryUsage,
-		VkSampler sampler, VkSampleCountFlagBits numSamples) {
-		QbVkTexture texture{};
-		VkUtils::CreateTexture(*context_, texture, width, height, imageFormat, imageTiling, imageUsage, imageLayout, imageAspectFlags, srcStage, dstStage, memoryUsage, sampler, numSamples);
-		userAllocations_.imageViews.insert(texture.imageView);
-		userAllocations_.images.insert(texture.image.imgHandle);
-		return texture;
-	}
-
-	VkSampler QbVkRenderer::CreateImageSampler(VkFilter samplerFilter, VkSamplerAddressMode addressMode, VkBool32 enableAnisotropy,
-		float maxAnisotropy, VkCompareOp compareOperation, VkSamplerMipmapMode samplerMipmapMode, float maxLod) {
-
-		VkSampler sampler;
-
-		auto createInfo = VkUtils::Init::SamplerCreateInfo(samplerFilter, addressMode, enableAnisotropy, maxAnisotropy, compareOperation, samplerMipmapMode, maxLod);
-		VK_CHECK(vkCreateSampler(context_->device, &createInfo, nullptr, &sampler));
-
-		userAllocations_.samplers.insert(sampler);
-		return sampler;
-	}
-
-	QbVkComputeInstance* QbVkRenderer::CreateComputeInstance(std::vector<QbVkComputeDescriptor>& descriptors,
-		const char* shader, const char* shaderFunc, const VkSpecializationInfo* specInfo, uint32_t pushConstantRangeSize) {
-		return computePipeline_->CreateInstance(descriptors, shader, shaderFunc, specInfo, pushConstantRangeSize);
-	}
-
-	void QbVkRenderer::ComputeDispatch(QbVkComputeInstance* instance) {
-		computePipeline_->Dispatch(instance);
-	}
-
-	void QbVkRenderer::ComputeRecord(const QbVkComputeInstance* instance, std::function<void()> func) {
-		computePipeline_->RecordCommands(instance, func);
-	}
-
-	QbVkComputeDescriptor QbVkRenderer::CreateComputeDescriptor(VkDescriptorType type, void* descriptor) {
-		return { type, 1, descriptor };
-	}
-
-	Entity QbVkRenderer::GetActiveCamera() {
-		return meshPipeline_->GetActiveCamera();
-	}
-
-	void QbVkRenderer::RegisterCamera(Entity entity) {
-		if(!context_->entityManager->HasComponent<RenderCamera>(entity)) {
-			QB_LOG_ERROR("Cannot register camera: Entity must have the Quadbit::RenderCamera component\n");
-			return;
-		}
-		meshPipeline_->userCamera_ = entity;
-	}
-
-	const QbVkRenderMeshInstance* QbVkRenderer::CreateRenderMeshInstance(std::vector<QbVkRenderDescriptor>& descriptors,
-		std::vector<QbVkVertexInputAttribute> vertexAttribs, QbVkShaderInstance& shaderInstance, int pushConstantStride, VkShaderStageFlags pushConstantShaderStage) {
-		return meshPipeline_->CreateInstance(descriptors, vertexAttribs, shaderInstance, pushConstantStride, pushConstantShaderStage);
-	}
-
-	const QbVkRenderMeshInstance* QbVkRenderer::CreateRenderMeshInstance(std::vector<QbVkVertexInputAttribute> vertexAttribs, QbVkShaderInstance& shaderInstance, 
-		int pushConstantStride, VkShaderStageFlags pushConstantShaderStage) {
-		std::vector<QbVkRenderDescriptor> empty{};
-		return meshPipeline_->CreateInstance(empty, vertexAttribs, shaderInstance, pushConstantStride, pushConstantShaderStage);
-	}
-
-	RenderTexturedObjectComponent QbVkRenderer::CreateObject(const char* objPath, const char* texturePath, VkFormat textureFormat) {
-		return meshPipeline_->CreateObject(objPath, texturePath, textureFormat);
-	}
-
-	RenderMeshComponent QbVkRenderer::CreateMesh(const char* objPath, std::vector<QbVkVertexInputAttribute> vertexModel, 
-		const QbVkRenderMeshInstance* externalInstance, int pushConstantStride) {
-		QbVkModel model = VkUtils::LoadModel(objPath, vertexModel);
-
-		return RenderMeshComponent{
-			meshPipeline_->CreateVertexBuffer(model.vertices.data(), model.vertexStride, static_cast<uint32_t>(model.vertices.size())),
-			meshPipeline_->CreateIndexBuffer(model.indices),
-			static_cast<uint32_t>(model.indices.size()),
-			std::array<float, 32>(),
-			pushConstantStride,
-			externalInstance
-		};
-	}
-
-	void QbVkRenderer::DestroyMesh(RenderMeshComponent& renderMeshComponent) {
-		meshPipeline_->DestroyMesh(renderMeshComponent);
-	}
-
-	VertexBufHandle QbVkRenderer::CreateVertexBuffer(const void* vertices, uint32_t vertexStride, uint32_t vertexCount) {
-		return meshPipeline_->CreateVertexBuffer(vertices, vertexStride, vertexCount);
-	}
-
-	IndexBufHandle QbVkRenderer::CreateIndexBuffer(const std::vector<uint32_t>& indices)
-	{
-		return meshPipeline_->CreateIndexBuffer(indices);
-	}
-
-	QbVkRenderDescriptor QbVkRenderer::CreateRenderDescriptor(VkDescriptorType type, void* descriptor, VkShaderStageFlagBits shaderStage) {
-		return { type, 1, descriptor, shaderStage };
-	}
-
-	void QbVkRenderer::LoadSkyGradient(glm::vec3 botColour, glm::vec3 topColour) {
-		meshPipeline_->LoadSkyGradient(botColour, topColour);
-	}
 
 #ifndef NDEBUG
 	// Debug messenger creation and callback function
@@ -518,6 +408,7 @@ namespace Quadbit {
 		for (auto i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
 			VK_CHECK(vkCreateSemaphore(context_->device, &sempahoreInfo, nullptr, &context_->renderingResources[i].imageAvailableSemaphore));
 			VK_CHECK(vkCreateSemaphore(context_->device, &sempahoreInfo, nullptr, &context_->renderingResources[i].renderFinishedSemaphore));
+			VK_CHECK(vkCreateSemaphore(context_->device, &sempahoreInfo, nullptr, &context_->renderingResources[i].transferSemaphore));
 			VK_CHECK(vkCreateFence(context_->device, &fenceInfo, nullptr, &context_->renderingResources[i].fence));
 		}
 	}
@@ -525,9 +416,7 @@ namespace Quadbit {
 	void QbVkRenderer::AllocateCommandBuffers() {
 		// Allocate the command buffers required for the rendering resources
 		for (auto&& renderingResource : context_->renderingResources) {
-			VkCommandBufferAllocateInfo commandBufferAllocateInfo = VkUtils::Init::CommandBufferAllocateInfo(context_->commandPool,
-				VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
-			VK_CHECK(vkAllocateCommandBuffers(context_->device, &commandBufferAllocateInfo, &renderingResource.commandbuffer));
+			renderingResource.commandBuffer = VkUtils::CreatePersistentCommandBuffer(*context_);
 		}
 	}
 
@@ -748,6 +637,7 @@ namespace Quadbit {
 		colourAttachmentResolveRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
 		// We can now create the render subpass
+		// TODO: External subpasses add unnecessary complexity, redo renderpass system
 		VkSubpassDescription subpassDesc{};
 		subpassDesc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 		subpassDesc.colorAttachmentCount = 1;

@@ -7,7 +7,6 @@ class Testing : public Quadbit::Game {
 public:
 	void Init() override;
 	void Simulate(float deltaTime) override;
-	void DrawFrame();
 };
 
 Quadbit::Game* Quadbit::CreateGame() {
