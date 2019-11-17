@@ -7,3 +7,6 @@
 [submodule "quadbit/dependencies/stb/stb"]
 	path = quadbit/dependencies/stb/stb
 	url = https://github.com/nothings/stb.git
+[submodule "quadbit/dependencies/EASTL"]
+	path = quadbit/dependencies/EASTL
+	url = https://github.com/electronicarts/EASTL.git
