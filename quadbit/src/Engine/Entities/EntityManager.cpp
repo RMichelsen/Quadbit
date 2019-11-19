@@ -4,9 +4,7 @@
 namespace Quadbit {
 	Entity::Entity() : id_(0, 1) {}
 
-	EntityManager::EntityManager() {
-		systemDispatch_ = std::make_unique<SystemDispatch>(this);
-	}
+	EntityManager::EntityManager() : systemDispatch_(eastl::make_unique<SystemDispatch>(this)) {}
 
 	EntityManager::~EntityManager() {
 		systemDispatch_->Shutdown();
@@ -55,7 +53,7 @@ namespace Quadbit {
 		// Remove by swap and pop
 		auto lastEntity = entities_.back();
 		sparse_[lastEntity.id_.index] = sparse_[entity.id_.index];
-		std::swap(entities_[sparse_[entity.id_.index]], lastEntity);
+		eastl::swap(entities_[sparse_[entity.id_.index]], lastEntity);
 		entities_.pop_back();
 		sparse_[entity.id_.index] = 0xFFFFFFFF;
 

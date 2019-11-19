@@ -1,10 +1,11 @@
 #pragma once
-#include <vector>
-#include <variant>
+#include <EASTL/algorithm.h>
+#include <EASTL/numeric.h>
+#include <EASTL/unique_ptr.h>
+#include <EASTL/vector.h>
 
 #include <vulkan/vulkan.h>
 #include <stb/stb_image.h>
-#include <tiny_obj_loader.h>
 #include <glm/glm.hpp>
 #include <glm/gtx/compatibility.hpp>
 
@@ -12,6 +13,10 @@
 #include "Engine/Core/Logging.h"
 #include "Engine/Rendering/Memory/Allocator.h"
 #include "Engine/Rendering/Memory/ResourceManager.h"
+
+
+
+#include "Engine/Rendering/RenderTypes.h"
 
 #define VK_ERROR_STRING(x) case (int)x: return #x;
 
@@ -512,7 +517,7 @@ namespace Quadbit::VkUtils {
 	}
 
 	inline VkSampleCountFlagBits GetMaxSampleCount(const VkPhysicalDeviceProperties& deviceProperties) {
-		VkSampleCountFlags commonCount = std::min(deviceProperties.limits.framebufferColorSampleCounts,
+		VkSampleCountFlags commonCount = eastl::min(deviceProperties.limits.framebufferColorSampleCounts,
 			deviceProperties.limits.framebufferDepthSampleCounts);
 
 		// Pick the maximum usable sample count (the minimum of colour and depth max sample counts)
@@ -525,7 +530,7 @@ namespace Quadbit::VkUtils {
 		return VK_SAMPLE_COUNT_1_BIT;
 	}
 
-	inline bool FindSuitableGPU(QbVkContext& context, const std::vector<VkPhysicalDevice>& physicalDevices) {
+	inline bool FindSuitableGPU(QbVkContext& context, const eastl::vector<VkPhysicalDevice>& physicalDevices) {
 		size_t physicalDeviceCount = physicalDevices.size();
 		GPU gpu{};
 
@@ -535,7 +540,7 @@ namespace Quadbit::VkUtils {
 			if (!IsSuitableGPUOfType(context, gpu, physicalDevices[i], VkPhysicalDeviceType::VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)) continue;
 
 			QB_LOG_INFO("Found Appropriate Discrete GPU: %s\n", gpu.deviceProps.deviceName);
-			context.gpu = std::make_unique<GPU>(gpu);
+			context.gpu = eastl::make_unique<GPU>(gpu);
 			context.multisamplingResources.msaaSamples = GetMaxSampleCount(context.gpu->deviceProps);
 			return true;
 		}
@@ -546,7 +551,7 @@ namespace Quadbit::VkUtils {
 			if (!IsSuitableGPUOfType(context, gpu, physicalDevices[i], VkPhysicalDeviceType::VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU)) continue;
 
 			QB_LOG_INFO("Found Appropriate Integrated GPU: %s\n", gpu.deviceProps.deviceName);
-			context.gpu = std::make_unique<GPU>(gpu);
+			context.gpu = eastl::make_unique<GPU>(gpu);
 			context.multisamplingResources.msaaSamples = GetMaxSampleCount(context.gpu->deviceProps);
 			return true;
 		}
@@ -558,7 +563,7 @@ namespace Quadbit::VkUtils {
 	template <typename T>
 	inline T AlignUp(T val, T alignment)
 	{
-		static_assert(std::is_unsigned<T>::value, "AlignUp requires an unsigned value");
+		static_assert(eastl::is_unsigned<T>::value, "AlignUp requires an unsigned value");
 		return ((val + alignment - 1) / alignment) * alignment;
 	}
 
@@ -605,7 +610,7 @@ namespace Quadbit::VkUtils {
 		}
 	}
 
-	inline VkSurfaceFormatKHR ChooseSurfaceFormat(std::vector<VkSurfaceFormatKHR>& formats) {
+	inline VkSurfaceFormatKHR ChooseSurfaceFormat(eastl::vector<VkSurfaceFormatKHR>& formats) {
 		const VkFormat desiredFormat = VK_FORMAT_B8G8R8_UNORM;
 		const VkColorSpaceKHR desiredColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
 
@@ -625,7 +630,7 @@ namespace Quadbit::VkUtils {
 		return formats[0];
 	}
 
-	inline VkPresentModeKHR ChoosePresentMode(std::vector<VkPresentModeKHR>& modes) {
+	inline VkPresentModeKHR ChoosePresentMode(eastl::vector<VkPresentModeKHR>& modes) {
 		const VkPresentModeKHR desiredPresentMode = VK_PRESENT_MODE_MAILBOX_KHR;
 
 		for (int i = 0; i < modes.size(); i++) {
@@ -651,7 +656,7 @@ namespace Quadbit::VkUtils {
 		}
 	}
 
-	inline VkShaderModule CreateShaderModule(const std::vector<char>& bytecode, VkDevice& device) {
+	inline VkShaderModule CreateShaderModule(const eastl::vector<char>& bytecode, VkDevice& device) {
 		// Creates the shader module using raw bytecode
 		VkShaderModuleCreateInfo shaderModuleInfo{};
 		shaderModuleInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -681,7 +686,7 @@ namespace Quadbit::VkUtils {
 		return (format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT);
 	}
 
-	inline std::vector<char> ReadShader(const char* filename) {
+	inline eastl::vector<char> ReadShader(const char* filename) {
 		FILE* pFile = fopen(filename, "rb");
 		if (pFile == nullptr) {
 			QB_LOG_ERROR("Couldn't open file %s\n", filename);
@@ -694,7 +699,7 @@ namespace Quadbit::VkUtils {
 		rewind(pFile);
 
 		// Read data into a char vector
-		std::vector<char> bytecode(fileSize);
+		eastl::vector<char> bytecode(fileSize);
 		size_t result = fread(bytecode.data(), sizeof(char), fileSize, pFile);
 		if (result != fileSize) {
 			QB_LOG_ERROR("Error reading shader file %s\n", filename);
@@ -711,10 +716,10 @@ namespace Quadbit::VkUtils {
 				return i;
 			}
 		}
-		return std::numeric_limits<uint32_t>().max();
+		return eastl::numeric_limits<uint32_t>().max();
 	}
 
-	inline VkFormat ChooseSupportedFormat(const QbVkContext& context, const std::vector<VkFormat>& formats, VkImageTiling tiling, VkFormatFeatureFlags features) {
+	inline VkFormat ChooseSupportedFormat(const QbVkContext& context, const eastl::vector<VkFormat>& formats, VkImageTiling tiling, VkFormatFeatureFlags features) {
 		for (VkFormat format : formats) {
 			VkFormatProperties formatProperties;
 			vkGetPhysicalDeviceFormatProperties(context.gpu->physicalDevice, format, &formatProperties);
@@ -801,7 +806,7 @@ namespace Quadbit::VkUtils {
 		// Submit to queue
 		VK_CHECK(vkQueueSubmit(context.graphicsQueue, 1, &submitInfo, fence));
 		// Wait for the fence to signal that the command buffer has finished
-		VK_CHECK(vkWaitForFences(context.device, 1, &fence, VK_TRUE, std::numeric_limits<uint64_t>().max()));
+		VK_CHECK(vkWaitForFences(context.device, 1, &fence, VK_TRUE, eastl::numeric_limits<uint64_t>().max()));
 
 		vkFreeCommandBuffers(context.device, context.commandPool, 1, &commandBuffer);
 		vkDestroyFence(context.device, fence, nullptr);
@@ -836,17 +841,6 @@ namespace Quadbit::VkUtils {
 		FlushCommandBuffer(context, commandBuffer);
 	}
 
-	inline QbGPUBuffer CreateGPUBuffer(const QbVkContext& context, VkDeviceSize size, VkBufferUsageFlags bufferUsage, QbVkMemoryUsage memoryUsage) {
-		auto bufferInfo = VkUtils::Init::BufferCreateInfo(size, bufferUsage);
-		auto handle = context.resourceManager->buffers.GetNextHandle();
-		auto& buffer = context.resourceManager->buffers[handle];
-
-		context.allocator->CreateBuffer(buffer, bufferInfo, memoryUsage);
-
-		VkDescriptorBufferInfo descriptor = { buffer.buf, 0, VK_WHOLE_SIZE };
-		return { handle, descriptor };
-	}
-
 	inline void TransferDataToGPUBuffer(const QbVkContext& context, const void* data, VkDeviceSize size, QbVkBuffer& destination) {
 		// Utilize a staging buffer to transfer the data onto the GPU
 		QbVkBuffer stagingBuffer;
@@ -868,7 +862,7 @@ namespace Quadbit::VkUtils {
 		framebufferInfo.width = context.swapchain.extent.width;
 		framebufferInfo.height = context.swapchain.extent.height;
 		framebufferInfo.layers = 1;
-		std::array<VkImageView, 3> attachments = { context.multisamplingResources.msaaImageView, context.depthResources.imageView, imageView };
+		eastl::array<VkImageView, 3> attachments = { context.multisamplingResources.msaaImageView, context.depthResources.imageView, imageView };
 		framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
 		framebufferInfo.pAttachments = attachments.data();
 
@@ -961,8 +955,8 @@ namespace Quadbit::VkUtils {
 		FlushCommandBuffer(context, commandBuffer);
 	}
 
-	inline std::vector<VkVertexInputAttributeDescription> CreateVertexInputAttributeDescription(std::vector<QbVkVertexInputAttribute> attributes) {
-		std::vector<VkVertexInputAttributeDescription> vertexAttributes;
+	inline eastl::vector<VkVertexInputAttributeDescription> CreateVertexInputAttributeDescription(eastl::vector<QbVkVertexInputAttribute> attributes) {
+		eastl::vector<VkVertexInputAttributeDescription> vertexAttributes;
 
 		uint32_t offset = 0;
 		for (uint32_t i = 0; i < attributes.size(); i++) {
@@ -997,7 +991,7 @@ namespace Quadbit::VkUtils {
 		return vertexAttributes;
 	}
 
-	inline VkVertexInputBindingDescription GetVertexBindingDescription(std::vector<QbVkVertexInputAttribute> attributes) {
+	inline VkVertexInputBindingDescription GetVertexBindingDescription(eastl::vector<QbVkVertexInputAttribute> attributes) {
 
 		uint32_t stride = 0;
 		for (uint32_t i = 0; i < attributes.size(); i++) {
@@ -1029,216 +1023,4 @@ namespace Quadbit::VkUtils {
 		bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 		return bindingDescription;
 	}
-
-	inline QbTexture LoadTexture(const QbVkContext& context, const char* imagePath, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage, VkImageLayout imageLayout,
-		VkImageAspectFlags imageAspectFlags, QbVkMemoryUsage memoryUsage, VkSamplerCreateInfo* samplerCreateInfo = nullptr, VkSampleCountFlagBits numSamples = VK_SAMPLE_COUNT_1_BIT) {
-
-		auto handle = context.resourceManager->textures.GetNextHandle();
-		auto& texture = context.resourceManager->textures[handle];
-
-		int width, height, channels;
-		stbi_uc* pixels = stbi_load(imagePath, &width, &height, &channels, STBI_rgb_alpha);
-		assert(pixels != nullptr);
-
-		void* data = static_cast<void*>(pixels);
-		uint32_t mipLevels = 1;
-		VkDeviceSize size = static_cast<uint64_t>(width)* static_cast<uint64_t>(height) * 4;
-
-		auto imageCreateInfo = VkUtils::Init::ImageCreateInfo(width, height, imageFormat, imageTiling, imageUsage, numSamples, mipLevels);
-		context.allocator->CreateImage(texture.image, imageCreateInfo, memoryUsage);
-
-		// Create buffer and copy data
-		QbVkBuffer pixelBuffer;
-		context.allocator->CreateStagingBuffer(pixelBuffer, size, data);
-
-		// Transition the image layout to the desired layout
-		TransitionImageLayout(context, texture.image.imgHandle, imageAspectFlags, VK_IMAGE_LAYOUT_UNDEFINED,
-			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
-
-		// Copy the pixel data to the image
-		CopyBufferToImage(context, pixelBuffer.buf, texture.image.imgHandle, width, height);
-
-		// Transition the image to be read in shader
-		TransitionImageLayout(context, texture.image.imgHandle, imageAspectFlags, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
-
-		texture.imageView = VkUtils::CreateImageView(context, texture.image.imgHandle, imageFormat, imageAspectFlags);
-		texture.imageLayout = imageLayout;
-		texture.format = imageFormat;
-		if (samplerCreateInfo != nullptr) VK_CHECK(vkCreateSampler(context.device, samplerCreateInfo, nullptr, &texture.sampler));
-
-		// Destroy the buffer and free the image
-		context.allocator->DestroyBuffer(pixelBuffer);
-		if (pixels != nullptr) stbi_image_free(pixels);
-
-		VkDescriptorImageInfo descriptor = { texture.sampler, texture.imageView, imageLayout };
-
-		return { handle, descriptor };
-	}
-
-	inline QbTexture LoadTexture(const QbVkContext& context, uint32_t width, uint32_t height, void* pixels, VkFormat imageFormat, VkImageTiling imageTiling,
-		VkImageUsageFlags imageUsage, VkImageLayout imageLayout, VkImageAspectFlags imageAspectFlags, QbVkMemoryUsage memoryUsage,
-		VkSamplerCreateInfo* samplerCreateInfo = nullptr, VkSampleCountFlagBits numSamples = VK_SAMPLE_COUNT_1_BIT) {
-
-		auto handle = context.resourceManager->textures.GetNextHandle();
-		auto& texture = context.resourceManager->textures[handle];
-
-		auto imageCreateInfo = VkUtils::Init::ImageCreateInfo(width, height, imageFormat, imageTiling, imageUsage, numSamples);
-		context.allocator->CreateImage(texture.image, imageCreateInfo, memoryUsage);
-
-		// Transition the image layout to the desired layout
-		TransitionImageLayout(context, texture.image.imgHandle, imageAspectFlags, VK_IMAGE_LAYOUT_UNDEFINED,
-			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
-
-		// Create buffer and copy data
-		QbVkBuffer pixelBuffer;
-		VkDeviceSize bufferSize = static_cast<uint64_t>(width)* static_cast<uint64_t>(height) * 4;
-		context.allocator->CreateStagingBuffer(pixelBuffer, bufferSize, pixels);
-
-		// Copy the pixel data to the image
-		CopyBufferToImage(context, pixelBuffer.buf, texture.image.imgHandle, width, height);
-
-		// Destroy the buffer
-		context.allocator->DestroyBuffer(pixelBuffer);
-
-		// Transition the image to be read in shader
-		TransitionImageLayout(context, texture.image.imgHandle, imageAspectFlags, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
-
-
-		texture.imageView = VkUtils::CreateImageView(context, texture.image.imgHandle, imageFormat, imageAspectFlags);
-		texture.imageLayout = imageLayout;
-		texture.format = imageFormat;
-		if (samplerCreateInfo != nullptr) VK_CHECK(vkCreateSampler(context.device, samplerCreateInfo, nullptr, &texture.sampler));
-		
-		VkDescriptorImageInfo descriptor = { texture.sampler, texture.imageView, imageLayout };
-		return { handle, descriptor };
-	}
-
-	inline QbTexture CreateTexture(const QbVkContext& context, uint32_t width, uint32_t height, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage,
-		VkImageLayout imageLayout, VkImageAspectFlags imageAspectFlags, VkPipelineStageFlagBits srcStage, VkPipelineStageFlagBits dstStage, QbVkMemoryUsage memoryUsage,
-		VkSampler sampler, VkSampleCountFlagBits numSamples) {
-
-		auto handle = context.resourceManager->textures.GetNextHandle();
-		auto& texture = context.resourceManager->textures[handle];
-
-		auto imageCreateInfo = VkUtils::Init::ImageCreateInfo(width, height, imageFormat, imageTiling, imageUsage, numSamples);
-		context.allocator->CreateImage(texture.image, imageCreateInfo, memoryUsage);
-		texture.imageView = VkUtils::CreateImageView(context, texture.image.imgHandle, imageFormat, imageAspectFlags);
-		texture.imageLayout = imageLayout;
-		texture.format = imageFormat;
-		texture.sampler = sampler;
-
-		// Transition the image layout to the desired layout
-		TransitionImageLayout(context, texture.image.imgHandle, imageAspectFlags, VK_IMAGE_LAYOUT_UNDEFINED, imageLayout, srcStage, dstStage);
-
-		VkDescriptorImageInfo descriptor = { texture.sampler, texture.imageView, imageLayout };
-		return { handle, descriptor };
-	}
-
-	inline QbVkModel LoadModel(const char* objPath, std::vector<QbVkVertexInputAttribute> vertexModel) {
-		QbVkModel model;
-
-		// Now load the model
-		tinyobj::attrib_t attrib;
-		std::vector<tinyobj::shape_t> shapes;
-		std::vector<tinyobj::material_t> materials;
-		std::string warn, err;
-
-		if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, objPath)) {
-			QB_LOG_ERROR("Failed to load object from file: %s\n", objPath);
-			return {};
-		}
-
-		uint32_t stride = 0;
-
-		for (auto inputAttribute : vertexModel) {
-			switch (inputAttribute) {
-			case QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_POSITION:
-				stride += sizeof(glm::float3);
-				break;
-			case QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_NORMAL:
-				stride += sizeof(glm::float3);
-				break;
-			case QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_UV:
-				stride += sizeof(glm::float2);
-				break;
-			case QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_COLOUR:
-				stride += sizeof(glm::float3);
-				break;
-			case QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_FLOAT:
-				stride += sizeof(glm::float1);
-				break;
-			case QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_FLOAT4:
-				stride += sizeof(glm::float4);
-				break;
-			}
-		}
-
-		model.vertexStride = stride;
-
-		for (auto& shape : shapes) {
-			for (auto& index : shape.mesh.indices) {
-				for (auto inputAttribute : vertexModel) {
-					switch (inputAttribute) {
-					case QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_POSITION:
-						model.vertices.push_back(attrib.vertices[3 * static_cast<uint64_t>(index.vertex_index) + 0]);
-						model.vertices.push_back(-attrib.vertices[3 * static_cast<uint64_t>(index.vertex_index) + 1]);
-						model.vertices.push_back(attrib.vertices[3 * static_cast<uint64_t>(index.vertex_index) + 2]);
-						break;
-					case QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_NORMAL:
-						if (attrib.normals.empty()) {
-							model.vertices.push_back(1.0f);
-							model.vertices.push_back(-1.0f);
-							model.vertices.push_back(1.0f);
-						}
-						else {
-							model.vertices.push_back(attrib.normals[3 * static_cast<uint64_t>(index.normal_index) + 0]);
-							model.vertices.push_back(-attrib.normals[3 * static_cast<uint64_t>(index.normal_index) + 1]);
-							model.vertices.push_back(attrib.normals[3 * static_cast<uint64_t>(index.normal_index) + 2]);
-						}
-						break;
-					case QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_UV:
-						model.vertices.push_back(attrib.texcoords[2 * static_cast<uint64_t>(index.texcoord_index) + 0]);
-						model.vertices.push_back(attrib.texcoords[2 * static_cast<uint64_t>(index.texcoord_index) + 1]);
-						break;
-					case QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_COLOUR:
-						model.vertices.push_back(attrib.colors[3 * static_cast<uint64_t>(index.vertex_index) + 0]);
-						model.vertices.push_back(attrib.colors[3 * static_cast<uint64_t>(index.vertex_index) + 1]);
-						model.vertices.push_back(attrib.colors[3 * static_cast<uint64_t>(index.vertex_index) + 2]);
-						break;
-					case QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_FLOAT:
-					case QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_FLOAT4:
-						break;
-					}
-				}
-				model.indices.push_back(static_cast<uint32_t>(model.indices.size()));
-			}
-		}
-		return model;
-	}
-
-	//inline VkPipelineShaderStageCreateInfo LoadShaders(const QbVkContext& context, const char* vertexShader, const char* vertexEntry, const char* fragmentShader, const char* fragmentEntry) {
-	//	std::vector<char> vertexShaderBytecode = ReadShader(vertexShader);
-	//	std::vector<char> fragmentShaderBytecode = ReadShader(fragmentShader);
-	//	VkShaderModule vertShaderModule = CreateShaderModule(vertexShaderBytecode, context.device);
-	//	VkShaderModule fragShaderModule = CreateShaderModule(fragmentShaderBytecode, context.device);
-
-	//	// This part specifies the two shader types used in the pipeline
-	//	VkPipelineShaderStageCreateInfo shaderStageInfo[2] = {
-	//		VkUtils::Init::PipelineShaderStageCreateInfo(),
-	//		VkUtils::Init::PipelineShaderStageCreateInfo()
-	//	};
-	//	// Specifies type of shader
-	//	shaderStageInfo[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-	//	// Specifies shader module to load
-	//	shaderStageInfo[0].module = vertShaderModule;
-	//	// "main" refers to the Entrypoint of a given shader module
-	//	shaderStageInfo[0].pName = vertexEntry;
-
-	//	// Similarly for the fragment shader
-	//	shaderStageInfo[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-	//	shaderStageInfo[1].module = fragShaderModule;
-	//	shaderStageInfo[1].pName = fragmentEntry;
-	//}
 }

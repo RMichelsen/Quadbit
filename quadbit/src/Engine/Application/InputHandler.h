@@ -1,5 +1,7 @@
 #pragma once
 
+#include <EASTL/array.h>
+
 #include "Engine/Application/QbInputDefs.h"
 
 namespace Quadbit {
@@ -11,12 +13,10 @@ namespace Quadbit {
 		MouseButtonStatus mouseButtonPressed_{};
 		MouseDragStatus mouseDrag_{};
 
-		unsigned char keyState_[0xFF];
-
+		eastl::array<unsigned char, 0xFF> keyState_;
+		eastl::array<unsigned char, 0xFF> keyPressed_;
 		KeyboardControlKeys controlKeysPressed_{};
-		unsigned char keyPressed_[0xFF];
 
-		//static InputHandler& Instance();
 		void NewFrame();
 		void ProcessRawInput(RAWINPUT* rawInput, HWND hwnd);
 	};

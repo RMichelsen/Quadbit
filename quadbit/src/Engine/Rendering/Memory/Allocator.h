@@ -1,5 +1,7 @@
 #pragma once
-#include <forward_list>
+#include <EASTL/array.h>
+#include <EASTL/slist.h>
+#include <EASTL/unique_ptr.h>
 
 #include "Engine/Rendering/VulkanTypes.h"
 #include "Engine/Rendering/Memory/Pool.h"
@@ -24,10 +26,10 @@ namespace Quadbit {
 		VkDeviceSize bufferImageGranularity_;
 		VkPhysicalDeviceMemoryProperties memoryProperties_;
 
-		std::array<std::forward_list<std::unique_ptr<QbVkPool>>, VK_MAX_MEMORY_TYPES> poolsByType_;
+		eastl::array<eastl::slist<eastl::unique_ptr<QbVkPool>>, VK_MAX_MEMORY_TYPES> poolsByType_;
 
 		uint32_t garbageIndex_;
-		std::array<std::vector<QbVkAllocation>, MAX_FRAMES_IN_FLIGHT> garbage_;
+		eastl::array<eastl::vector<QbVkAllocation>, MAX_FRAMES_IN_FLIGHT> garbage_;
 
 		int32_t FindMemoryProperties(uint32_t memoryTypeBitsRequirement, VkMemoryPropertyFlags requiredProperties);
 		int32_t FindMemoryTypeIndex(const uint32_t memoryTypeBitsRequirement, QbVkMemoryUsage memoryUsage);

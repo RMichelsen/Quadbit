@@ -1,6 +1,6 @@
 #pragma once
-#include <type_traits>
-#include <array>
+#include <EASTL/vector.h>
+#include <EASTL/type_traits.h>
 
 #include <glm/gtx/compatibility.hpp>
 
@@ -15,7 +15,7 @@ enum class VisibleFaces {
 	Bottom = 1 << 5	// 100000
 };
 inline VisibleFaces operator | (VisibleFaces lhs, VisibleFaces rhs) {
-	using type = std::underlying_type_t<VisibleFaces>;
+	using type = eastl::underlying_type_t<VisibleFaces>;
 	return static_cast<VisibleFaces>(static_cast<type>(lhs) | static_cast<type>(rhs));
 }
 inline VisibleFaces& operator |= (VisibleFaces& lhs, VisibleFaces rhs) {
@@ -23,7 +23,7 @@ inline VisibleFaces& operator |= (VisibleFaces& lhs, VisibleFaces rhs) {
 	return lhs;
 }
 inline VisibleFaces operator & (VisibleFaces lhs, VisibleFaces rhs) {
-	using type = std::underlying_type_t<VisibleFaces>;
+	using type = eastl::underlying_type_t<VisibleFaces>;
 	return static_cast<VisibleFaces>(static_cast<type>(lhs) & static_cast<type>(rhs));
 }
 inline VisibleFaces& operator &= (VisibleFaces& lhs, VisibleFaces rhs) {
@@ -31,7 +31,7 @@ inline VisibleFaces& operator &= (VisibleFaces& lhs, VisibleFaces rhs) {
 	return lhs;
 }
 inline VisibleFaces operator ~ (const VisibleFaces a) {
-	using type = std::underlying_type_t<VisibleFaces>;
+	using type = eastl::underlying_type_t<VisibleFaces>;
 	return static_cast<VisibleFaces>(~static_cast<type>(a));
 }
 
@@ -62,19 +62,19 @@ struct VoxelVertex {
 };
 
 struct VoxelBlockComponent {
-	// Could be stored in a std::array but might overflow stack size
+	// Could be stored in an rray but might overflow stack size
 	// Heap allocated in a vector seems like the best option
 	VoxelBlockComponent() {
 		voxels.resize(VOXEL_BLOCK_SIZE);
 	}
-	std::vector<Voxel> voxels;
+	eastl::vector<Voxel> voxels;
 
 	// Vectors necessary for mesh generation
-	std::vector<VoxelVertex> vertices;
-	std::vector<uint32_t> indices;
+	eastl::vector<VoxelVertex> vertices;
+	eastl::vector<uint32_t> indices;
 };
 
-const std::vector<VoxelVertex> cubeVertices = {
+const eastl::vector<VoxelVertex> cubeVertices = {
 {{-1.0f, -1.0f, 1.0f},	{1.0f, 0.0f, 0.0f}},
 {{1.0f, -1.0f, 1.0f},	{0.0f, 1.0f, 0.0f}},
 {{1.0f, 1.0f, 1.0f},	{0.0f, 0.0f, 1.0f}},
@@ -86,7 +86,7 @@ const std::vector<VoxelVertex> cubeVertices = {
 {{-1.0f, 1.0f, -1.0f},	{1.0f, 1.0f, 0.0f}}
 };
 
-const std::vector<uint32_t> cubeIndices = {
+const eastl::vector<uint32_t> cubeIndices = {
 	0, 1, 2,
 	2, 3, 0,
 	1, 5, 6,

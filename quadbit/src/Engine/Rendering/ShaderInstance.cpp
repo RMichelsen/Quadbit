@@ -21,7 +21,7 @@ namespace Quadbit {
 	}
 
 	void QbVkShaderInstance::AddShader(const char* shaderPath, const char* shaderEntry, VkShaderStageFlagBits shaderStage) {
-		std::vector<char> shaderBytecode = VkUtils::ReadShader(shaderPath);
+		eastl::vector<char> shaderBytecode = VkUtils::ReadShader(shaderPath);
 		VkShaderModule shaderModule = VkUtils::CreateShaderModule(shaderBytecode, context_.device);
 
 		VkPipelineShaderStageCreateInfo shader = VkUtils::Init::PipelineShaderStageCreateInfo();

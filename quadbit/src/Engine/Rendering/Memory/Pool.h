@@ -1,5 +1,7 @@
 #pragma once
 
+#include <EASTL/unique_ptr.h>
+
 #include "Engine/Rendering/VulkanTypes.h"
 
 namespace Quadbit {
@@ -18,10 +20,10 @@ namespace Quadbit {
 			VkDeviceSize size = 0;
 			VkDeviceSize offset = 0;
 			Block* prev = nullptr;
-			std::unique_ptr<Block> next = nullptr;
+			eastl::unique_ptr<Block> next = nullptr;
 			QbVkAllocationType allocationType = QbVkAllocationType::QBVK_ALLOCATION_TYPE_UNKNOWN;
 		};
-		std::unique_ptr<Block> head_ = std::make_unique<Block>();
+		eastl::unique_ptr<Block> head_ = eastl::make_unique<Block>();
 
 		QbVkPool(VkDevice device, const int32_t memoryTypeIndex, const VkDeviceSize size, QbVkMemoryUsage usage);
 		~QbVkPool();

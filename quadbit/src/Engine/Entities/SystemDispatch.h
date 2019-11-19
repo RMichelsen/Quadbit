@@ -1,7 +1,10 @@
 #pragma once
-#include <array>
-#include <memory>
-#include <vector>
+
+#include <cstdint>
+
+#include <EASTL/array.h>
+#include <EASTL/type_traits.h>
+#include <EASTL/unique_ptr.h>
 #include <imgui/imgui.h>
 
 #include "Engine/Core/Sfinae.h"
@@ -9,13 +12,13 @@
 
 namespace Quadbit {
 	template <class S>
-	using has_init = decltype(std::declval<S>().Init());
+	using has_init = decltype(eastl::declval<S>().Init());
 
 	class SystemDispatch {
 	public:
 		EntityManager* const entityManager_;
-		std::size_t systemCount_ = 0;
-		std::array<std::unique_ptr<ComponentSystem>, MAX_SYSTEMS> systems_;
+		size_t systemCount_ = 0;
+		eastl::array<eastl::unique_ptr<ComponentSystem>, MAX_SYSTEMS> systems_;
 
 		SystemDispatch(EntityManager* const entityManager) : entityManager_(entityManager) {}
 
@@ -27,9 +30,9 @@ namespace Quadbit {
 
 		template<typename S>
 		void RegisterSystem() {
-			static_assert(std::is_base_of_v<ComponentSystem, S>, "All systems must inherit from ComponentSystem");
+			static_assert(eastl::is_base_of_v<ComponentSystem, S>, "All systems must inherit from ComponentSystem");
 			size_t systemID = SystemID::GetUnique<S>();
-			systems_[systemID] = std::make_unique<S>();
+			systems_[systemID] = eastl::make_unique<S>();
 			systems_[systemID]->entityManager_ = entityManager_;
 			systems_[systemID]->name = typeid(S).name();
 			if constexpr (SFINAE::is_detected_v<has_init, S>) {

@@ -1,6 +1,6 @@
 #pragma once
 #include <Windows.h>
-#include <memory>
+#include <EASTL/unique_ptr.h>
 
 #include "Engine/Application/InputHandler.h"
 
@@ -10,7 +10,7 @@ namespace Quadbit {
 		HWND hwnd_ = NULL;
 		HINSTANCE instance_ = NULL;
 
-		std::unique_ptr<InputHandler> inputHandler_;
+		eastl::unique_ptr<InputHandler> inputHandler_;
 
 		Window(HINSTANCE hInstance, int nCmdShow);
 		~Window();

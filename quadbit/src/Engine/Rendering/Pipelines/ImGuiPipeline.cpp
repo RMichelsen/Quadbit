@@ -1,5 +1,8 @@
 #include "ImGuiPipeline.h"
 
+#include <EASTL/algorithm.h>
+#include <EASTL/chrono.h>
+#include <EASTL/numeric.h>
 #include <imgui/imgui.h>
 
 #include "Engine/Application/InputHandler.h"
@@ -112,8 +115,8 @@ namespace Quadbit {
 				for (auto j = 0; j < cmdList->CmdBuffer.Size; j++) {
 					const ImDrawCmd* pCmd = &cmdList->CmdBuffer[j];
 					VkRect2D scissorRect = VkUtils::Init::ScissorRect(
-						std::max(static_cast<int32_t>(pCmd->ClipRect.x), 0),
-						std::max(static_cast<int32_t>(pCmd->ClipRect.y), 0),
+						eastl::max(static_cast<int32_t>(pCmd->ClipRect.x), 0),
+						eastl::max(static_cast<int32_t>(pCmd->ClipRect.y), 0),
 						static_cast<uint32_t>(pCmd->ClipRect.z - pCmd->ClipRect.x),
 						static_cast<uint32_t>(pCmd->ClipRect.w - pCmd->ClipRect.y));
 					vkCmdSetScissor(commandbuffer, 0, 1, &scissorRect);
@@ -165,9 +168,11 @@ namespace Quadbit {
 		samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 		samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
 
-		fontTexture_ = VkUtils::LoadTexture(context_, textureWidth, textureHeight, fontData, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
-			VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-			VK_IMAGE_ASPECT_COLOR_BIT, QbVkMemoryUsage::QBVK_MEMORY_USAGE_GPU_ONLY, &samplerInfo);
+		fontTexture_ = context_.resourceManager->LoadTexture(textureWidth, textureHeight, fontData, &samplerInfo);
+
+		//fontTexture_ = VkUtils::LoadTexture(context_, textureWidth, textureHeight, fontData, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
+		//	VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		//	VK_IMAGE_ASPECT_COLOR_BIT, QbVkMemoryUsage::QBVK_MEMORY_USAGE_GPU_ONLY, &samplerInfo);
 	}
 
 	void ImGuiPipeline::CreateDescriptorPoolAndSets() {
@@ -204,7 +209,8 @@ namespace Quadbit {
 		VK_CHECK(vkAllocateDescriptorSets(context_.device, &descAllocInfo, &descriptorSet_));
 
 		// Write
-		VkWriteDescriptorSet writeDesc = VkUtils::Init::WriteDescriptorSet(descriptorSet_, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 0, &fontTexture_.descriptor);
+		auto& descriptor = context_.resourceManager->textures_[fontTexture_].descriptor;
+		VkWriteDescriptorSet writeDesc = VkUtils::Init::WriteDescriptorSet(descriptorSet_, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 0, &descriptor);
 
 		// Update
 		vkUpdateDescriptorSets(context_.device, 1, &writeDesc, 0, nullptr);
@@ -243,10 +249,10 @@ namespace Quadbit {
 		shaderStageInfo[1].pName = "main";
 
 		// This part specifies the format of the vertex data passed to the vertex shader
-		const std::array<VkVertexInputBindingDescription, 1> bindingDescriptions{
+		const eastl::array<VkVertexInputBindingDescription, 1> bindingDescriptions{
 			VkUtils::Init::VertexInputBindingDescription(0, sizeof(ImDrawVert), VK_VERTEX_INPUT_RATE_VERTEX)
 		};
-		const std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions{
+		const eastl::array<VkVertexInputAttributeDescription, 3> attributeDescriptions{
 			VkUtils::Init::VertexInputAttributeDescription(0, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(ImDrawVert, pos)),
 			VkUtils::Init::VertexInputAttributeDescription(0, 1, VK_FORMAT_R32G32_SFLOAT, offsetof(ImDrawVert, uv)),
 			VkUtils::Init::VertexInputAttributeDescription(0, 2, VK_FORMAT_R8G8B8A8_UNORM, offsetof(ImDrawVert, col)),
@@ -337,13 +343,13 @@ namespace Quadbit {
 	void ImGuiPipeline::ImGuiDrawState() {
 		frametimeCache_.push_back(Time::deltaTime);
 
-		static auto tStart = std::chrono::time_point_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now());
-		auto tEnd = std::chrono::high_resolution_clock::now();
+		static auto tStart = eastl::chrono::time_point_cast<eastl::chrono::nanoseconds>(eastl::chrono::high_resolution_clock::now());
+		auto tEnd = eastl::chrono::high_resolution_clock::now();
 
-		if (static_cast<std::chrono::duration<float, std::ratio<1>>>(tEnd - tStart).count() > 1) {
-			currentFrametime_ = std::accumulate(frametimeCache_.begin(), frametimeCache_.end(), 0.0f) / frametimeCache_.size() * 1000.0f;
+		if (static_cast<eastl::chrono::duration<float, eastl::ratio<1>>>(tEnd - tStart).count() > 1) {
+			currentFrametime_ = eastl::accumulate(frametimeCache_.begin(), frametimeCache_.end(), 0.0f) / frametimeCache_.size() * 1000.0f;
 			currentFPS_ = frametimeCache_.size();
-			tStart = std::chrono::high_resolution_clock::now();
+			tStart = eastl::chrono::high_resolution_clock::now();
 			frametimeCache_.clear();
 		}
 

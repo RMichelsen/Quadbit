@@ -169,7 +169,7 @@ namespace Quadbit {
 		// Otherwise we'll just create a new pool
 		// 256MB for device local, 64MB for host-visible
 		VkDeviceSize poolSize = (memoryUsage == QbVkMemoryUsage::QBVK_MEMORY_USAGE_GPU_ONLY) ? DEFAULT_DEVICE_LOCAL_POOLSIZE : DEFAULT_HOST_VISIBLE_POOLSIZE;
-		pools.push_front(std::make_unique<QbVkPool>(device_, memoryTypeIndex, poolSize, memoryUsage));
+		pools.push_front(eastl::make_unique<QbVkPool>(device_, memoryTypeIndex, poolSize, memoryUsage));
 		if (!pools.front()->Allocate(size, alignment, bufferImageGranularity_, allocType, allocation)) {
 			QB_LOG_WARN("Failed to allocate new memory block\n");
 		}

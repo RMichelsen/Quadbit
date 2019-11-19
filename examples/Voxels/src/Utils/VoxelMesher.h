@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <EASTL/vector.h>
 
 #include <glm/glm.hpp>
 #include <glm/gtx/compatibility.hpp>
@@ -10,8 +11,8 @@
 
 namespace VoxelMesher {
 	struct VoxelMesh {
-		std::vector<VoxelVertex> vertices;
-		std::vector<uint32_t> indices;
+		eastl::vector<VoxelVertex> vertices;
+		eastl::vector<uint32_t> indices;
 	};
 
 	// For a given face, returns a direction for the greedy meshing
@@ -33,7 +34,7 @@ namespace VoxelMesher {
 
 	// Returns the offsets for the ambient occlusion for a particular face.
 	// The first two float3's are the sides, the last is the corner offset.
-	inline std::array<const glm::int3x3, 4> GetAmbientOcclusionOffsets(const VisibleFaces face) {
+	inline eastl::array<const glm::int3x3, 4> GetAmbientOcclusionOffsets(const VisibleFaces face) {
 		switch(face) {
 		case VisibleFaces::Top:
 			return {
@@ -71,7 +72,7 @@ namespace VoxelMesher {
 	}
 
 	// Important: Side 3 is the corner side
-	inline float CalculateVertexOcclusion(const glm::int3x3 sides, const std::vector<Voxel>& voxels, const glm::int3 extents) {
+	inline float CalculateVertexOcclusion(const glm::int3x3 sides, const eastl::vector<Voxel>& voxels, const glm::int3 extents) {
 		static const glm::float4 OCCLUSION_CURVE = glm::float4{ 0.5f, 0.7f, 0.85f, 1.0f };
 
 		const bool ocSide1 = (sides[0].x < extents.x && sides[0].x >= 0 && sides[0].y < extents.y && sides[0].y >= 0 && sides[0].z < extents.z && sides[0].z >= 0)
@@ -88,7 +89,7 @@ namespace VoxelMesher {
 		return OCCLUSION_CURVE[3 - (ocSide1 + ocSide2 + ocCorner)];
 	}
 
-	inline glm::float4 CalculateFaceAmbientOcclusion(const VisibleFaces face, const glm::int3 position, const std::vector<Voxel>& voxels, const glm::int3 extents) {
+	inline glm::float4 CalculateFaceAmbientOcclusion(const VisibleFaces face, const glm::int3 position, const eastl::vector<Voxel>& voxels, const glm::int3 extents) {
 		auto ambientOcclusionOffsets = GetAmbientOcclusionOffsets(face);
 
 		return {
@@ -138,7 +139,7 @@ namespace VoxelMesher {
 	}
 
 	inline glm::int4x3 GetPointsForFaces(const VisibleFaces face) {
-		static const std::array<glm::ivec3, 8> cubePoints{ {
+		static const eastl::array<glm::ivec3, 8> cubePoints{ {
 			{0, 0, 0},
 			{0, 1, 0},
 			{0, 0, 1},
@@ -168,7 +169,7 @@ namespace VoxelMesher {
 	}
 
 	inline void AddQuad(const VisibleFaces face, const glm::int4x3 points, const glm::vec3 colour, glm::float4 ambientOcclusion,
-		std::vector<VoxelVertex>& vertices, std::vector<uint32_t>& indices) {
+		eastl::vector<VoxelVertex>& vertices, eastl::vector<uint32_t>& indices) {
 		glm::int4x3 translatedPoints = GetPointsForFaces(face, points);
 		for(int i = 0; i < 4; i++) {
 			vertices.push_back({ translatedPoints[i], colour * ambientOcclusion[i] });
@@ -186,7 +187,7 @@ namespace VoxelMesher {
 	}
 
 	inline void AddQuad(const VisibleFaces face, const glm::int3 position, const glm::vec3 colour, glm::float4 ambientOcclusion,
-		std::vector<VoxelVertex>& vertices, std::vector<uint32_t>& indices) {
+		eastl::vector<VoxelVertex>& vertices, eastl::vector<uint32_t>& indices) {
 		glm::int4x3 points = GetPointsForFaces(face);
 		for(int i = 0; i < 4; i++) {
 			vertices.push_back({ points[i] + position, colour * ambientOcclusion[i] });
@@ -203,7 +204,7 @@ namespace VoxelMesher {
 		indices.push_back(vertexCount - 4 + 3);
 	}
 
-	inline void GreedyMeshVoxelBlock(const std::vector<Voxel>& voxels, std::vector<VoxelVertex>& vertices, std::vector<uint32_t>& indices, glm::int3 extents) {
+	inline void GreedyMeshVoxelBlock(const eastl::vector<Voxel>& voxels, eastl::vector<VoxelVertex>& vertices, eastl::vector<uint32_t>& indices, glm::int3 extents) {
 		vertices.clear();
 		indices.clear();
 
@@ -286,7 +287,7 @@ namespace VoxelMesher {
 		}
 	}
 
-	inline void CulledMeshVoxelBlock(const std::vector<Voxel>& voxels, std::vector<VoxelVertex>& vertices, std::vector<uint32_t>& indices, glm::int3 extents) {
+	inline void CulledMeshVoxelBlock(const eastl::vector<Voxel>& voxels, eastl::vector<VoxelVertex>& vertices, eastl::vector<uint32_t>& indices, glm::int3 extents) {
 		vertices.clear();
 		indices.clear();
 

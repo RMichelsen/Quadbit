@@ -1,5 +1,6 @@
 #include "ComputePipeline.h"
 
+#include <EASTL/numeric_limits.h>
 #include <imgui/imgui.h>
 
 #include "Engine/Rendering/VulkanTypes.h"
@@ -21,7 +22,7 @@ namespace Quadbit {
 
 	ComputePipeline::~ComputePipeline() {
 		for (const auto& instance : activeInstances_) {
-			DestroyInstance(std::get<std::unique_ptr<QbVkComputeInstance>>(instance).get());
+			DestroyInstance(eastl::get<eastl::unique_ptr<QbVkComputeInstance>>(instance).get());
 		}
 
 		vkDestroyCommandPool(context_.device, commandPool_, nullptr);
@@ -29,7 +30,7 @@ namespace Quadbit {
 	}
 
 	// Records user-defined vulkan commands directly into a commandbuffer
-	void ComputePipeline::RecordCommands(const QbVkComputeInstance* instance, std::function<void()> func) {
+	void ComputePipeline::RecordCommands(const QbVkComputeInstance* instance, eastl::function<void()> func) {
 		VkCommandBufferBeginInfo cmdBufInfo = VkUtils::Init::CommandBufferBeginInfo();
 		VK_CHECK(vkBeginCommandBuffer(instance->commandBuffer, &cmdBufInfo));
 		vkCmdResetQueryPool(instance->commandBuffer, instance->queryPool, 0, 128);
@@ -49,7 +50,7 @@ namespace Quadbit {
 
 		VK_CHECK(vkQueueSubmit(context_.computeQueue, 1, &computeSubmitInfo, computeFence_));
 
-		VK_CHECK(vkWaitForFences(context_.device, 1, &computeFence_, VK_TRUE, std::numeric_limits<uint64_t>().max()));
+		VK_CHECK(vkWaitForFences(context_.device, 1, &computeFence_, VK_TRUE, eastl::numeric_limits<uint64_t>().max()));
 		VK_CHECK(vkResetFences(context_.device, 1, &computeFence_));
 
 		uint64_t timestamps[2]{};
@@ -60,12 +61,12 @@ namespace Quadbit {
 		computeInstance->msAvgTime = computeInstance->msAvgTime * 0.95 + (computeEnd - computeStart) * 0.05;
 	}
 
-	QbVkComputeInstance* ComputePipeline::CreateInstance(std::vector<QbVkComputeDescriptor>& descriptors, const char* shader,
+	QbVkComputeInstance* ComputePipeline::CreateInstance(eastl::vector<QbVkComputeDescriptor>& descriptors, const char* shader,
 		const char* shaderFunc, const VkSpecializationInfo* specInfo, const uint32_t pushConstantRangeSize) {
-		activeInstances_.push_back({ shader, std::make_unique<QbVkComputeInstance>() });
-		QbVkComputeInstance* computeInstance = std::get<std::unique_ptr<QbVkComputeInstance>>(activeInstances_.back()).get();
+		activeInstances_.push_back({ shader, eastl::make_unique<QbVkComputeInstance>() });
+		QbVkComputeInstance* computeInstance = eastl::get<eastl::unique_ptr<QbVkComputeInstance>>(activeInstances_.back()).get();
 
-		std::vector<VkDescriptorPoolSize> poolSizes;
+		eastl::vector<VkDescriptorPoolSize> poolSizes;
 		for (auto i = 0; i < descriptors.size(); i++) {
 			poolSizes.push_back(VkUtils::Init::DescriptorPoolSize(descriptors[i].type, descriptors[i].count));
 		}
@@ -79,7 +80,7 @@ namespace Quadbit {
 		VK_CHECK(vkCreateDescriptorPool(context_.device, &poolInfo, nullptr, &computeInstance->descriptorPool));
 
 		// Create descriptor sets
-		std::vector<VkDescriptorSetLayoutBinding> descSetLayoutBindings;
+		eastl::vector<VkDescriptorSetLayoutBinding> descSetLayoutBindings;
 		for (auto i = 0; i < descriptors.size(); i++) {
 			descSetLayoutBindings.push_back(VkUtils::Init::DescriptorSetLayoutBinding(i, descriptors[i].type, VK_SHADER_STAGE_COMPUTE_BIT, descriptors[i].count));
 		}
@@ -96,7 +97,7 @@ namespace Quadbit {
 		descSetAllocInfo.descriptorSetCount = 1;
 		VK_CHECK(vkAllocateDescriptorSets(context_.device, &descSetAllocInfo, &computeInstance->descriptorSet));
 
-		std::vector<VkWriteDescriptorSet> writeDescSets;
+		eastl::vector<VkWriteDescriptorSet> writeDescSets;
 		for (auto i = 0; i < descriptors.size(); i++) {
 			if (descriptors[i].type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER || descriptors[i].type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER) {
 				writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(computeInstance->descriptorSet, descriptors[i].type, i,
@@ -111,7 +112,7 @@ namespace Quadbit {
 		vkUpdateDescriptorSets(context_.device, static_cast<uint32_t>(writeDescSets.size()), writeDescSets.data(), 0, nullptr);
 
 		// Prepare shader
-		std::vector<char> computeShaderBytecode = VkUtils::ReadShader(shader);
+		eastl::vector<char> computeShaderBytecode = VkUtils::ReadShader(shader);
 		VkShaderModule computeShaderModule = VkUtils::CreateShaderModule(computeShaderBytecode, context_.device);
 		VkPipelineShaderStageCreateInfo shaderStageInfo{};
 		shaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -165,11 +166,12 @@ namespace Quadbit {
 	}
 
 	void ComputePipeline::ImGuiDrawState() {
+		if (activeInstances_.empty()) return;
 		ImGui::SetNextWindowSize(ImVec2(500, 200), ImGuiCond_FirstUseEver);
 		ImGui::Begin("Quadbit Compute Shader Performance", nullptr);
 		for (const auto& instance : activeInstances_) {
-			auto* computeInstance = std::get<std::unique_ptr<QbVkComputeInstance>>(instance).get();
-			auto label = std::get<const char*>(instance);
+			auto* computeInstance = eastl::get<eastl::unique_ptr<QbVkComputeInstance>>(instance).get();
+			auto label = eastl::get<const char*>(instance);
 			ImGui::Text("%s %.5fms", label, computeInstance->msAvgTime);
 		}
 		ImGui::End();

@@ -6,7 +6,7 @@
 namespace Quadbit {
 	Compute::Compute(QbVkRenderer* const renderer) : renderer_(renderer) { }
 
-	QbVkComputeInstance* Compute::CreateComputeInstance(std::vector<QbVkComputeDescriptor>& descriptors,
+	QbVkComputeInstance* Compute::CreateComputeInstance(eastl::vector<QbVkComputeDescriptor>& descriptors,
 		const char* shader, const char* shaderFunc, const VkSpecializationInfo* specInfo, uint32_t pushConstantRangeSize) {
 		return renderer_->computePipeline_->CreateInstance(descriptors, shader, shaderFunc, specInfo, pushConstantRangeSize);
 	}
@@ -15,7 +15,7 @@ namespace Quadbit {
 		renderer_->computePipeline_->Dispatch(instance);
 	}
 
-	void Compute::ComputeRecord(const QbVkComputeInstance* instance, std::function<void()> func) {
+	void Compute::ComputeRecord(const QbVkComputeInstance* instance, eastl::function<void()> func) {
 		renderer_->computePipeline_->RecordCommands(instance, func);
 	}
 

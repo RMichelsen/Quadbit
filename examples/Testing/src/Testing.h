@@ -1,5 +1,7 @@
 #pragma once
 
+#include <EASTL/unique_ptr.h>
+
 #include "Engine/Core/Entry.h"
 #include "Engine/Core/Game.h"
 
@@ -9,6 +11,6 @@ public:
 	void Simulate(float deltaTime) override;
 };
 
-Quadbit::Game* Quadbit::CreateGame() {
-	return new Testing();
+eastl::unique_ptr<Quadbit::Game> Quadbit::CreateGame() {
+	return eastl::make_unique<Testing>();
 }

@@ -1,5 +1,9 @@
 #pragma once
 
+#include <cstdint>
+#include <EASTL/array.h>
+#include <EASTL/vector.h>
+
 #include "Engine/Rendering/RenderTypes.h"
 #include "Engine/Rendering/VulkanTypes.h"
 
@@ -23,11 +27,11 @@ namespace Quadbit {
 
 		QbVkContext& context_;
 
-		std::size_t currentFPS_;
+		size_t currentFPS_;
 		float currentFrametime_;
-		std::vector<float> frametimeCache_;
+		eastl::vector<float> frametimeCache_;
 
-		QbTexture fontTexture_{};
+		QbVkTextureHandle fontTexture_{};
 
 		VkDescriptorPool descriptorPool_ = VK_NULL_HANDLE;
 		VkDescriptorSetLayout descriptorSetLayout_ = VK_NULL_HANDLE;
@@ -37,8 +41,8 @@ namespace Quadbit {
 		VkPipeline pipeline_ = VK_NULL_HANDLE;
 		PushConstBlock pushConstBlock_{};
 
-		std::array<QbVkBuffer, MAX_FRAMES_IN_FLIGHT> vertexBuffer_;
-		std::array<QbVkBuffer, MAX_FRAMES_IN_FLIGHT> indexBuffer_;
+		eastl::array<QbVkBuffer, MAX_FRAMES_IN_FLIGHT> vertexBuffer_;
+		eastl::array<QbVkBuffer, MAX_FRAMES_IN_FLIGHT> indexBuffer_;
 
 		void InitImGui();
 		void CreateFontTexture();

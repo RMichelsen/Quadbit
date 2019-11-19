@@ -1,6 +1,5 @@
 #pragma once
-#include <functional>
-#include <unordered_set>
+#include <EASTL/unique_ptr.h>
 
 #include "Engine/Rendering/ShaderInstance.h"
 #include "Engine/Rendering/RenderTypes.h"
@@ -34,10 +33,10 @@ namespace Quadbit {
 		HWND windowHandle_ = NULL;
 
 		VkInstance instance_ = VK_NULL_HANDLE;
-		std::unique_ptr<QbVkContext> context_;
-		std::unique_ptr<MeshPipeline> meshPipeline_;
-		std::unique_ptr<ImGuiPipeline> imGuiPipeline_;
-		std::unique_ptr<ComputePipeline> computePipeline_;
+		eastl::unique_ptr<QbVkContext> context_;
+		eastl::unique_ptr<MeshPipeline> meshPipeline_;
+		eastl::unique_ptr<ImGuiPipeline> imGuiPipeline_;
+		eastl::unique_ptr<ComputePipeline> computePipeline_;
 
 		//QbVkUserAllocations userAllocations_{};
 

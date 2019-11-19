@@ -1,10 +1,8 @@
 #pragma once
 
 #include <vulkan/vulkan.h>
-#include <vector>
-#include <array>
-#include <deque>
-#include <unordered_set>
+
+#include <EASTL/array.h>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -18,43 +16,6 @@ namespace Quadbit {
 		glm::vec3 position;
 		glm::vec3 colour;
 	};
-
-	struct MeshVertex {
-		glm::vec3 position;
-		glm::vec3 normal;
-		glm::vec2 uv;
-
-		static VkVertexInputBindingDescription GetBindingDescription() {
-			VkVertexInputBindingDescription bindingDescription{};
-			bindingDescription.binding = 0;
-			bindingDescription.stride = sizeof(MeshVertex);
-			bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-			return bindingDescription;
-		}
-
-		static std::array<VkVertexInputAttributeDescription, 3> GetAttributeDescriptions() {
-			std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions{};
-			// Attribute description for the position
-			attributeDescriptions[0].binding = 0;
-			attributeDescriptions[0].location = 0;
-			attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-			attributeDescriptions[0].offset = offsetof(MeshVertex, position);
-			// Attribute description for the normal
-			attributeDescriptions[1].binding = 0;
-			attributeDescriptions[1].location = 1;
-			attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-			attributeDescriptions[1].offset = offsetof(MeshVertex, normal);
-			// Attribute description for the uv
-			attributeDescriptions[2].binding = 0;
-			attributeDescriptions[2].location = 2;
-			attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
-			attributeDescriptions[2].offset = offsetof(MeshVertex, uv);
-			return attributeDescriptions;
-		}
-	};
-
-	using VertexBufHandle = uint16_t;
-	using IndexBufHandle = uint16_t;
 
 	struct alignas(16) EnvironmentMapPushConstants {
 		glm::mat4 proj;
@@ -114,12 +75,46 @@ namespace Quadbit {
 		}
 	};
 
-	struct RenderTexturedObjectComponent {
+	struct QbVkMaterial {
+		struct TextureIndices {
+			int baseColorTextureIndex = -1;
+			int metallicRoughnessTextureIndex = -1;
+			int normalTextureIndex = -1;
+			int occlusionTextureIndex = -1;
+			int emissiveTextureIndex = -1;
+		};
+
+		QbVkTextureHandle baseColorTexture = QBVK_TEXTURE_NULL_HANDLE;
+		QbVkTextureHandle metallicRoughnessTexture = QBVK_TEXTURE_NULL_HANDLE;
+		QbVkTextureHandle normalTexture = QBVK_TEXTURE_NULL_HANDLE;
+		QbVkTextureHandle occlusionTexture = QBVK_TEXTURE_NULL_HANDLE;
+		QbVkTextureHandle emissiveTexture = QBVK_TEXTURE_NULL_HANDLE;
+
+		TextureIndices textureIndices;
+
+		glm::vec4 baseColorFactor{};
+		glm::vec4 emissiveFactor{};
+		float metallicFactor = 0.0f;
+		float roughnessFactor = 0.0f;
+
+		QbVkDescriptorSetHandle descriptorHandle = QBVK_DESCRIPTORSET_NULL_HANDLE;
+	};
+
+	struct QbVkPBRMesh {
+		QbVkMaterial material;
+
+		uint32_t vertexOffset;
+		uint32_t indexOffset;
+		uint32_t indexCount;
+	};
+
+	struct PBRModelComponent {
+		eastl::vector<QbVkPBRMesh> meshes;
+
 		QbVkResourceHandle<QbVkBuffer> vertexHandle;
 		QbVkResourceHandle<QbVkBuffer> indexHandle;
-		uint32_t indexCount;
-		uint32_t descriptorIndex;
-		std::array<float, 32> pushConstants;
+
+		eastl::array<float, 32> pushConstants;
 		int pushConstantStride;
 
 		template<typename T>
@@ -133,7 +128,7 @@ namespace Quadbit {
 		QbVkResourceHandle<QbVkBuffer> vertexHandle;
 		QbVkResourceHandle<QbVkBuffer> indexHandle;
 		uint32_t indexCount;
-		std::array<float, 32> pushConstants;
+		eastl::array<float, 32> pushConstants;
 		int pushConstantStride;
 		const QbVkRenderMeshInstance* instance;
 

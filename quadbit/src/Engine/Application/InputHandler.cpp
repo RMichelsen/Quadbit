@@ -3,16 +3,12 @@
 #include "InputHandler.h"
 
 namespace Quadbit {
-	//InputHandler& InputHandler::Instance() {
-	//	static InputHandler instance;
-	//	return instance;
-	//}
 	void InputHandler::NewFrame() {
 		// Reset per-frame key/button press
 		memset(&mouseDelta_, 0, sizeof(MouseDelta));
 		memset(&mouseButtonPressed_, 0, sizeof(MouseButtonStatus));
 		memset(&controlKeysPressed_, 0, sizeof(KeyboardControlKeys));
-		memset(keyPressed_, 0, sizeof(keyPressed_));
+		keyPressed_.fill(0);
 	}
 
 	void InputHandler::ProcessRawInput(RAWINPUT* rawInput, HWND hwnd) {
@@ -26,8 +22,6 @@ namespace Quadbit {
 				keyState_[rawInput->data.keyboard.VKey] = 0x80;
 				keyPressed_[rawInput->data.keyboard.VKey] = true;
 
-				uint16_t c = 0;
-				const uint16_t scancode = MapVirtualKey(virtual_key, MAPVK_VK_TO_VSC);
 				if (virtual_key == VK_DELETE) controlKeysPressed_.del = true;
 				if (virtual_key == VK_BACK) controlKeysPressed_.backspace = true;
 				if (virtual_key == VK_RETURN) controlKeysPressed_.enter = true;
@@ -105,9 +99,8 @@ namespace Quadbit {
 
 			// Update deltamovement if we are dragging
 			if (mouseDrag_.left.active || mouseDrag_.right.active) {
-				// TODO: REMOVE IF?
-				if (mouseDelta_.x == 0) mouseDelta_.x = static_cast<float>(rawInput->data.mouse.lLastX);
-				if (mouseDelta_.y == 0) mouseDelta_.y = static_cast<float>(rawInput->data.mouse.lLastY);
+				mouseDelta_.x = static_cast<float>(rawInput->data.mouse.lLastX);
+				mouseDelta_.y = static_cast<float>(rawInput->data.mouse.lLastY);
 			}
 		}
 	}

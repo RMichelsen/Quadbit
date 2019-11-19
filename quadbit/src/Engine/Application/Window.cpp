@@ -1,5 +1,6 @@
 #include "Window.h"
 
+#include <cstdio>
 #include <windowsx.h>
 #include <imgui/imgui.h>
 
@@ -23,7 +24,7 @@ namespace Quadbit {
 			return;
 		}
 
-		inputHandler_ = std::make_unique<InputHandler>();
+		inputHandler_ = eastl::make_unique<InputHandler>();
 
 		if (!SetupConsole()) {
 			QB_LOG_ERROR("Failed to setup the console\n");
@@ -57,7 +58,7 @@ namespace Quadbit {
 		}
 		return true;
 	}
-
+	
 	bool Window::SetupWindow(int nCmdShow, WNDPROC windowProc) {
 		// Could make these parameters but fine as const for now
 		const char* windowClassName = "Quadbit_Class";

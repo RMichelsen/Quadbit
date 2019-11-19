@@ -2,6 +2,9 @@
 
 #include <Windows.h>
 #include <glm/gtx/compatibility.hpp>
+#include <EASTL/array.h>
+#include <EASTL/unique_ptr.h>
+#include <EASTL/vector.h>
 
 #include "Engine/Core/Entry.h"
 #include "Engine/Core/Game.h"
@@ -34,23 +37,23 @@ struct alignas(16) TogglesUBO {
 };
 
 struct PreCalculatedResources {
-	std::vector<glm::float4> precalcUniformRandoms;
+	eastl::vector<glm::float4> precalcUniformRandoms;
 
-	Quadbit::QbMappedGPUBuffer<PrecalcUBO> ubo;
-	Quadbit::QbGPUBuffer uniformRandomsStorageBuffer;
+	Quadbit::QbVkMappedBuffer<PrecalcUBO> ubo;
+	Quadbit::QbVkBufferHandle uniformRandomsStorageBuffer;
 
-	Quadbit::QbTexture h0Tilde;
-	Quadbit::QbTexture h0TildeConj;
+	Quadbit::QbVkTextureHandle h0Tilde;
+	Quadbit::QbVkTextureHandle h0TildeConj;
 };
 
 struct WaveheightResources {
-	Quadbit::QbMappedGPUBuffer<WaveheightUBO> ubo;
+	Quadbit::QbVkMappedBuffer<WaveheightUBO> ubo;
 
-	Quadbit::QbTexture h0TildeTx;
-	Quadbit::QbTexture h0TildeTy;
-	Quadbit::QbTexture h0TildeTz;
-	Quadbit::QbTexture h0TildeSlopeX;
-	Quadbit::QbTexture h0TildeSlopeZ;
+	Quadbit::QbVkTextureHandle h0TildeTx;
+	Quadbit::QbVkTextureHandle h0TildeTy;
+	Quadbit::QbVkTextureHandle h0TildeTz;
+	Quadbit::QbVkTextureHandle h0TildeSlopeX;
+	Quadbit::QbVkTextureHandle h0TildeSlopeZ;
 };
 
 struct IFFTPushConstants {
@@ -58,20 +61,20 @@ struct IFFTPushConstants {
 };
 
 struct InverseFFTResources {
-	Quadbit::QbTexture dX{};
-	Quadbit::QbTexture dY{};
-	Quadbit::QbTexture dZ{};
-	Quadbit::QbTexture dSlopeX{};
-	Quadbit::QbTexture dSlopeZ{};
+	Quadbit::QbVkTextureHandle dX{};
+	Quadbit::QbVkTextureHandle dY{};
+	Quadbit::QbVkTextureHandle dZ{};
+	Quadbit::QbVkTextureHandle dSlopeX{};
+	Quadbit::QbVkTextureHandle dSlopeZ{};
 
-	std::array<int, 6> specData;
+	eastl::array<int, 6> specData;
 
 	IFFTPushConstants pushConstants;
 };
 
 struct DisplacementResources {
-	Quadbit::QbTexture displacementMap;
-	Quadbit::QbTexture normalMap;
+	Quadbit::QbVkTextureHandle displacementMap;
+	Quadbit::QbVkTextureHandle normalMap;
 };
 
 class Water : public Quadbit::Game {
@@ -91,8 +94,8 @@ private:
 
 	Quadbit::Entity skybox;
 
-	std::vector<glm::float3> waterVertices_;
-	std::vector<uint32_t> waterIndices_;
+	eastl::vector<glm::float3> waterVertices_;
+	eastl::vector<uint32_t> waterIndices_;
 
 	PreCalculatedResources precalcResources_{};
 	WaveheightResources waveheightResources_{};
@@ -105,7 +108,7 @@ private:
 	Quadbit::QbVkComputeInstance* verticalIFFTInstance_ = nullptr;
 	Quadbit::QbVkComputeInstance* displacementInstance_ = nullptr;
 
-	Quadbit::QbMappedGPUBuffer<TogglesUBO> togglesUBO_;
+	Quadbit::QbVkMappedBuffer<TogglesUBO> togglesUBO_;
 
 	void InitPrecalcComputeInstance();
 	void InitWaveheightComputeInstance();
@@ -116,6 +119,6 @@ private:
 	void DrawImGui();
 };
 
-Quadbit::Game* Quadbit::CreateGame() {
-	return new Water();
+eastl::unique_ptr<Quadbit::Game> Quadbit::CreateGame() {
+	return eastl::make_unique<Water>();
 }

@@ -1,8 +1,7 @@
-// Necessary define for stb_image library and tiny obj loader
-#define STB_IMAGE_IMPLEMENTATION
-#define TINYOBJLOADER_IMPLEMENTATION
-
 #include "Renderer.h"
+
+#include <EASTL/array.h>
+#include <EASTL/vector.h>
 
 #include "Engine/Core/Time.h"
 #include "Engine/Entities/EntityManager.h"
@@ -55,7 +54,7 @@ namespace Quadbit {
 	QbVkRenderer::QbVkRenderer(HINSTANCE hInstance, HWND hwnd, InputHandler* inputHandler, EntityManager* entityManager) :
 	    localHandle_(hInstance), 
 		windowHandle_(hwnd), 
-		context_(std::make_unique<QbVkContext>()) {
+		context_(eastl::make_unique<QbVkContext>()) {
 
 		context_->inputHandler = inputHandler;
 		context_->entityManager = entityManager;
@@ -69,7 +68,7 @@ namespace Quadbit {
 		CreatePhysicalDevice();
 		CreateLogicalDeviceAndQueues();
 
-		context_->allocator = std::make_unique<QbVkAllocator>(context_->device, context_->gpu->deviceProps.limits.bufferImageGranularity, context_->gpu->memoryProps);
+		context_->allocator = eastl::make_unique<QbVkAllocator>(context_->device, context_->gpu->deviceProps.limits.bufferImageGranularity, context_->gpu->memoryProps);
 
 		CreateCommandPool();
 		CreateSyncObjects();
@@ -82,12 +81,12 @@ namespace Quadbit {
 		CreateMainRenderPass();
 
 		// Resource Manager
-		context_->resourceManager = std::make_unique<QbVkResourceManager>(*context_);
+		context_->resourceManager = eastl::make_unique<QbVkResourceManager>(*context_);
 
 		// Pipelines
-		meshPipeline_ = std::make_unique<MeshPipeline>(*context_);
-		imGuiPipeline_ = std::make_unique<ImGuiPipeline>(*context_);
-		computePipeline_ = std::make_unique<ComputePipeline>(*context_);
+		meshPipeline_ = eastl::make_unique<MeshPipeline>(*context_);
+		imGuiPipeline_ = eastl::make_unique<ImGuiPipeline>(*context_);
+		computePipeline_ = eastl::make_unique<ComputePipeline>(*context_);
 	}
 
 	QbVkRenderer::~QbVkRenderer() {
@@ -192,11 +191,11 @@ namespace Quadbit {
 		// Here we specify the semaphores to wait for and the stage in which to wait
 		// The semaphores and stages are matched to eachother by index
 		auto waitSemaphores = transferActive ? 
-			std::vector{ currentRenderingResources.imageAvailableSemaphore, currentRenderingResources.transferSemaphore } :
-			std::vector{ currentRenderingResources.imageAvailableSemaphore };
+			eastl::vector{ currentRenderingResources.imageAvailableSemaphore, currentRenderingResources.transferSemaphore } :
+			eastl::vector{ currentRenderingResources.imageAvailableSemaphore };
 		auto waitStages = transferActive ? 
-			std::vector<VkPipelineStageFlags> { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,  VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT} :
-			std::vector<VkPipelineStageFlags> { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+			eastl::vector<VkPipelineStageFlags> { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,  VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT} :
+			eastl::vector<VkPipelineStageFlags> { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
 		submitInfo.waitSemaphoreCount = transferActive ? 2 : 1;
 		submitInfo.pWaitSemaphores = waitSemaphores.data();
 		submitInfo.pWaitDstStageMask = waitStages.data();
@@ -241,22 +240,10 @@ namespace Quadbit {
 	}
 
 	void QbVkRenderer::DestroyResource(QbVkTexture texture) {
-		if (texture.imageView != VK_NULL_HANDLE) vkDestroyImageView(context_->device, texture.imageView, nullptr);
-		if (texture.sampler != VK_NULL_HANDLE) vkDestroySampler(context_->device, texture.sampler, nullptr);
+		if (texture.descriptor.imageView != VK_NULL_HANDLE) vkDestroyImageView(context_->device, texture.descriptor.imageView, nullptr);
+		if (texture.descriptor.sampler != VK_NULL_HANDLE) vkDestroySampler(context_->device, texture.descriptor.sampler, nullptr);
 		context_->allocator->DestroyImage(texture.image);
 	}
-
-	//void QbVkRenderer::LoadEnvironmentMap(const char* environmentTexture, VkFormat textureFormat) {
-	//	meshPipeline_->LoadEnvironmentMap(environmentTexture, textureFormat);
-	//}
-
-	//VkDescriptorImageInfo QbVkRenderer::GetEnvironmentMapDescriptor() {
-	//	return meshPipeline_->GetEnvironmentMapDescriptor();
-	//}
-
-	//QbVkTexture QbVkRenderer::LoadCubemap(const char* imagePath, VkFormat imageFormat, VkImageTiling imageTiling, VkImageUsageFlags imageUsage, VkImageLayout imageLayout, VkImageAspectFlags imageAspectFlags, QbVkMemoryUsage memoryUsage) {
-	//	return VkUtils::LoadCubemap(*context_, imagePath, imageFormat, imageTiling, imageUsage, imageLayout, imageAspectFlags, memoryUsage);
-	//}
 
 #ifndef NDEBUG
 	// Debug messenger creation and callback function
@@ -321,7 +308,7 @@ namespace Quadbit {
 		VK_VALIDATE(deviceCount > 0, "VkEnumeratePhysicalDevices returned zero devices.");
 
 		// Allocate array of physical devices
-		std::vector<VkPhysicalDevice> physicalDevices(deviceCount);
+		eastl::vector<VkPhysicalDevice> physicalDevices(deviceCount);
 
 		// Fill array of physical devices
 		VK_CHECK(vkEnumeratePhysicalDevices(instance_, &deviceCount, physicalDevices.data()));
@@ -334,7 +321,7 @@ namespace Quadbit {
 
 	void QbVkRenderer::CreateLogicalDeviceAndQueues() {
 		// We'll start by filling out device queue information
-		std::vector<int> queueIndices;
+		eastl::vector<int> queueIndices;
 		queueIndices.push_back(context_->gpu->graphicsFamilyIdx);
 		if (context_->gpu->graphicsFamilyIdx != context_->gpu->presentFamilyIdx) {
 			queueIndices.push_back(context_->gpu->presentFamilyIdx);
@@ -343,7 +330,7 @@ namespace Quadbit {
 			queueIndices.push_back(context_->gpu->computeFamilyIdx);
 		}
 
-		std::vector<VkDeviceQueueCreateInfo> deviceQueueInfo;
+		eastl::vector<VkDeviceQueueCreateInfo> deviceQueueInfo;
 
 		const float priority = 1.0f;
 		for (auto i = 0; i < queueIndices.size(); i++) {
@@ -662,7 +649,7 @@ namespace Quadbit {
 		dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
 		// Now we can create the actual renderpass
-		std::array<VkAttachmentDescription, 3> attachments =
+		eastl::array<VkAttachmentDescription, 3> attachments =
 		{ colourAttachment, depthAttachment, colourAttachmentResolve };
 		VkRenderPassCreateInfo renderPassInfo = VkUtils::Init::RenderPassCreateInfo();
 		renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
@@ -692,7 +679,7 @@ namespace Quadbit {
 		// Let the allocator cleanup stuff before preparing the frame
 		context_->allocator->EmptyGarbage();
 
-		std::array<VkClearValue, 2> clearValues;
+		eastl::array<VkClearValue, 2> clearValues;
 
 		VkCommandBufferBeginInfo commandBufferInfo = VkUtils::Init::CommandBufferBeginInfo();
 		commandBufferInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;

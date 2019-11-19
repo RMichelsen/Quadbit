@@ -10,13 +10,13 @@ namespace Quadbit {
 	class SystemID {
 	public:
 		template<typename>
-		static std::size_t GetUnique() noexcept {
-			static const std::size_t val = GetID();
+		static size_t GetUnique() noexcept {
+			static const size_t val = GetID();
 			return val;
 		}
 	private:
-		static std::size_t GetID() noexcept {
-			static std::size_t val = 0;
+		static size_t GetID() noexcept {
+			static size_t val = 0;
 			return val++;
 		}
 	};
@@ -24,13 +24,13 @@ namespace Quadbit {
 	class ComponentID {
 	public:
 		template<typename>
-		static std::size_t GetUnique() noexcept {
-			static const std::size_t val = GetID();
+		static size_t GetUnique() noexcept {
+			static const size_t val = GetID();
 			return val;
 		}
 	private:
-		static std::size_t GetID() noexcept {
-			static std::size_t val = 0;
+		static size_t GetID() noexcept {
+			static size_t val = 0;
 			return val++;
 		}
 	};

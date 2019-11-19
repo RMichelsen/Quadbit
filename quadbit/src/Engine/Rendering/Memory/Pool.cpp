@@ -98,8 +98,8 @@ namespace Quadbit {
 		// If the size of the candidate is greater than the size of the requested allocation,
 		// we'll allocate a new block to fill the size leftover in the old block after allocation
 		if (bestCandidate->size > size) {
-			std::unique_ptr<Block> newBlock = std::make_unique<Block>();
-			newBlock->next = std::move(bestCandidate->next);
+			eastl::unique_ptr<Block> newBlock = eastl::make_unique<Block>();
+			newBlock->next = eastl::move(bestCandidate->next);
 
 			newBlock->id = nextBlockId_++;
 			newBlock->prev = bestCandidate;
@@ -112,7 +112,7 @@ namespace Quadbit {
 			newBlock->offset = offset + size;
 			newBlock->allocationType = QbVkAllocationType::QBVK_ALLOCATION_TYPE_FREE;
 
-			bestCandidate->next = std::move(newBlock);
+			bestCandidate->next = eastl::move(newBlock);
 		}
 		bestCandidate->size = size;
 		bestCandidate->allocationType = allocationType;
@@ -158,7 +158,7 @@ namespace Quadbit {
 			prev->size += current->size;
 
 			// This move should invalidate the current block so its merged into the previous
-			prev->next = std::move(current->next);
+			prev->next = eastl::move(current->next);
 
 			current = prev;
 		}
@@ -172,7 +172,7 @@ namespace Quadbit {
 			current->size += next->size;
 
 			// This move invalidates the next block so its merged into the current
-			current->next = std::move(next->next);
+			current->next = eastl::move(next->next);
 		}
 
 		allocatedSize_ -= allocation.size;

@@ -1,8 +1,7 @@
 #pragma once
-#include <memory>
-#include <array>
-#include <vector>
-#include <deque>
+#include <EASTL/array.h>
+#include <EASTL/unique_ptr.h>
+#include <EASTL/vector.h>
 
 #include "Engine/Entities/EntityManager.h"
 #include "Engine/Rendering/RenderTypes.h"
@@ -22,16 +21,14 @@ namespace Quadbit {
 		void SetCamera(Entity entity);
 		void LoadSkyGradient(glm::vec3 botColour, glm::vec3 topColour);
 
-		const QbVkRenderMeshInstance* CreateInstance(std::vector<QbVkRenderDescriptor>& descriptors, std::vector<QbVkVertexInputAttribute> vertexAttribs,
+		const QbVkRenderMeshInstance* CreateInstance(eastl::vector<QbVkRenderDescriptor>& descriptors, eastl::vector<QbVkVertexInputAttribute> vertexAttribs,
 			QbVkShaderInstance& shaderInstance, int pushConstantStride = -1, VkShaderStageFlags pushConstantShaderStage = VK_SHADER_STAGE_VERTEX_BIT,
 			VkBool32 depthTestingEnabled = VK_TRUE);
-		QbVkBufferHandle CreateVertexBuffer(const void* vertices, uint32_t vertexStride, uint32_t vertexCount);
-		QbVkBufferHandle CreateIndexBuffer(const std::vector<uint32_t>& indices);
 
 		void DestroyMesh(RenderMeshComponent& renderMeshComponent);
 		void DestroyInstance(const QbVkRenderMeshInstance* instance);
 
-		RenderTexturedObjectComponent CreateObject(const char* objPath, const char* texturePath, VkFormat textureFormat);
+		//RenderTexturedObjectComponent CreateObject(const char* objPath, const char* texturePath, VkFormat textureFormat);
 
 	private:
 		friend class QbVkRenderer;
@@ -42,10 +39,10 @@ namespace Quadbit {
 		VkPipeline pipeline_ = VK_NULL_HANDLE;
 		VkDescriptorPool descriptorPool_;
 		VkDescriptorSetLayout descriptorSetLayout_;
-		std::array<std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT>, 512> descriptorSets_{};
+		eastl::array<eastl::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT>, 512> descriptorSets_{};
 		uint32_t textureCount = 0;
 
-		std::vector<std::unique_ptr<QbVkRenderMeshInstance>> externalInstances_;
+		eastl::vector<eastl::unique_ptr<QbVkRenderMeshInstance>> externalInstances_;
 
 		Entity fallbackCamera_ = NULL_ENTITY;
 		Entity userCamera_ = NULL_ENTITY;

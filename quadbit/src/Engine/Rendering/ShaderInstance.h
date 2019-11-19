@@ -1,14 +1,14 @@
 #pragma once
 
+#include <EASTL/vector.h>
 #include <vulkan/vulkan.h>
-#include <vector>
 
 #include "Engine/Rendering/VulkanTypes.h"
 
 namespace Quadbit {
 	class QbVkShaderInstance {
 	public:
-		std::vector<VkPipelineShaderStageCreateInfo> stages;
+		eastl::vector<VkPipelineShaderStageCreateInfo> stages;
 
 		QbVkShaderInstance(QbVkContext& context) : context_(context) {}
 		~QbVkShaderInstance();

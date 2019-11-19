@@ -1,6 +1,8 @@
 #pragma once
-#include <Windows.h>
+#include <EASTL/unique_ptr.h>
+#include <EASTL/vector.h>
 
+#include <Windows.h>
 #include <FastNoiseSIMD/FastNoiseSIMD.h>
 
 #include "Engine/Core/Entry.h"
@@ -45,7 +47,7 @@ private:
 	FastNoiseSIMD* fastnoiseRegions_;
 	FastNoiseSIMD* fastnoiseColours_;
 
-	std::vector<Quadbit::Entity> chunks_;
+	eastl::vector<Quadbit::Entity> chunks_;
 
 	Quadbit::Entity camera_;
 	Quadbit::Entity player_;
@@ -53,6 +55,6 @@ private:
 	void DrawImGui();
 };
 
-Quadbit::Game* Quadbit::CreateGame() {
-	return new Infinitum();
+eastl::unique_ptr<Quadbit::Game> Quadbit::CreateGame() {
+	return eastl::make_unique<Infinitum>();
 }

@@ -1,18 +1,22 @@
 #pragma once
 
-#include <vulkan/vulkan.h>
-#include <vector>
-#include <array>
-#include <variant>
-#include <functional>
-#include <unordered_set>
-#include <type_traits>
-#include <deque>
 #include <cassert>
+
+#include <EASTL/array.h>
+#include <EASTL/deque.h>
+#include <EASTL/type_traits.h>
+#include <EASTL/unique_ptr.h>
+#include <EASTL/vector.h>
+#include <glm/glm.hpp>
+#include <vulkan/vulkan.h>
+
 
 inline constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
 namespace Quadbit {
+	// At the moment we only support 65535 deletions of the same resource slot
+	// And 65535 unique resources of the same type
+
 	template<typename T>
 	struct QbVkResourceHandle {
 		uint32_t index : 16;
@@ -21,14 +25,14 @@ namespace Quadbit {
 
 	template<typename T, size_t Size>
 	struct QbVkResource {
-		uint32_t resourceIndex = 0;
-		std::array<T, Size> elements{};
-		std::array<uint16_t, Size> versions{};
-		std::deque<uint16_t> freeList;
+		uint16_t resourceIndex = 0;
+		eastl::array<T, Size> elements{};
+		eastl::array<uint16_t, Size> versions{};
+		eastl::deque<uint16_t> freeList;
 
 		template<typename U>
 		T& operator[](QbVkResourceHandle<U> handle) {
-			static_assert(std::is_same<T, U>::value, "Resource has a different type than the resource handle passed!");
+			static_assert(eastl::is_same<T, U>::value, "Resource has a different type than the resource handle passed!");
 			assert(handle.index < Size && "Resource array out of bounds!");
 			assert(handle.version == versions[handle.index] && "Handle passed does not match internal handle!");
 			return elements[handle.index];
@@ -36,7 +40,7 @@ namespace Quadbit {
 
 		template<typename U>
 		void DestroyResource(QbVkResourceHandle<U> handle) {
-			static_assert(std::is_same<T, U>::value, "Resource has a different type than the resource handle passed!");
+			static_assert(eastl::is_same<T, U>::value, "Resource has a different type than the resource handle passed!");
 			assert(handle.index < Size && "Resource array out of bounds!");
 			assert(handle.version == versions[handle.index] && "Handle passed does not match internal handle!");
 			versions[handle.index]++;
@@ -44,6 +48,8 @@ namespace Quadbit {
 		}
 
 		QbVkResourceHandle<T> GetHandle(uint16_t index) {
+			assert(index < (Size - 1) && "Resource array full, too many elements!");
+			assert(index < 65536 && versions[index] < 65536 && "Resource array is out of handles to give out!");
 			return QbVkResourceHandle<T> { index, versions[index] };
 		}
 
@@ -57,13 +63,50 @@ namespace Quadbit {
 				freeList.pop_front();
 			}
 			assert(next < (Size - 1) && "Resource array full, too many elements!");
+			assert(next < 65536 && versions[next] < 65536 && "Resource array is out of handles to give out!");
 			return QbVkResourceHandle<T> {next, versions[next]};
 		}
 	};
 
-	// VULKAN DEFINITIONS
-	using VertexBufHandle = uint16_t;
-	using IndexBufHandle = uint16_t;
+	struct QbVkVertex {
+		glm::vec3 position{};
+		glm::vec3 normal{};
+		glm::vec2 uv0{};
+		glm::vec2 uv1{};
+		
+		static VkVertexInputBindingDescription GetBindingDescription() {
+			VkVertexInputBindingDescription bindingDescription{};
+			bindingDescription.binding = 0;
+			bindingDescription.stride = sizeof(QbVkVertex);
+			bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+			return bindingDescription;
+		}
+
+		static eastl::array<VkVertexInputAttributeDescription, 4> GetAttributeDescriptions() {
+			eastl::array<VkVertexInputAttributeDescription, 4> attributeDescriptions{};
+			// Attribute description for POSITION
+			attributeDescriptions[0].binding = 0;
+			attributeDescriptions[0].location = 0;
+			attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+			attributeDescriptions[0].offset = offsetof(QbVkVertex, position);
+			// Attribute description for NORMAL
+			attributeDescriptions[1].binding = 0;
+			attributeDescriptions[1].location = 1;
+			attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+			attributeDescriptions[1].offset = offsetof(QbVkVertex, normal);
+			// Attribute description for TEXCOORD_0
+			attributeDescriptions[2].binding = 0;
+			attributeDescriptions[2].location = 2;
+			attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
+			attributeDescriptions[2].offset = offsetof(QbVkVertex, uv0);
+			// Attribute description for TEXCOORD_1
+			attributeDescriptions[3].binding = 0;
+			attributeDescriptions[3].location = 3;	
+			attributeDescriptions[3].format = VK_FORMAT_R32G32_SFLOAT;
+			attributeDescriptions[3].offset = offsetof(QbVkVertex, uv1);
+			return attributeDescriptions;
+		}
+	};
 
 	enum class QbVkMemoryUsage {
 		QBVK_MEMORY_USAGE_UNKNOWN,
@@ -96,6 +139,7 @@ namespace Quadbit {
 	struct QbVkBuffer {
 		VkBuffer buf = VK_NULL_HANDLE;
 		QbVkAllocation alloc{};
+		VkDescriptorBufferInfo descriptor{};
 	};
 
 	struct QbVkImage {
@@ -105,10 +149,7 @@ namespace Quadbit {
 
 	struct QbVkTexture {
 		QbVkImage image{};
-		VkImageLayout imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		VkImageView imageView = VK_NULL_HANDLE;
-		VkSampler sampler = VK_NULL_HANDLE;
-		VkFormat format = VK_FORMAT_UNDEFINED;
+		VkDescriptorImageInfo descriptor{};
 	};
 
 	struct QbVkComputeDescriptor {
@@ -122,12 +163,6 @@ namespace Quadbit {
 		uint32_t count;
 		void* data;
 		VkShaderStageFlagBits shaderStage;
-	};
-
-	struct QbVkModel {
-		std::vector<float> vertices;
-		uint32_t vertexStride;
-		std::vector<uint32_t> indices;
 	};
 
 	struct QbVkComputeInstance {
@@ -159,11 +194,11 @@ namespace Quadbit {
 		VkPhysicalDeviceMemoryProperties memoryProps{};
 		VkPhysicalDeviceFeatures features{};
 
-		std::vector<VkSurfaceFormatKHR> surfaceFormats;
-		std::vector<VkPresentModeKHR> presentModes;
+		eastl::vector<VkSurfaceFormatKHR> surfaceFormats;
+		eastl::vector<VkPresentModeKHR> presentModes;
 
-		std::vector<VkQueueFamilyProperties> queueProps;
-		std::vector<VkExtensionProperties> extensionProps;
+		eastl::vector<VkQueueFamilyProperties> queueProps;
+		eastl::vector<VkExtensionProperties> extensionProps;
 
 		int graphicsFamilyIdx = -1;
 		int presentFamilyIdx = -1;
@@ -175,8 +210,8 @@ namespace Quadbit {
 		VkFormat imageFormat{};
 		VkPresentModeKHR presentMode{};
 		VkExtent2D extent{};
-		std::vector<VkImage> images;
-		std::vector<VkImageView> imageViews;
+		eastl::vector<VkImage> images;
+		eastl::vector<VkImageView> imageViews;
 	};
 
 	struct MSAAResources {
@@ -207,9 +242,9 @@ namespace Quadbit {
 		InputHandler* inputHandler;
 		EntityManager* entityManager;
 
-		std::unique_ptr<GPU> gpu;
-		std::unique_ptr<QbVkAllocator> allocator;
-		std::unique_ptr<QbVkResourceManager> resourceManager;
+		eastl::unique_ptr<GPU> gpu;
+		eastl::unique_ptr<QbVkAllocator> allocator;
+		eastl::unique_ptr<QbVkResourceManager> resourceManager;
 		VkDevice device = VK_NULL_HANDLE;
 		VkSurfaceKHR surface = VK_NULL_HANDLE;
 		VkQueue graphicsQueue = VK_NULL_HANDLE;
@@ -223,7 +258,7 @@ namespace Quadbit {
 		VkCommandPool commandPool = VK_NULL_HANDLE;
 		VkRenderPass mainRenderPass = VK_NULL_HANDLE;
 
-		std::array<RenderingResources, MAX_FRAMES_IN_FLIGHT> renderingResources;
+		eastl::array<RenderingResources, MAX_FRAMES_IN_FLIGHT> renderingResources;
 	};
 
 	struct QbVkRenderMeshInstance {
@@ -232,35 +267,28 @@ namespace Quadbit {
 
 		VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
 		VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
-		std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> descriptorSets{};
+		eastl::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> descriptorSets{};
 	};
 
 	using QbVkTextureHandle = QbVkResourceHandle<QbVkTexture>;
 	using QbVkBufferHandle = QbVkResourceHandle<QbVkBuffer>;
+	using QbVkDescriptorSetHandle = QbVkResourceHandle<VkDescriptorSet>;
+
+	constexpr QbVkBufferHandle QBVK_BUFFER_NULL_HANDLE = { 65535, 65535 };
+	constexpr QbVkTextureHandle QBVK_TEXTURE_NULL_HANDLE = { 65535, 65535 };
+	constexpr QbVkDescriptorSetHandle QBVK_DESCRIPTORSET_NULL_HANDLE = { 65535, 65535 };
 
 	struct QbVkTransfer {
-		VkDeviceSize size;
-		QbVkBufferHandle destinationBuffer;
+		VkDeviceSize size = 0;
+		QbVkBufferHandle destinationBuffer = QBVK_BUFFER_NULL_HANDLE;
 	};
 
 	template<typename T>
-	struct QbMappedGPUBuffer {
-		QbVkBufferHandle handle;
+	struct QbVkMappedBuffer {
+		QbVkBufferHandle handle = QBVK_BUFFER_NULL_HANDLE;
 		T* data;
-		VkDescriptorBufferInfo descriptor{};
-
 		T* operator->() {
 			return data;
 		}
-	};
-
-	struct QbGPUBuffer {
-		QbVkBufferHandle handle;
-		VkDescriptorBufferInfo descriptor{};
-	};
-
-	struct QbTexture {
-		QbVkTextureHandle handle;
-		VkDescriptorImageInfo descriptor{};
 	};
 }

@@ -10,7 +10,7 @@
 
 
 struct MeshGenerationSystem : Quadbit::ComponentSystem {
-	void GreedyMeshGeneration(Quadbit::Graphics* graphics, const Quadbit::QbVkRenderMeshInstance* rMeshInstance) {
+	void GreedyMeshGeneration(Quadbit::Graphics* const graphics, const Quadbit::QbVkRenderMeshInstance* rMeshInstance) {
 		entityManager_->ParForEachAddTag<Quadbit::RenderTransformComponent, VoxelBlockComponent, MeshGenerationUpdateTag>
 			([&](Quadbit::Entity entity, Quadbit::RenderTransformComponent& transform, VoxelBlockComponent& block, auto& tag) {
 
@@ -24,7 +24,7 @@ struct MeshGenerationSystem : Quadbit::ComponentSystem {
 		});
 	}
 
-	void CulledMeshGeneration(Quadbit::Graphics* graphics, const Quadbit::QbVkRenderMeshInstance* rMeshInstance) {
+	void CulledMeshGeneration(Quadbit::Graphics* const graphics, const Quadbit::QbVkRenderMeshInstance* rMeshInstance) {
 		entityManager_->ParForEachAddTag<Quadbit::RenderTransformComponent, VoxelBlockComponent, MeshGenerationUpdateTag>
 			([&](Quadbit::Entity entity, Quadbit::RenderTransformComponent& transform, VoxelBlockComponent& block, auto& tag) {
 
@@ -39,7 +39,7 @@ struct MeshGenerationSystem : Quadbit::ComponentSystem {
 
 	}
 
-	void Update(float dt, Quadbit::Graphics* graphics, const Quadbit::QbVkRenderMeshInstance* rMeshInstance) {
+	void Update(float dt, Quadbit::Graphics* const graphics, const Quadbit::QbVkRenderMeshInstance* rMeshInstance) {
 		GreedyMeshGeneration(graphics, rMeshInstance);
 	}
 };
