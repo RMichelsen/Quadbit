@@ -115,7 +115,7 @@ namespace Quadbit {
 		return { type, 1, descriptor, shaderStage };
 	}
 
-	PBRModelComponent Graphics::LoadPBRModel(const char* path) {
+	PBRSceneComponent Graphics::LoadPBRModel(const char* path) {
 		return renderer_->context_->resourceManager->LoadModel(path);
 	}
 

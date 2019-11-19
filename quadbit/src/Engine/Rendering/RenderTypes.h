@@ -75,7 +75,7 @@ namespace Quadbit {
 		}
 	};
 
-	struct QbVkMaterial {
+	struct QbVkPBRMaterial {
 		struct TextureIndices {
 			int baseColorTextureIndex = -1;
 			int metallicRoughnessTextureIndex = -1;
@@ -100,19 +100,24 @@ namespace Quadbit {
 		QbVkDescriptorSetHandle descriptorHandle = QBVK_DESCRIPTORSET_NULL_HANDLE;
 	};
 
-	struct QbVkPBRMesh {
-		QbVkMaterial material;
+	struct QbVkPBRPrimitive {
+		QbVkPBRMaterial material;
 
 		uint32_t vertexOffset;
 		uint32_t indexOffset;
 		uint32_t indexCount;
 	};
 
-	struct PBRModelComponent {
-		eastl::vector<QbVkPBRMesh> meshes;
+	struct QbVkPBRMesh {
+		glm::mat4 localTransform;
+		eastl::vector<QbVkPBRPrimitive> primitives;
+	};
 
+	struct PBRSceneComponent {
 		QbVkResourceHandle<QbVkBuffer> vertexHandle;
 		QbVkResourceHandle<QbVkBuffer> indexHandle;
+
+		eastl::vector<QbVkPBRMesh> meshes;
 
 		eastl::array<float, 32> pushConstants;
 		int pushConstantStride;

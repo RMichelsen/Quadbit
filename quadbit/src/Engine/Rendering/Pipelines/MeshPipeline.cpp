@@ -20,7 +20,7 @@ namespace Quadbit {
 		context_(context) {
 
 		// Register the mesh component to be used by the ECS
-		context.entityManager->RegisterComponents<RenderMeshComponent, PBRModelComponent, RenderTransformComponent,
+		context.entityManager->RegisterComponents<RenderMeshComponent, PBRSceneComponent, RenderTransformComponent,
 			RenderMeshDeleteComponent, RenderCamera, CameraUpdateAspectRatioTag>();
 
 		fallbackCamera_ = context.entityManager->Create();
@@ -108,24 +108,28 @@ namespace Quadbit {
 
 		VkDeviceSize offsets[]{ 0 };
 
-		context_.entityManager->ForEach<PBRModelComponent, RenderTransformComponent>(
-			[&](Entity entity, PBRModelComponent& model, RenderTransformComponent& transform) noexcept {
+		context_.entityManager->ForEach<PBRSceneComponent, RenderTransformComponent>(
+			[&](Entity entity, PBRSceneComponent& scene, RenderTransformComponent& transform) noexcept {
 			vkCmdBindPipeline(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
 
-			RenderMeshPushConstants* pushConstants = model.GetSafePushConstPtr<RenderMeshPushConstants>();
-			pushConstants->model = transform.model;
-			pushConstants->mvp = camera->perspective * camera->view * transform.model;
-			vkCmdPushConstants(commandbuffer, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RenderMeshPushConstants), pushConstants);
+			for (const auto& mesh : scene.meshes) {
+				eastl::array<VkDeviceSize, 1> offsets{ 0 };
 
-			eastl::array<VkDeviceSize, 1> offsets{ 0 };
-			for (const auto& mesh : model.meshes) {
-				offsets[0] = mesh.vertexOffset * sizeof(QbVkVertex);
-				vkCmdBindVertexBuffers(commandbuffer, 0, 1, &context_.resourceManager->buffers_[model.vertexHandle].buf, offsets.data());
-				vkCmdBindIndexBuffer(commandbuffer, context_.resourceManager->buffers_[model.indexHandle].buf, mesh.indexOffset * sizeof(uint32_t), VK_INDEX_TYPE_UINT32);
+				for (const auto& primitive : mesh.primitives) {
+					offsets[0] = primitive.vertexOffset * sizeof(QbVkVertex);
+					vkCmdBindVertexBuffers(commandbuffer, 0, 1, &context_.resourceManager->buffers_[scene.vertexHandle].buf, offsets.data());
+					vkCmdBindIndexBuffer(commandbuffer, context_.resourceManager->buffers_[scene.indexHandle].buf, primitive.indexOffset * sizeof(uint32_t), VK_INDEX_TYPE_UINT32);
 
-				vkCmdBindDescriptorSets(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 0, 1, 
-					&context_.resourceManager->materialDescriptorSets_[mesh.material.descriptorHandle], 0, nullptr);
-				vkCmdDrawIndexed(commandbuffer, mesh.indexCount, 1, 0, 0, 0);
+					RenderMeshPushConstants* pushConstants = scene.GetSafePushConstPtr<RenderMeshPushConstants>();
+					auto model = transform.model * mesh.localTransform;
+					pushConstants->model = model;
+					pushConstants->mvp = camera->perspective * camera->view * model;
+					vkCmdPushConstants(commandbuffer, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RenderMeshPushConstants), pushConstants);
+
+					vkCmdBindDescriptorSets(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 0, 1,
+						&context_.resourceManager->materialDescriptorSets_[primitive.material.descriptorHandle], 0, nullptr);
+					vkCmdDrawIndexed(commandbuffer, primitive.indexCount, 1, 0, 0, 0);
+				}
 			}
 			});
 

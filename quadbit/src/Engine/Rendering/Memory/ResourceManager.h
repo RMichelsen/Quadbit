@@ -54,7 +54,7 @@ namespace Quadbit {
 		QbVkTextureHandle LoadTexture(uint32_t width, uint32_t height, const void* data, VkSamplerCreateInfo* samplerInfo = nullptr);
 		QbVkTextureHandle LoadTexture(const char* imagePath, VkSamplerCreateInfo* samplerInfo = nullptr);
 
-		PBRModelComponent LoadModel(const char* path);
+		PBRSceneComponent LoadModel(const char* path);
 
 		bool TransferQueuedDataToGPU(uint32_t resourceIndex);
 
@@ -98,8 +98,12 @@ namespace Quadbit {
 		QbVkTextureHandle emptyTexture_;
 
 		VkSamplerCreateInfo GetSamplerInfo(const tinygltf::Model& model, int samplerIndex);
-		QbVkDescriptorSetHandle GetDescriptorSetHandle(QbVkMaterial& material);
+		QbVkDescriptorSetHandle GetDescriptorSetHandle(QbVkPBRMaterial& material);
 		QbVkTextureHandle CreateTextureFromResource(const tinygltf::Model& model, const tinygltf::Material& material, const char* textureName);
-		QbVkMaterial ParseMaterial(const tinygltf::Model& model, const tinygltf::Material& material);
+		QbVkPBRMaterial ParseMaterial(const tinygltf::Model& model, const tinygltf::Material& material);
+		void ParseNode(const tinygltf::Model& model, const tinygltf::Node& node, PBRSceneComponent& scene, 
+			eastl::vector<QbVkVertex>& vertices, eastl::vector<uint32_t>& indices, const eastl::vector<QbVkPBRMaterial> materials, glm::mat4 parentTransform);
+		QbVkPBRMesh ParseMesh(const tinygltf::Model& model, const tinygltf::Mesh& mesh, 
+			eastl::vector<QbVkVertex>& vertices, eastl::vector<uint32_t>& indices, const eastl::vector<QbVkPBRMaterial>& materials);
 	};
 }

@@ -3,7 +3,10 @@
 #include <EASTL/algorithm.h>
 
 #include <filesystem>
+#include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/quaternion.hpp>
 
 #include "Engine/Rendering/VulkanUtils.h"
 
@@ -191,141 +194,48 @@ namespace Quadbit {
 		return handle;
 	}
 
-	PBRModelComponent QbVkResourceManager::LoadModel(const char* path) {
+	PBRSceneComponent QbVkResourceManager::LoadModel(const char* path) {
 
 		auto fsPath = std::filesystem::path(path);
 		eastl::string extension = eastl::string(fsPath.extension().string().c_str());
 		eastl::string directoryPath = eastl::string(fsPath.remove_filename().string().c_str());
-		PBRModelComponent model;
+		PBRSceneComponent scene;
 
 		std::string err, warn;
 		tinygltf::TinyGLTF loader;
-		tinygltf::Model gltfModel;
+		tinygltf::Model model;
 
 		bool loaded = false;
 		if (extension.compare(".gltf") == 0) {
-			loaded = loader.LoadASCIIFromFile(&gltfModel, &err, &warn, path);
+			loaded = loader.LoadASCIIFromFile(&model, &err, &warn, path);
 		}
 		else if (extension.compare(".glb") == 0) {
-			loaded = loader.LoadBinaryFromFile(&gltfModel, &err, &warn, path);
+			loaded = loader.LoadBinaryFromFile(&model, &err, &warn, path);
 		}
 		if (!loaded) {
 			QB_LOG_ERROR("Failed to load model at %s\n", path);
 		}
 
+		// For now we only support loading single scenes
+		assert(model.scenes.size() == 1 && "Failed to parse model, only one scene allowed!");
+
 		// Parse materials
-		eastl::vector<QbVkMaterial> materials;
-		for (const auto& mat : gltfModel.materials) {
-			QbVkMaterial material = ParseMaterial(gltfModel, mat);
-			materials.push_back(material);
+		eastl::vector<QbVkPBRMaterial> materials;
+		for (const auto& material : model.materials) {
+			materials.push_back(ParseMaterial(model, material));
 		}
 
 		eastl::vector<QbVkVertex> vertices;
 		eastl::vector<uint32_t> indices;
-
-		// Parse buffers
-		const auto& buffers = gltfModel.buffers;
-		for (const auto& mesh : gltfModel.meshes) {
-			for (const auto& primitive : mesh.primitives) {
-				assert(primitive.attributes.find("POSITION") != primitive.attributes.end());
-				assert(primitive.mode == TINYGLTF_MODE_TRIANGLES);
-
-				const auto vertexCount = gltfModel.accessors[primitive.attributes.find("POSITION")->second].count;
-
-				const auto vertexOffset = static_cast<uint32_t>(vertices.size());
-				const auto indexOffset = static_cast<uint32_t>(indices.size());
-
-				int positionStride = 0;
-				int normalStride = 0;
-				int uv0Stride = 0;
-				int uv1Stride = 0;
-				const float* positions = nullptr;
-				const float* normals = nullptr;
-				const float* uvs0 = nullptr;
-				const float* uvs1 = nullptr;
-
-				for (const auto& [name, index] : primitive.attributes) {
-					const auto& accessor = gltfModel.accessors[index];
-					const auto& bufferView = gltfModel.bufferViews[accessor.bufferView];
-					const auto& buffer = gltfModel.buffers[bufferView.buffer];
-
-					if (name.compare("POSITION") == 0) {
-						positions = reinterpret_cast<const float*>(&buffer.data[accessor.byteOffset + bufferView.byteOffset]);
-						positionStride = accessor.ByteStride(bufferView) / sizeof(float);
-						assert(positions != nullptr && positionStride > 0);
-					}
-					else if (name.compare("NORMAL") == 0) {
-						normals = reinterpret_cast<const float*>(&buffer.data[accessor.byteOffset + bufferView.byteOffset]);
-						normalStride = accessor.ByteStride(bufferView) / sizeof(float);
-						assert(normals != nullptr && normalStride > 0);
-					}
-					else if (name.compare("TEXCOORD_0") == 0) {
-						uvs0 = reinterpret_cast<const float*>(&buffer.data[accessor.byteOffset + bufferView.byteOffset]);
-						uv0Stride = accessor.ByteStride(bufferView) / sizeof(float);
-						assert(uvs0 != nullptr && uv0Stride > 0);
-					}
-					else if (name.compare("TEXCOORD_1") == 0) {
-						uvs1 = reinterpret_cast<const float*>(&buffer.data[accessor.byteOffset + bufferView.byteOffset]);
-						uv1Stride = accessor.ByteStride(bufferView) / sizeof(float);
-						assert(uvs1 != nullptr && uv1Stride > 0);
-					}
-				}
-
-				for (int i = 0; i < vertexCount; i++) {
-					QbVkVertex vertex{};
-					vertex.position = glm::make_vec3(&positions[i * positionStride]);
-					if (normals != nullptr) vertex.normal = glm::normalize(glm::make_vec3(&normals[i * normalStride]));
-					if (uvs0 != nullptr) vertex.uv0 = glm::make_vec2(&uvs0[i * uv0Stride]);
-					if (uvs1 != nullptr) vertex.uv1 = glm::make_vec2(&uvs1[i * uv1Stride]);
-					vertices.push_back(vertex);
-				}
-
-				// TODO: Fallback to draw without indexes if not available
-				assert(primitive.indices > -1);
-
-				const auto& accessor = gltfModel.accessors[primitive.indices];
-				const auto& bufferView = gltfModel.bufferViews[accessor.bufferView];
-				const auto& buffer = gltfModel.buffers[bufferView.buffer];
-				const auto indexCount = accessor.count;
-				
-				assert((accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE ||
-					accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT ||
-					accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
-					&& "Indexbuffer type not supported, supported types are uint8, uint16, uint32");
-
-				const void* indexBuffer = &buffer.data[accessor.byteOffset + bufferView.byteOffset];
-				if (accessor.componentType == TINYGLTF_PARAMETER_TYPE_UNSIGNED_BYTE) {
-					const uint8_t* buf = static_cast<const uint8_t*>(indexBuffer);
-					for (auto i = 0; i < indexCount; i++) {
-						indices.push_back(buf[i]);
-					}
-				}
-				else if (accessor.componentType == TINYGLTF_PARAMETER_TYPE_UNSIGNED_SHORT) {
-					const uint16_t* buf = static_cast<const uint16_t*>(indexBuffer);
-					for (auto i = 0; i < indexCount; i++) {
-						indices.push_back(buf[i]);
-					}
-				}
-				else if (accessor.componentType == TINYGLTF_PARAMETER_TYPE_UNSIGNED_INT) {
-					const uint32_t* buf = static_cast<const uint32_t*>(indexBuffer);
-					for (auto i = 0; i < indexCount; i++) {
-						indices.push_back(buf[i]);
-					}
-				}
-
-				QbVkPBRMesh mesh;
-				mesh.vertexOffset = vertexOffset;
-				mesh.indexOffset = indexOffset;
-				mesh.indexCount = static_cast<uint32_t>(indices.size()) - indexOffset;
-				mesh.material = materials[primitive.material];
-				model.meshes.push_back(mesh);
-			}
+		// Parse nodes recursively
+		for (const auto& node : model.scenes[model.defaultScene].nodes) {
+			ParseNode(model, model.nodes[node], scene, vertices, indices, materials, glm::mat4(1.0f));
 		}
 
-		model.vertexHandle = CreateVertexBuffer(vertices.data(), sizeof(QbVkVertex), static_cast<uint32_t>(vertices.size()));
-		model.indexHandle = CreateIndexBuffer(indices);
+		scene.vertexHandle = CreateVertexBuffer(vertices.data(), sizeof(QbVkVertex), static_cast<uint32_t>(vertices.size()));
+		scene.indexHandle = CreateIndexBuffer(indices);
 
-		return model;
+		return scene;
 	}
 
 	bool QbVkResourceManager::TransferQueuedDataToGPU(uint32_t resourceIndex) {
@@ -398,7 +308,7 @@ namespace Quadbit {
 		return samplerCreateInfo;
 	}
 
-	QbVkDescriptorSetHandle QbVkResourceManager::GetDescriptorSetHandle(QbVkMaterial& material) {
+	QbVkDescriptorSetHandle QbVkResourceManager::GetDescriptorSetHandle(QbVkPBRMaterial& material) {
 		std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, materialDescriptorSetLayout_);
 		VkDescriptorSetAllocateInfo descSetallocInfo = VkUtils::Init::DescriptorSetAllocateInfo();
 		descSetallocInfo.descriptorPool = materialDescriptorPool_;
@@ -450,8 +360,8 @@ namespace Quadbit {
 		return LoadTexture(image.width, image.height, image.image.data(), &samplerInfo);
 	}
 
-	QbVkMaterial QbVkResourceManager::ParseMaterial(const tinygltf::Model& model, const tinygltf::Material& material) {
-		QbVkMaterial mat{};
+	QbVkPBRMaterial QbVkResourceManager::ParseMaterial(const tinygltf::Model& model, const tinygltf::Material& material) {
+		QbVkPBRMaterial mat{};
 		if (material.values.find("baseColorTexture") != material.values.end()) {
 			mat.baseColorTexture = CreateTextureFromResource(model, material, "baseColorTexture");
 			mat.textureIndices.baseColorTextureIndex = material.values.at("baseColorTexture").TextureTexCoord();
@@ -486,5 +396,136 @@ namespace Quadbit {
 		}
 		mat.descriptorHandle = GetDescriptorSetHandle(mat);
 		return mat;
+	}
+
+	void QbVkResourceManager::ParseNode(const tinygltf::Model& model, const tinygltf::Node& node, PBRSceneComponent& scene,
+		eastl::vector<QbVkVertex>& vertices, eastl::vector<uint32_t>& indices, const eastl::vector<QbVkPBRMaterial> materials, glm::mat4 parentTransform) {
+		// Construct transform matrix from node data and parent data
+		glm::mat4 translation = (node.translation.size() == 3) ?
+			glm::translate(glm::mat4(1.0f), glm::vec3(glm::make_vec3(node.translation.data()))) : glm::mat4(1.0f);
+		glm::mat4 rotation = (node.rotation.size() == 4) ?
+			glm::mat4_cast(glm::make_quat(node.rotation.data())) : glm::mat4(1.0f);
+		glm::mat4 scale = (node.scale.size() == 3) ?
+			glm::scale(glm::mat4(1.0f), glm::vec3(glm::make_vec3(node.scale.data()))) : glm::mat4(1.0f);
+		glm::mat4 nodeTransform = (node.matrix.size() == 16) ?
+			translation * rotation * scale * glm::mat4(glm::make_mat4x4(node.matrix.data())) :
+			translation * rotation * scale * glm::mat4(1.0f);
+		glm::mat4 transform = parentTransform * nodeTransform;
+
+		// Let parent transform data propagate down through children on recurse
+		if (node.children.size() > 0) {
+			for (const auto& node : node.children) {
+				ParseNode(model, model.nodes[node], scene, vertices, indices, materials, transform);
+			}
+		}
+
+		// Parse mesh if node contains a mesh
+		if (node.mesh > -1) {
+			QbVkPBRMesh mesh = ParseMesh(model, model.meshes[node.mesh], vertices, indices, materials);
+			mesh.localTransform = transform;
+			scene.meshes.push_back(mesh);
+		}
+	}
+
+	QbVkPBRMesh QbVkResourceManager::ParseMesh(const tinygltf::Model& model, const tinygltf::Mesh& mesh,
+		eastl::vector<QbVkVertex>& vertices, eastl::vector<uint32_t>& indices, const eastl::vector<QbVkPBRMaterial>& materials) {
+		QbVkPBRMesh qbMesh{};
+
+		for (const auto& primitive : mesh.primitives) {
+			assert(primitive.attributes.find("POSITION") != primitive.attributes.end());
+			assert(primitive.mode == TINYGLTF_MODE_TRIANGLES);
+
+			const auto vertexCount = model.accessors[primitive.attributes.find("POSITION")->second].count;
+
+			const auto vertexOffset = static_cast<uint32_t>(vertices.size());
+			const auto indexOffset = static_cast<uint32_t>(indices.size());
+
+			int positionStride = 0;
+			int normalStride = 0;
+			int uv0Stride = 0;
+			int uv1Stride = 0;
+			const float* positions = nullptr;
+			const float* normals = nullptr;
+			const float* uvs0 = nullptr;
+			const float* uvs1 = nullptr;
+
+			for (const auto& [name, index] : primitive.attributes) {
+				const auto& accessor = model.accessors[index];
+				const auto& bufferView = model.bufferViews[accessor.bufferView];
+				const auto& buffer = model.buffers[bufferView.buffer];
+
+				if (name.compare("POSITION") == 0) {
+					positions = reinterpret_cast<const float*>(&buffer.data[accessor.byteOffset + bufferView.byteOffset]);
+					positionStride = accessor.ByteStride(bufferView) / sizeof(float);
+					assert(positions != nullptr && positionStride > 0);
+				}
+				else if (name.compare("NORMAL") == 0) {
+					normals = reinterpret_cast<const float*>(&buffer.data[accessor.byteOffset + bufferView.byteOffset]);
+					normalStride = accessor.ByteStride(bufferView) / sizeof(float);
+					assert(normals != nullptr && normalStride > 0);
+				}
+				else if (name.compare("TEXCOORD_0") == 0) {
+					uvs0 = reinterpret_cast<const float*>(&buffer.data[accessor.byteOffset + bufferView.byteOffset]);
+					uv0Stride = accessor.ByteStride(bufferView) / sizeof(float);
+					assert(uvs0 != nullptr && uv0Stride > 0);
+				}
+				else if (name.compare("TEXCOORD_1") == 0) {
+					uvs1 = reinterpret_cast<const float*>(&buffer.data[accessor.byteOffset + bufferView.byteOffset]);
+					uv1Stride = accessor.ByteStride(bufferView) / sizeof(float);
+					assert(uvs1 != nullptr && uv1Stride > 0);
+				}
+			}
+
+			for (int i = 0; i < vertexCount; i++) {
+				QbVkVertex vertex{};
+				vertex.position = glm::make_vec3(&positions[i * positionStride]);
+				if (normals != nullptr) vertex.normal = glm::normalize(glm::make_vec3(&normals[i * normalStride]));
+				if (uvs0 != nullptr) vertex.uv0 = glm::make_vec2(&uvs0[i * uv0Stride]);
+				if (uvs1 != nullptr) vertex.uv1 = glm::make_vec2(&uvs1[i * uv1Stride]);
+				vertices.push_back(vertex);
+			}
+
+			// TODO: Fallback to draw without indexes if not available
+			assert(primitive.indices > -1);
+
+			const auto& accessor = model.accessors[primitive.indices];
+			const auto& bufferView = model.bufferViews[accessor.bufferView];
+			const auto& buffer = model.buffers[bufferView.buffer];
+			const auto indexCount = accessor.count;
+
+			assert((accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE ||
+				accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT ||
+				accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
+				&& "Indexbuffer type not supported, supported types are uint8, uint16, uint32");
+
+			const void* indexBuffer = &buffer.data[accessor.byteOffset + bufferView.byteOffset];
+			if (accessor.componentType == TINYGLTF_PARAMETER_TYPE_UNSIGNED_BYTE) {
+				const uint8_t* buf = static_cast<const uint8_t*>(indexBuffer);
+				for (auto i = 0; i < indexCount; i++) {
+					indices.push_back(buf[i]);
+				}
+			}
+			else if (accessor.componentType == TINYGLTF_PARAMETER_TYPE_UNSIGNED_SHORT) {
+				const uint16_t* buf = static_cast<const uint16_t*>(indexBuffer);
+				for (auto i = 0; i < indexCount; i++) {
+					indices.push_back(buf[i]);
+				}
+			}
+			else if (accessor.componentType == TINYGLTF_PARAMETER_TYPE_UNSIGNED_INT) {
+				const uint32_t* buf = static_cast<const uint32_t*>(indexBuffer);
+				for (auto i = 0; i < indexCount; i++) {
+					indices.push_back(buf[i]);
+				}
+			}
+
+			QbVkPBRPrimitive qbPrimitive;
+			qbPrimitive.vertexOffset = vertexOffset;
+			qbPrimitive.indexOffset = indexOffset;
+			qbPrimitive.indexCount = static_cast<uint32_t>(indices.size()) - indexOffset;
+			qbPrimitive.material = materials[primitive.material];
+			qbMesh.primitives.push_back(qbPrimitive);
+		}
+
+		return qbMesh;
 	}
 }

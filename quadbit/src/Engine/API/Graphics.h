@@ -67,7 +67,7 @@ namespace Quadbit {
 		QbVkBufferHandle CreateVertexBuffer(const void* vertices, uint32_t vertexStride, uint32_t vertexCount);
 		QbVkBufferHandle CreateIndexBuffer(const eastl::vector<uint32_t>& indices);
 		QbVkRenderDescriptor CreateRenderDescriptor(VkDescriptorType type, void* descriptor, VkShaderStageFlagBits shaderStage);
-		PBRModelComponent LoadPBRModel(const char* path);
+		PBRSceneComponent LoadPBRModel(const char* path);
 
 		template<typename T>
 		RenderMeshComponent CreateMesh(const eastl::vector<T>& vertices, uint32_t vertexStride, const eastl::vector<uint32_t>& indices, const QbVkRenderMeshInstance* externalInstance,
