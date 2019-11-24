@@ -22,15 +22,14 @@ add_library(Quadbit STATIC
     src/Engine/Application/InputHandler.cpp
     src/Engine/Core/Entry.cpp
     src/Engine/Entities/EntityManager.cpp
-    src/Engine/Rendering/Pipeline.cpp
     src/Engine/Rendering/Renderer.cpp
-    src/Engine/Rendering/ShaderInstance.cpp
+    src/Engine/Rendering/Shaders/ShaderInstance.cpp
     src/Engine/Rendering/Memory/Allocator.cpp
     src/Engine/Rendering/Memory/Pool.cpp
     src/Engine/Rendering/Memory/ResourceManager.cpp
-    src/Engine/Rendering/Pipelines/ComputePipeline.cpp
+    src/Engine/Rendering/Pipelines/Pipeline.cpp
     src/Engine/Rendering/Pipelines/ImGuiPipeline.cpp
-    src/Engine/Rendering/Pipelines/MeshPipeline.cpp
+    src/Engine/Rendering/Pipelines/PBRPipeline.cpp
     )
 
 target_compile_definitions(Quadbit 

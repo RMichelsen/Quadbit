@@ -7,17 +7,17 @@
 
 #include "Engine/Entities/EntityManager.h"
 #include "Engine/Rendering/RenderTypes.h"
-#include "Engine/Rendering/Pipeline.h"
-#include "Engine/Rendering/ShaderInstance.h"
+#include "Engine/Rendering/Pipelines/Pipeline.h"
+#include "Engine/Rendering/Shaders/ShaderInstance.h"
 #include "Engine/Rendering/VulkanTypes.h"
 
 namespace Quadbit {
-	class MeshPipeline {
+	class PBRPipeline {
 	public:
-		MeshPipeline(QbVkContext& context);
+		PBRPipeline(QbVkContext& context);
 
 		void RebuildPipeline();
-		void DrawFrame(uint32_t resourceIndex, VkCommandBuffer commandbuffer);
+		void DrawFrame(uint32_t resourceIndex, VkCommandBuffer commandBuffer);
 
 		PBRSceneComponent LoadModel(const char* path);
 
@@ -28,6 +28,10 @@ namespace Quadbit {
 		eastl::unique_ptr<QbVkPipeline> pipeline_;
 
 	private:
+		void SetViewportAndScissor(VkCommandBuffer& commandBuffer);
+
+
+		// PBR Loader Helpers
 		QbVkPBRMaterial ParseMaterial(const tinygltf::Model& model, const tinygltf::Material& material);
 		void ParseNode(const tinygltf::Model& model, const tinygltf::Node& node, PBRSceneComponent& scene,
 			eastl::vector<QbVkVertex>& vertices, eastl::vector<uint32_t>& indices, const eastl::vector<QbVkPBRMaterial> materials, glm::mat4 parentTransform);

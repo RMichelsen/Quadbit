@@ -31,7 +31,6 @@ namespace Quadbit {
 		eastl::vector<float> frametimeCache_;
 
 		eastl::unique_ptr<QbVkPipeline> pipeline_;
-		QbVkDescriptorSetsHandle descriptors_;
 		QbVkTextureHandle fontTexture_ = QBVK_TEXTURE_NULL_HANDLE;
 
 		PushConstBlock pushConstBlock_{};

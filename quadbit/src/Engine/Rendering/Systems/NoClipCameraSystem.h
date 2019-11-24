@@ -4,7 +4,7 @@
 #include <glm/glm.hpp>
 #include <glm/vec3.hpp>
 
-#include "Engine/Application/inputHandler.h"
+#include "Engine/Application/InputHandler.h"
 #include "Engine/Rendering/RenderTypes.h"
 #include "Engine/Entities/EntityManager.h"
 

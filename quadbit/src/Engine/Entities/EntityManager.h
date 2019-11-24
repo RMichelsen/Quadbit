@@ -6,6 +6,7 @@
 #include <EASTL/unique_ptr.h>
 #include <EASTL/vector.h>
 
+#include "Engine/Core/Logging.h"
 #include "Engine/Entities/EntityTypes.h"
 #include "Engine/Entities/SparseSet.h"
 #include "Engine/Rendering/RenderTypes.h"
@@ -41,7 +42,7 @@ namespace Quadbit {
 		void RemoveComponent();
 	};
 
-	const Entity NULL_ENTITY{ {0xFFFF'FFFF, 0xFFFF'FFFF} };
+	inline const Entity NULL_ENTITY{ {0xFFFF'FFFF, 0xFFFF'FFFF} };
 
 	/*
 	Note on entity manager behaviour:
@@ -72,7 +73,7 @@ namespace Quadbit {
 		void RegisterComponent() {
 			size_t componentID = ComponentID::GetUnique<C>();
 			auto componentStorage = GetComponentStoragePtr<C>();
-			assert(componentStorage == nullptr && "Failed to register component: Component is already registered with the entity manager\n");
+			QB_ASSERT(componentStorage == nullptr && "Failed to register component: Component is already registered with the entity manager\n");
 			componentPools_[componentID] = eastl::make_unique<SparseSet<C>>();
 		}
 
@@ -84,7 +85,7 @@ namespace Quadbit {
 		template<typename C>
 		void AddComponent(const Entity& entity) const {
 			auto* componentStorage = GetComponentStoragePtr<C>();
-			assert(componentStorage != nullptr && "Failed to add component: Component isn't registered with the entity manager\n");
+			QB_ASSERT(componentStorage != nullptr && "Failed to add component: Component isn't registered with the entity manager\n");
 			componentStorage->Insert(entity.id_);
 		}
 
@@ -92,8 +93,16 @@ namespace Quadbit {
 		template<typename C>
 		void AddComponent(const Entity& entity, C&& t) const {
 			auto* componentStorage = GetComponentStoragePtr<C>();
-			assert(componentStorage != nullptr && "Failed to add component: Component isn't registered with the entity manager\n");
+			QB_ASSERT(componentStorage != nullptr && "Failed to add component: Component isn't registered with the entity manager\n");
 			componentStorage->Insert(entity.id_, eastl::move(t));
+		}
+
+		// Copy initialization
+		template<typename C>
+		void AddComponent(const Entity& entity, C& t) const {
+			auto* componentStorage = GetComponentStoragePtr<C>();
+			QB_ASSERT(componentStorage != nullptr && "Failed to add component: Component isn't registered with the entity manager\n");
+			componentStorage->Insert(entity.id_, t);
 		}
 
 		template<typename... Cs>
@@ -114,7 +123,7 @@ namespace Quadbit {
 		template<typename C>
 		void RemoveComponent(const Entity& entity) const {
 			auto* componentStorage = GetComponentStoragePtr<C>();
-			assert(componentStorage != nullptr && "Failed to remove component: Component isn't registered with the entity manager\n");
+			QB_ASSERT(componentStorage != nullptr && "Failed to remove component: Component isn't registered with the entity manager\n");
 			componentStorage->Remove(entity.id_);
 		}
 
@@ -272,7 +281,7 @@ namespace Quadbit {
 		template<typename C>
 		SparseSet<C>* const GetPool() const {
 			size_t componentID = ComponentID::GetUnique<C>();
-			assert(componentPools_[componentID] != nullptr && "Failed to get pool: Component isn't registered with the entity manager\n");
+			QB_ASSERT(componentPools_[componentID] != nullptr && "Failed to get pool: Component isn't registered with the entity manager\n");
 			return reinterpret_cast<SparseSet<C>*>(componentPools_[componentID].get());
 		}
 

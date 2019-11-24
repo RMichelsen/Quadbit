@@ -1,11 +1,12 @@
 #include "Graphics.h"
 
+#include "Engine/Core/Logging.h"
 #include "Engine/Entities/EntityManager.h"
 #include "Engine/Rendering/Renderer.h"
-#include "Engine/Rendering/ShaderInstance.h"
+#include "Engine/Rendering/Shaders/ShaderInstance.h"
 #include "Engine/Rendering/VulkanUtils.h"
-#include "Engine/Rendering/Pipeline.h"
-#include "Engine/Rendering/Pipelines/MeshPipeline.h"
+#include "Engine/Rendering/Pipelines/Pipeline.h"
+#include "Engine/Rendering/Pipelines/PBRPipeline.h"
 #include "Engine/Rendering/Memory/ResourceManager.h"
 
 namespace Quadbit {
@@ -17,16 +18,9 @@ namespace Quadbit {
 	}
 
 	void Graphics::LoadSkyGradient(glm::vec3 botColour, glm::vec3 topColour) {
-		renderer_->meshPipeline_->LoadSkyGradient(botColour, topColour);
+		renderer_->pbrPipeline_->LoadSkyGradient(botColour, topColour);
 	}
 
-	VkDescriptorBufferInfo* Graphics::GetDescriptorPtr(QbVkBufferHandle handle) {
-		return resourceManager_->GetDescriptorPtr<QbVkBuffer, VkDescriptorBufferInfo>(handle);
-	}
-
-	VkDescriptorImageInfo* Graphics::GetDescriptorPtr(QbVkTextureHandle handle) {
-		return resourceManager_->GetDescriptorPtr<QbVkTexture, VkDescriptorImageInfo>(handle);
-	}
 #pragma endregion
 
 #pragma region GPU
@@ -74,7 +68,7 @@ namespace Quadbit {
 
 #pragma region Objects and Meshes
 	Entity Graphics::GetActiveCamera() {
-		return renderer_->meshPipeline_->GetActiveCamera();
+		return renderer_->pbrPipeline_->GetActiveCamera();
 	}
 
 	void Graphics::RegisterCamera(Entity entity) {
@@ -82,7 +76,7 @@ namespace Quadbit {
 			QB_LOG_ERROR("Cannot register camera: Entity must have the Quadbit::RenderCamera component\n");
 			return;
 		}
-		renderer_->meshPipeline_->SetCamera(entity);
+		renderer_->pbrPipeline_->SetCamera(entity);
 	}
 
 	QbVkShaderInstance Graphics::CreateShaderInstance() {
@@ -114,28 +108,62 @@ namespace Quadbit {
 		auto vertexBytecode = VkUtils::ReadShader(vertexPath);
 		auto fragmentBytecode = VkUtils::ReadShader(fragmentPath);
 
-		return CreatePipeline(reinterpret_cast<uint32_t*>(vertexBytecode.data()), vertexBytecode.size() / sizeof(uint32_t),
-			reinterpret_cast<uint32_t*>(fragmentBytecode.data()), fragmentBytecode.size() / sizeof(uint32_t), pipelineDescription,
+		return CreatePipeline(reinterpret_cast<uint32_t*>(vertexBytecode.data()), static_cast<uint32_t>(vertexBytecode.size() / sizeof(uint32_t)),
+			reinterpret_cast<uint32_t*>(fragmentBytecode.data()), static_cast<uint32_t>(fragmentBytecode.size() / sizeof(uint32_t)), pipelineDescription,
 			maxInstances, vertexAttributeOverride);
 	}
 
-	void Graphics::BindResource(const QbVkPipelineHandle pipelineHandle, const eastl::string name, const QbVkBufferHandle bufferHandle) {
+	void Graphics::BindResource(const QbVkPipelineHandle pipelineHandle, const eastl::string name,
+		const QbVkBufferHandle bufferHandle, const QbVkDescriptorSetsHandle descriptorsHandle) {
 		auto& pipeline = resourceManager_->pipelines_[pipelineHandle];
-		pipeline->BindResource(name, bufferHandle);
+		if (descriptorsHandle != QBVK_DESCRIPTOR_SETS_NULL_HANDLE) {
+			pipeline->BindResource(descriptorsHandle, name, bufferHandle);
+		}
+		else {
+			pipeline->BindResource(name, bufferHandle);
+		}
 	}
 
-	void Graphics::BindResource(const QbVkPipelineHandle pipelineHandle, const eastl::string name, const QbVkTextureHandle textureHandle) {
+	void Graphics::BindResource(const QbVkPipelineHandle pipelineHandle, const eastl::string name,
+		const QbVkTextureHandle textureHandle, const QbVkDescriptorSetsHandle descriptorsHandle) {
 		auto& pipeline = resourceManager_->pipelines_[pipelineHandle];
-		pipeline->BindResource(name, textureHandle);
+		if (descriptorsHandle != QBVK_DESCRIPTOR_SETS_NULL_HANDLE) {
+			pipeline->BindResource(descriptorsHandle, name, textureHandle);
+		}
+		else {
+			pipeline->BindResource(name, textureHandle);
+		}
+	}
+
+	void Graphics::BindResourceArray(const QbVkPipelineHandle pipelineHandle, const eastl::string name,
+		const eastl::vector<QbVkBufferHandle> bufferHandles, const QbVkDescriptorSetsHandle descriptorsHandle) {
+		auto& pipeline = resourceManager_->pipelines_[pipelineHandle];
+		if (descriptorsHandle != QBVK_DESCRIPTOR_SETS_NULL_HANDLE) {
+			pipeline->BindResourceArray(descriptorsHandle, name, bufferHandles);
+		}
+		else {
+			pipeline->BindResourceArray(name, bufferHandles);
+		}
+	}
+
+	void Graphics::BindResourceArray(const QbVkPipelineHandle pipelineHandle, const eastl::string name,
+		const eastl::vector<QbVkTextureHandle> textureHandles, const QbVkDescriptorSetsHandle descriptorsHandle) {
+		auto& pipeline = resourceManager_->pipelines_[pipelineHandle];
+		if (descriptorsHandle != QBVK_DESCRIPTOR_SETS_NULL_HANDLE) {
+			pipeline->BindResourceArray(descriptorsHandle, name, textureHandles);
+		}
+		else {
+			pipeline->BindResourceArray(name, textureHandles);
+		}
 	}
 
 	PBRSceneComponent Graphics::LoadPBRModel(const char* path) {
-		return renderer_->meshPipeline_->LoadModel(path);
+		return renderer_->pbrPipeline_->LoadModel(path);
 	}
 
 	void Graphics::DestroyMesh(const Entity& entity) {
 		const auto& entityManager = renderer_->context_->entityManager;
-		assert(entityManager->HasComponent<CustomMeshComponent>(entity));
+		QB_ASSERT(entityManager->HasComponent<CustomMeshComponent>(entity));
 		const auto& mesh = entityManager->GetComponentPtr<CustomMeshComponent>(entity);
 		entityManager->AddComponent<CustomMeshDeleteComponent>(
 			entityManager->Create(),
@@ -145,7 +173,7 @@ namespace Quadbit {
 	}
 
 	void* Graphics::GetMappedGPUData(QbVkBufferHandle handle) {
-		assert(resourceManager_->buffers_[handle].alloc.data != nullptr && "GPUBuffer data not mapped!");
+		QB_ASSERT(resourceManager_->buffers_[handle].alloc.data != nullptr && "GPUBuffer data not mapped!");
 		return resourceManager_->buffers_[handle].alloc.data;
 	}
 #pragma endregion

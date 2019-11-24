@@ -9,10 +9,9 @@
 #include "Engine/Rendering/RenderTypes.h"
 #include "Engine/Rendering/VulkanUtils.h"
 #include "Engine/Rendering/Memory/ResourceManager.h"
-#include "Engine/Rendering/Pipelines/ComputePipeline.h"
-#include "Engine/Rendering/Pipelines/MeshPipeline.h"
+#include "Engine/Rendering/Pipelines/PBRPipeline.h"
 #include "Engine/Rendering/Pipelines/ImGuiPipeline.h"
-#include "Engine/Rendering/Pipeline.h"
+#include "Engine/Rendering/Pipelines/Pipeline.h"
 
 
 #ifndef NDEBUG
@@ -80,9 +79,8 @@ namespace Quadbit {
 		context_->resourceManager = eastl::make_unique<QbVkResourceManager>(*context_);
 
 		// Pipelines
-		meshPipeline_ = eastl::make_unique<MeshPipeline>(*context_);
+		pbrPipeline_ = eastl::make_unique<PBRPipeline>(*context_);
 		imGuiPipeline_ = eastl::make_unique<ImGuiPipeline>(*context_);
-		computePipeline_ = eastl::make_unique<ComputePipeline>(*context_);
 	}
 
 	QbVkRenderer::~QbVkRenderer() {
@@ -90,9 +88,8 @@ namespace Quadbit {
 		VK_CHECK(vkDeviceWaitIdle(context_->device));
 
 		// Destroy pipelines
-		meshPipeline_.reset();
+		pbrPipeline_.reset();
 		imGuiPipeline_.reset();
-		computePipeline_.reset();
 
 		// Destroy persistent buffers and textures from the resource manager
 		context_->resourceManager.reset();
@@ -603,7 +600,7 @@ namespace Quadbit {
 		CreateDepthResources();
 
 		// Mesh Pipeline
-		meshPipeline_->RebuildPipeline();
+		pbrPipeline_->RebuildPipeline();
 
 		// Requery the surface capabilities
 		VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(context_->gpu->physicalDevice, context_->surface, &context_->gpu->surfaceCapabilities));
@@ -714,7 +711,6 @@ namespace Quadbit {
 		imGuiPipeline_->ImGuiDrawState();
 		context_->entityManager->systemDispatch_->ImGuiDrawState();
 		context_->allocator->ImGuiDrawState();
-		computePipeline_->ImGuiDrawState();
 
 		// Any ImGui draw commands before this call will be rendered to the screen
 		// this also means user-code as Game->Simulate() is done before rendering 
@@ -749,7 +745,7 @@ namespace Quadbit {
 
 		vkCmdBeginRenderPass(commandbuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-		meshPipeline_->DrawFrame(resourceIndex, commandbuffer);
+		pbrPipeline_->DrawFrame(resourceIndex, commandbuffer);
 
 		ImGuiUpdateContent();
 		imGuiPipeline_->DrawFrame(resourceIndex, commandbuffer);

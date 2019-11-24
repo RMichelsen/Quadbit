@@ -125,7 +125,7 @@ namespace Quadbit {
 
 		template<typename T>
 		T* GetSafePushConstPtr() {
-			assert(sizeof(T) <= 128 && "Push Constants must have a max size of 128 bytes");
+			QB_ASSERT(sizeof(T) <= 128 && "Push Constants must have a max size of 128 bytes");
 			return reinterpret_cast<T*>(pushConstants.data());
 		}
 	};
@@ -142,7 +142,7 @@ namespace Quadbit {
 
 		template<typename T>
 		T* GetSafePushConstPtr() {
-			assert(sizeof(T) <= 128 && "Push Constants must have a max size of 128 bytes");
+			QB_ASSERT(sizeof(T) <= 128 && "Push Constants must have a max size of 128 bytes");
 			return reinterpret_cast<T*>(pushConstants.data());
 		}
 	};

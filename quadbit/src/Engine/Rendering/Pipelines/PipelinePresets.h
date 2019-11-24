@@ -2,6 +2,8 @@
 
 #include <vulkan/vulkan.h>
 
+#include "Engine/Core/Logging.h"
+
 namespace Quadbit {
 	enum class QbVkPipelineDepth {
 		QBVK_PIPELINE_DEPTH_DISABLE,
@@ -144,6 +146,9 @@ namespace Quadbit {
 				return PIPELINE_DEPTH_DISABLE;
 			case QbVkPipelineDepth::QBVK_PIPELINE_DEPTH_ENABLE:
 				return PIPELINE_DEPTH_ENABLE;
+			default:
+				QB_ASSERT(false && "Unknown Depth Preset!");
+				return PIPELINE_DEPTH_DISABLE;
 			}
 		}
 
@@ -153,6 +158,9 @@ namespace Quadbit {
 				return PIPELINE_RASTERIZATION_DEFAULT;
 			case QbVkPipelineRasterization::QBVK_PIPELINE_RASTERIZATION_NOCULL:
 				return PIPELINE_RASTERIZATION_NOCULL;
+			default:
+				QB_ASSERT(false && "Unknown Rasterization Preset!");
+				return PIPELINE_RASTERIZATION_DEFAULT;
 			}
 		}
 
@@ -162,6 +170,9 @@ namespace Quadbit {
 				return PIPELINE_BLEND_DISABLE;
 			case QbVkPipelineColorBlending::QBVK_COLORBLENDING_ENABLE:
 				return PIPELINE_BLEND_ENABLE;
+			default:
+				QB_ASSERT(false && "Unknown Blend Preset!");
+				return PIPELINE_BLEND_DISABLE;
 			}
 		}
 
@@ -171,6 +182,9 @@ namespace Quadbit {
 				return PIPELINE_DYNAMICSTATES_VIEWPORTSCISSOR;
 			case QbVkPipelineDynamicState::QBVK_DYNAMICSTATE_NONE:
 				return PIPELINE_DYNAMICSTATES_NONE;
+			default:
+				QB_ASSERT(false && "Unknown DynamicStates Preset!");
+				return PIPELINE_DYNAMICSTATES_VIEWPORTSCISSOR;
 			}
 		}
 	}

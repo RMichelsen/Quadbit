@@ -8,7 +8,7 @@
 #include <EASTL/type_traits.h>
 
 #include "Engine/Rendering/VulkanTypes.h"
-#include "Engine/Rendering/Pipeline.h"
+#include "Engine/Rendering/Pipelines/Pipeline.h"
 
 constexpr size_t MAX_TRANSFERS_PER_FRAME = 1024;
 constexpr size_t MAX_BUFFER_COUNT = 65536;

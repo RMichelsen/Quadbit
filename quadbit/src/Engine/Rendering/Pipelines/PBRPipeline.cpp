@@ -1,4 +1,4 @@
-#include "MeshPipeline.h"
+#include "PBRPipeline.h"
 
 #include <string>
 #include <filesystem>
@@ -17,6 +17,7 @@
 #define TINYGLTF_NO_INCLUDE_STB_IMAGE_WRITE
 #include <tinygltf/tiny_gltf.h>
 
+#include "Engine/Core/Logging.h"
 #include "Engine/Core/Time.h"
 #include "Engine/Rendering/VulkanTypes.h"
 #include "Engine/Rendering/RenderTypes.h"
@@ -24,12 +25,12 @@
 #include "Engine/Entities/EntityManager.h"
 #include "Engine/Rendering/VulkanUtils.h"
 #include "Engine/Rendering/Systems/NoClipCameraSystem.h"
-#include "Engine/Rendering/ShaderBytecode.h"
+#include "Engine/Rendering/Shaders/ShaderBytecode.h"
 #include "Engine/Rendering/Memory/ResourceManager.h"
 
 
 namespace Quadbit {
-	MeshPipeline::MeshPipeline(QbVkContext& context) :
+	PBRPipeline::PBRPipeline(QbVkContext& context) :
 		context_(context) {
 
 		// Register the mesh component to be used by the ECS
@@ -46,16 +47,16 @@ namespace Quadbit {
 		pipelineDescription.enableMSAA = true;
 		pipelineDescription.rasterization = QbVkPipelineRasterization::QBVK_PIPELINE_RASTERIZATION_DEFAULT;
 
-		pipeline_ = eastl::make_unique<QbVkPipeline>(context_, defaultVert.data(), defaultVert.size(),
-			defaultFrag.data(), defaultFrag.size(), pipelineDescription, 1024);
+		pipeline_ = eastl::make_unique<QbVkPipeline>(context_, defaultVert.data(), static_cast<uint32_t>(defaultVert.size()),
+			defaultFrag.data(), static_cast<uint32_t>(defaultFrag.size()), pipelineDescription, 1024);
 	}
 
-	void MeshPipeline::RebuildPipeline() {
+	void PBRPipeline::RebuildPipeline() {
 		context_.entityManager->AddComponent<CameraUpdateAspectRatioTag>(fallbackCamera_);
 		if (userCamera_ != NULL_ENTITY && context_.entityManager->IsValid(userCamera_)) context_.entityManager->AddComponent<CameraUpdateAspectRatioTag>(userCamera_);
 	}
 
-	void MeshPipeline::DrawFrame(uint32_t resourceIndex, VkCommandBuffer commandbuffer) {
+	void PBRPipeline::DrawFrame(uint32_t resourceIndex, VkCommandBuffer commandBuffer) {
 		// Here we clean up meshes that are due for removal
 		context_.entityManager->ForEachWithCommandBuffer<CustomMeshDeleteComponent>([&](Entity entity, EntityCommandBuffer* cmdBuf, CustomMeshDeleteComponent& mesh) noexcept {
 			if (mesh.deletionDelay == 0) {
@@ -106,105 +107,78 @@ namespace Quadbit {
 		//	camera->view = glm::lookAt(camera->position, camera->position + camera->front, camera->up);
 		//}
 
+		SetViewportAndScissor(commandBuffer);
+
 		VkDeviceSize offsets[]{ 0 };
 
+		pipeline_->Bind(commandBuffer);
 		context_.entityManager->ForEach<PBRSceneComponent, RenderTransformComponent>(
 			[&](Entity entity, PBRSceneComponent& scene, RenderTransformComponent& transform) noexcept {
-			pipeline_->Bind(commandbuffer);
-
-			// Dynamic update viewport and scissor for user-defined pipelines (also doesn't necessitate rebuilding the pipeline on window resize)
-			VkViewport viewport{};
-			VkRect2D scissor{};
-			// In our case the viewport covers the entire window
-			viewport.width = static_cast<float>(context_.swapchain.extent.width);
-			viewport.height = static_cast<float>(context_.swapchain.extent.height);
-			viewport.minDepth = 0.0f;
-			viewport.maxDepth = 1.0f;
-			vkCmdSetViewport(commandbuffer, 0, 1, &viewport);
-			// And so does the scissor
-			scissor.offset = { 0, 0 };
-			scissor.extent = context_.swapchain.extent;
-			vkCmdSetScissor(commandbuffer, 0, 1, &scissor);
-
 			for (const auto& mesh : scene.meshes) {
 				eastl::array<VkDeviceSize, 1> offsets{ 0 };
 
 				for (const auto& primitive : mesh.primitives) {
 					offsets[0] = primitive.vertexOffset * sizeof(QbVkVertex);
-					vkCmdBindVertexBuffers(commandbuffer, 0, 1, &context_.resourceManager->buffers_[scene.vertexHandle].buf, offsets.data());
-					vkCmdBindIndexBuffer(commandbuffer, context_.resourceManager->buffers_[scene.indexHandle].buf, primitive.indexOffset * sizeof(uint32_t), VK_INDEX_TYPE_UINT32);
+					vkCmdBindVertexBuffers(commandBuffer, 0, 1, &context_.resourceManager->buffers_[scene.vertexHandle].buf, offsets.data());
+					vkCmdBindIndexBuffer(commandBuffer, context_.resourceManager->buffers_[scene.indexHandle].buf, primitive.indexOffset * sizeof(uint32_t), VK_INDEX_TYPE_UINT32);
 
 					RenderMeshPushConstants* pushConstants = scene.GetSafePushConstPtr<RenderMeshPushConstants>();
 					auto model = transform.model * mesh.localTransform;
 					pushConstants->model = model;
 					pushConstants->mvp = camera->perspective * camera->view * model;
-					vkCmdPushConstants(commandbuffer, pipeline_->pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RenderMeshPushConstants), pushConstants);
+					vkCmdPushConstants(commandBuffer, pipeline_->pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RenderMeshPushConstants), pushConstants);
 
 					const auto& descriptorSets = 
 						context_.resourceManager->GetDescriptorSets(primitive.material.descriptorAllocator, primitive.material.descriptorSets);
-					vkCmdBindDescriptorSets(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_->pipelineLayout_, 0,
+					vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_->pipelineLayout_, 0,
 						static_cast<uint32_t>(descriptorSets[resourceIndex].size()), descriptorSets[resourceIndex].data(), 0, nullptr);
 
-					vkCmdDrawIndexed(commandbuffer, primitive.indexCount, 1, 0, 0, 0);
+					vkCmdDrawIndexed(commandBuffer, primitive.indexCount, 1, 0, 0, 0);
 				}
 			}
 			});
 
+
 		context_.entityManager->ForEach<CustomMeshComponent, RenderTransformComponent>(
 			[&](Entity entity, CustomMeshComponent& mesh, RenderTransformComponent& transform) noexcept {
-			assert(mesh.pipelineHandle != QBVK_PIPELINE_NULL_HANDLE && "Invalid pipeline handle!");
+			QB_ASSERT(mesh.pipelineHandle != QBVK_PIPELINE_NULL_HANDLE && "Invalid pipeline handle!");
 			const auto& pipeline = context_.resourceManager->pipelines_[mesh.pipelineHandle];
-			pipeline->Bind(commandbuffer);
-
-			// Dynamic update viewport and scissor for user-defined pipelines (also doesn't necessitate rebuilding the pipeline on window resize)
-			VkViewport viewport{};
-			VkRect2D scissor{};
-			// In our case the viewport covers the entire window
-			viewport.width = static_cast<float>(context_.swapchain.extent.width);
-			viewport.height = static_cast<float>(context_.swapchain.extent.height);
-			viewport.minDepth = 0.0f;
-			viewport.maxDepth = 1.0f;
-			vkCmdSetViewport(commandbuffer, 0, 1, &viewport);
-			// And so does the scissor
-			scissor.offset = { 0, 0 };
-			scissor.extent = context_.swapchain.extent;
-			vkCmdSetScissor(commandbuffer, 0, 1, &scissor);
+			pipeline->Bind(commandBuffer);
 
 			if (mesh.pushConstantStride == -1) {
 				RenderMeshPushConstants* pushConstants = mesh.GetSafePushConstPtr<RenderMeshPushConstants>();
 				pushConstants->model = transform.model;
 				pushConstants->mvp = camera->perspective * camera->view * transform.model;
-				vkCmdPushConstants(commandbuffer, pipeline_->pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RenderMeshPushConstants), pushConstants);
+				vkCmdPushConstants(commandBuffer, pipeline_->pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RenderMeshPushConstants), pushConstants);
 			}
 			else if (mesh.pushConstantStride > 0) {
-				vkCmdPushConstants(commandbuffer, pipeline_->pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, mesh.pushConstantStride, mesh.pushConstants.data());
+				vkCmdPushConstants(commandBuffer, pipeline_->pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, mesh.pushConstantStride, mesh.pushConstants.data());
 			}
 
-			vkCmdBindVertexBuffers(commandbuffer, 0, 1, &context_.resourceManager->buffers_[mesh.vertexHandle].buf, offsets);
-			vkCmdBindIndexBuffer(commandbuffer, context_.resourceManager->buffers_[mesh.indexHandle].buf, 0, VK_INDEX_TYPE_UINT32);
+			vkCmdBindVertexBuffers(commandBuffer, 0, 1, &context_.resourceManager->buffers_[mesh.vertexHandle].buf, offsets);
+			vkCmdBindIndexBuffer(commandBuffer, context_.resourceManager->buffers_[mesh.indexHandle].buf, 0, VK_INDEX_TYPE_UINT32);
 
 			if (mesh.descriptorSetsHandle != QBVK_DESCRIPTOR_SETS_NULL_HANDLE) {
 				const auto& descriptorSets =
 					context_.resourceManager->GetDescriptorSets(pipeline->descriptorAllocator_, mesh.descriptorSetsHandle);
-				vkCmdBindDescriptorSets(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipelineLayout_, 0,
+				vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipelineLayout_, 0,
 					static_cast<uint32_t>(descriptorSets[resourceIndex].size()), descriptorSets[resourceIndex].data(), 0, nullptr);
 			}
 			else if (pipeline->mainDescriptors_ != QBVK_DESCRIPTOR_SETS_NULL_HANDLE) {
 				const auto& descriptorSets =
 					context_.resourceManager->GetDescriptorSets(pipeline->descriptorAllocator_, pipeline->mainDescriptors_);
-				vkCmdBindDescriptorSets(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipelineLayout_, 0,
+				vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipelineLayout_, 0,
 					static_cast<uint32_t>(descriptorSets[resourceIndex].size()), descriptorSets[resourceIndex].data(), 0, nullptr);
 			}
 
-			vkCmdDrawIndexed(commandbuffer, mesh.indexCount, 1, 0, 0, 0);
+			vkCmdDrawIndexed(commandBuffer, mesh.indexCount, 1, 0, 0, 0);
 			});
 	}
 
-	PBRSceneComponent MeshPipeline::LoadModel(const char* path)
+	PBRSceneComponent PBRPipeline::LoadModel(const char* path)
 	{
 		auto fsPath = std::filesystem::path(path);
 		eastl::string extension = eastl::string(fsPath.extension().string().c_str());
-		eastl::string directoryPath = eastl::string(fsPath.remove_filename().string().c_str());
 		PBRSceneComponent scene;
 
 		std::string err, warn;
@@ -223,7 +197,7 @@ namespace Quadbit {
 		}
 
 		// For now we only support loading single scenes
-		assert(model.scenes.size() == 1 && "Failed to parse model, only one scene allowed!");
+		QB_ASSERT(model.scenes.size() == 1 && "Failed to parse model, only one scene allowed!");
 
 		// Parse materials
 		eastl::vector<QbVkPBRMaterial> materials;
@@ -244,15 +218,15 @@ namespace Quadbit {
 		return scene;
 	}
 
-	Entity MeshPipeline::GetActiveCamera() {
+	Entity PBRPipeline::GetActiveCamera() {
 		return (userCamera_ == NULL_ENTITY) ? fallbackCamera_ : userCamera_;
 	}
 
-	void MeshPipeline::SetCamera(Entity entity) {
+	void PBRPipeline::SetCamera(Entity entity) {
 		if(entity != NULL_ENTITY) userCamera_ = entity;
 	}
 
-	void MeshPipeline::LoadSkyGradient(glm::vec3 botColour, glm::vec3 topColour) {
+	void PBRPipeline::LoadSkyGradient(glm::vec3 botColour, glm::vec3 topColour) {
 		//eastl::vector<Quadbit::QbVkVertexInputAttribute> vertexModel{
 		//	Quadbit::QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_POSITION,
 		//	Quadbit::QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_COLOUR
@@ -305,7 +279,23 @@ namespace Quadbit {
 		//	Quadbit::RenderTransformComponent(1.0f, { 0.0f, 0.0f, 0.0f }, { 0, 0, 0, 1 }));
 	}
 
-	QbVkPBRMaterial MeshPipeline::ParseMaterial(const tinygltf::Model& model, const tinygltf::Material& material) {
+	void PBRPipeline::SetViewportAndScissor(VkCommandBuffer& commandBuffer) {
+		// Dynamic update viewport and scissor for user-defined pipelines (also doesn't necessitate rebuilding the pipeline on window resize)
+		VkViewport viewport{};
+		VkRect2D scissor{};
+		// In our case the viewport covers the entire window
+		viewport.width = static_cast<float>(context_.swapchain.extent.width);
+		viewport.height = static_cast<float>(context_.swapchain.extent.height);
+		viewport.minDepth = 0.0f;
+		viewport.maxDepth = 1.0f;
+		vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+		// And so does the scissor
+		scissor.offset = { 0, 0 };
+		scissor.extent = context_.swapchain.extent;
+		vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+	}
+
+	QbVkPBRMaterial PBRPipeline::ParseMaterial(const tinygltf::Model& model, const tinygltf::Material& material) {
 		QbVkPBRMaterial mat{};
 		if (material.values.find("baseColorTexture") != material.values.end()) {
 			mat.baseColorTexture = CreateTextureFromResource(model, material, "baseColorTexture");
@@ -344,19 +334,31 @@ namespace Quadbit {
 		return mat;
 	}
 
-	void MeshPipeline::ParseNode(const tinygltf::Model& model, const tinygltf::Node& node, PBRSceneComponent& scene,
+	void PBRPipeline::ParseNode(const tinygltf::Model& model, const tinygltf::Node& node, PBRSceneComponent& scene,
 		eastl::vector<QbVkVertex>& vertices, eastl::vector<uint32_t>& indices, const eastl::vector<QbVkPBRMaterial> materials, glm::mat4 parentTransform) {
 		// Construct transform matrix from node data and parent data
-		glm::mat4 translation = (node.translation.size() == 3) ?
-			glm::translate(glm::mat4(1.0f), glm::vec3(glm::make_vec3(node.translation.data()))) : glm::mat4(1.0f);
-		glm::mat4 rotation = (node.rotation.size() == 4) ?
-			glm::mat4_cast(glm::make_quat(node.rotation.data())) : glm::mat4(1.0f);
-		glm::mat4 scale = (node.scale.size() == 3) ?
-			glm::scale(glm::mat4(1.0f), glm::vec3(glm::make_vec3(node.scale.data()))) : glm::mat4(1.0f);
-		glm::mat4 nodeTransform = (node.matrix.size() == 16) ?
-			translation * rotation * scale * glm::mat4(glm::make_mat4x4(node.matrix.data())) :
-			translation * rotation * scale * glm::mat4(1.0f);
-		glm::mat4 transform = parentTransform * nodeTransform;
+		// Even though the data read is in double precision, we will 
+		// take the precision hit and store them as floats since it should
+		// be plenty precision for simple transforms
+		glm::f64mat4 translation = glm::f64mat4(1.0f);
+		if (node.translation.size() == 3) {
+			translation = glm::translate(translation, glm::make_vec3(node.translation.data()));
+		} 
+		glm::f64mat4 rotation = glm::f64mat4(1.0f);
+		if (node.rotation.size() == 4) {
+			rotation = glm::f64mat4(glm::make_quat(node.rotation.data()));
+		}
+		glm::f64mat4 scale = glm::f64mat4(1.0f);
+		if (node.scale.size() == 3) {
+			scale = glm::scale(scale, glm::make_vec3(node.scale.data()));
+		}
+		glm::mat4 transform = glm::mat4(1.0f);
+		if (node.matrix.size() == 16) {
+			transform = translation * rotation * scale * glm::make_mat4x4(node.matrix.data());
+		}
+		else {
+			transform = translation * rotation * scale;
+		}
 
 		// Let parent transform data propagate down through children on recurse
 		if (node.children.size() > 0) {
@@ -373,13 +375,13 @@ namespace Quadbit {
 		}
 	}
 
-	QbVkPBRMesh MeshPipeline::ParseMesh(const tinygltf::Model& model, const tinygltf::Mesh& mesh,
+	QbVkPBRMesh PBRPipeline::ParseMesh(const tinygltf::Model& model, const tinygltf::Mesh& mesh,
 		eastl::vector<QbVkVertex>& vertices, eastl::vector<uint32_t>& indices, const eastl::vector<QbVkPBRMaterial>& materials) {
 		QbVkPBRMesh qbMesh{};
 
 		for (const auto& primitive : mesh.primitives) {
-			assert(primitive.attributes.find("POSITION") != primitive.attributes.end());
-			assert(primitive.mode == TINYGLTF_MODE_TRIANGLES);
+			QB_ASSERT(primitive.attributes.find("POSITION") != primitive.attributes.end());
+			QB_ASSERT(primitive.mode == TINYGLTF_MODE_TRIANGLES);
 
 			const auto vertexCount = model.accessors[primitive.attributes.find("POSITION")->second].count;
 
@@ -403,22 +405,22 @@ namespace Quadbit {
 				if (name.compare("POSITION") == 0) {
 					positions = reinterpret_cast<const float*>(&buffer.data[accessor.byteOffset + bufferView.byteOffset]);
 					positionStride = accessor.ByteStride(bufferView) / sizeof(float);
-					assert(positions != nullptr && positionStride > 0);
+					QB_ASSERT(positions != nullptr && positionStride > 0);
 				}
 				else if (name.compare("NORMAL") == 0) {
 					normals = reinterpret_cast<const float*>(&buffer.data[accessor.byteOffset + bufferView.byteOffset]);
 					normalStride = accessor.ByteStride(bufferView) / sizeof(float);
-					assert(normals != nullptr && normalStride > 0);
+					QB_ASSERT(normals != nullptr && normalStride > 0);
 				}
 				else if (name.compare("TEXCOORD_0") == 0) {
 					uvs0 = reinterpret_cast<const float*>(&buffer.data[accessor.byteOffset + bufferView.byteOffset]);
 					uv0Stride = accessor.ByteStride(bufferView) / sizeof(float);
-					assert(uvs0 != nullptr && uv0Stride > 0);
+					QB_ASSERT(uvs0 != nullptr && uv0Stride > 0);
 				}
 				else if (name.compare("TEXCOORD_1") == 0) {
 					uvs1 = reinterpret_cast<const float*>(&buffer.data[accessor.byteOffset + bufferView.byteOffset]);
 					uv1Stride = accessor.ByteStride(bufferView) / sizeof(float);
-					assert(uvs1 != nullptr && uv1Stride > 0);
+					QB_ASSERT(uvs1 != nullptr && uv1Stride > 0);
 				}
 			}
 
@@ -432,14 +434,14 @@ namespace Quadbit {
 			}
 
 			// TODO: Fallback to draw without indexes if not available
-			assert(primitive.indices > -1);
+			QB_ASSERT(primitive.indices > -1);
 
 			const auto& accessor = model.accessors[primitive.indices];
 			const auto& bufferView = model.bufferViews[accessor.bufferView];
 			const auto& buffer = model.buffers[bufferView.buffer];
 			const auto indexCount = accessor.count;
 
-			assert((accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE ||
+			QB_ASSERT((accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE ||
 				accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT ||
 				accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
 				&& "Indexbuffer type not supported, supported types are uint8, uint16, uint32");
@@ -475,7 +477,7 @@ namespace Quadbit {
 		return qbMesh;
 	}
 
-	QbVkDescriptorSetsHandle MeshPipeline::WriteMaterialDescriptors(const QbVkPBRMaterial& material) {
+	QbVkDescriptorSetsHandle PBRPipeline::WriteMaterialDescriptors(const QbVkPBRMaterial& material) {
 		auto descriptorSetsHandle = pipeline_->GetNextDescriptorSetsHandle();
 		auto emptyTextureHandle = context_.resourceManager->GetEmptyTexture();
 
@@ -504,7 +506,7 @@ namespace Quadbit {
 
 		return descriptorSetsHandle;
 	}
-	QbVkTextureHandle MeshPipeline::CreateTextureFromResource(const tinygltf::Model& model, const tinygltf::Material& material, const char* textureName) {
+	QbVkTextureHandle PBRPipeline::CreateTextureFromResource(const tinygltf::Model& model, const tinygltf::Material& material, const char* textureName) {
 		auto& texture = model.textures[material.values.at(textureName).TextureIndex()];
 		auto& image = model.images[texture.source];
 
@@ -512,7 +514,7 @@ namespace Quadbit {
 		return context_.resourceManager->LoadTexture(image.width, image.height, image.image.data(), &samplerInfo);
 	}
 
-	VkSamplerCreateInfo MeshPipeline::GetSamplerInfo(const tinygltf::Model& model, int samplerIndex) {
+	VkSamplerCreateInfo PBRPipeline::GetSamplerInfo(const tinygltf::Model& model, int samplerIndex) {
 		VkSamplerCreateInfo samplerCreateInfo{};
 		samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
 		samplerCreateInfo.magFilter = VK_FILTER_LINEAR;

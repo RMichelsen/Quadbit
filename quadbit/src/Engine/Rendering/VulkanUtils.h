@@ -560,7 +560,7 @@ namespace Quadbit::VkUtils {
 	// Returns whether or not the end of the first resource and the beginning of the second resource
 	// reside in separate pages. Algorithm from the Vulkan 1.1.106 specification.
 	inline bool IsOnSamePage(VkDeviceSize resourceAOffset, VkDeviceSize resourceASize, VkDeviceSize resourceBOffset, VkDeviceSize pageSize) {
-		assert(resourceAOffset + resourceASize <= resourceBOffset && resourceASize > 0 && pageSize > 0);
+		QB_ASSERT(resourceAOffset + resourceASize <= resourceBOffset && resourceASize > 0 && pageSize > 0);
 		VkDeviceSize firstResourceEnd = resourceAOffset + resourceASize - 1;
 		VkDeviceSize firstResourceEndPage = firstResourceEnd & ~(pageSize - 1);
 		VkDeviceSize secondResourceStartPage = resourceBOffset & ~(pageSize - 1);
@@ -595,7 +595,7 @@ namespace Quadbit::VkUtils {
 		case QbVkAllocationType::QBVK_ALLOCATION_TYPE_IMAGE_OPTIMAL:
 			return false;
 		default:
-			assert(false);
+			QB_ASSERT(false);
 			return true;
 		}
 	}
@@ -969,7 +969,7 @@ namespace Quadbit::VkUtils {
 		case 16:
 			return VK_FORMAT_R32G32B32A32_SFLOAT;
 		default:
-			assert(false && "Vertex input attribute not recognized");
+			QB_ASSERT(false && "Vertex input attribute not recognized");
 			return VK_FORMAT_UNDEFINED;
 		}
 	}

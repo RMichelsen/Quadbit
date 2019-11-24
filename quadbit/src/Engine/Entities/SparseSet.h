@@ -21,8 +21,8 @@ namespace Quadbit {
 		}
 
 		void Insert(EntityID id) {
-			assert(id.index < sparse_.size());
-			assert(sparse_[id.index] == 0xFFFF'FFFF && "Failed to add component: Component is already part of entity");
+			QB_ASSERT(id.index < sparse_.size());
+			QB_ASSERT(sparse_[id.index] == 0xFFFF'FFFF && "Failed to add component: Component is already part of entity");
 
 			sparse_[id.index] = static_cast<uint32_t>(dense_.size());
 			dense_.push_back(T());
@@ -30,8 +30,17 @@ namespace Quadbit {
 		}
 
 		void Insert(EntityID id, T&& t) {
-			assert(id.index < sparse_.size());
-			assert(sparse_[id.index] == 0xFFFF'FFFF && "Failed to add component: Component is already part of entity");
+			QB_ASSERT(id.index < sparse_.size());
+			QB_ASSERT(sparse_[id.index] == 0xFFFF'FFFF && "Failed to add component: Component is already part of entity");
+
+			sparse_[id.index] = static_cast<uint32_t>(dense_.size());
+			dense_.push_back(t);
+			entityFromComponentIndices_.push_back(id.index);
+		}
+
+		void Insert(EntityID id, T& t) {
+			QB_ASSERT(id.index < sparse_.size());
+			QB_ASSERT(sparse_[id.index] == 0xFFFF'FFFF && "Failed to add component: Component is already part of entity");
 
 			sparse_[id.index] = static_cast<uint32_t>(dense_.size());
 			dense_.push_back(t);
@@ -39,8 +48,8 @@ namespace Quadbit {
 		}
 
 		void Remove(EntityID id) {
-			assert(id.index < sparse_.size());
-			assert(sparse_[id.index] != 0xFFFF'FFFF && "Failed to remove component: Component is not part of the entity");
+			QB_ASSERT(id.index < sparse_.size());
+			QB_ASSERT(sparse_[id.index] != 0xFFFF'FFFF && "Failed to remove component: Component is not part of the entity");
 
 			// Removal works by swap and pop
 			uint32_t lastIndex = FindEntityID(static_cast<uint32_t>(dense_.size()) - 1);
@@ -59,7 +68,7 @@ namespace Quadbit {
 		}
 
 		void RemoveIfExists(EntityID id) override {
-			assert(id.index < sparse_.size());
+			QB_ASSERT(id.index < sparse_.size());
 			if (sparse_[id.index] == 0xFFFF'FFFF) return;
 
 			// Removal works by swap and pop
@@ -79,19 +88,19 @@ namespace Quadbit {
 		}
 
 		bool HasComponent(EntityID id) {
-			assert(id.index < sparse_.size());
+			QB_ASSERT(id.index < sparse_.size());
 			return sparse_[id.index] != 0xFFFF'FFFF;
 		}
 
 		T* const GetComponentPtr(EntityID id) {
-			assert(id.index < sparse_.size());
-			assert(sparse_[id.index] != 0xFFFF'FFFF && "Failed to get component: Component is not part of the entity");
+			QB_ASSERT(id.index < sparse_.size());
+			QB_ASSERT(sparse_[id.index] != 0xFFFF'FFFF && "Failed to get component: Component is not part of the entity");
 
 			return &dense_[sparse_[id.index]];
 		}
 
 		uint32_t FindEntityID(uint32_t denseIndex) {
-			assert(denseIndex < entityFromComponentIndices_.size());
+			QB_ASSERT(denseIndex < entityFromComponentIndices_.size());
 
 			return entityFromComponentIndices_[denseIndex];
 		}

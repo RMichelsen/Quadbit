@@ -11,6 +11,7 @@
 
 #include "Engine/Rendering/VulkanUtils.h"
 #include "Engine/Rendering/Memory/Allocator.h"
+#include "Engine/Core/Logging.h"
 
 namespace Quadbit {
 	PerFrameTransfers::PerFrameTransfers(const QbVkContext& context) : count(0) {
@@ -213,7 +214,7 @@ namespace Quadbit {
 	QbVkTextureHandle QbVkResourceManager::LoadTexture(const char* imagePath, VkSamplerCreateInfo* samplerInfo) {
 		int width, height, channels;
 		stbi_uc* pixels = stbi_load(imagePath, &width, &height, &channels, STBI_rgb_alpha);
-		assert(pixels != nullptr);
+		QB_ASSERT(pixels != nullptr);
 
 		auto handle = LoadTexture(width, height, pixels, samplerInfo);
 
@@ -248,8 +249,8 @@ namespace Quadbit {
 			auto& sets = allocator.setInstances.elements[i];
 			eastl::vector<VkDescriptorSetLayout> layouts;
 
-			for (int j = 0; j < setCount; j++) {
-				layouts.push_back(setLayouts[j]);
+			for (const auto& setLayout : setLayouts) {
+				layouts.push_back(setLayout);
 			}
 
 			for (int j = 0; j < MAX_FRAMES_IN_FLIGHT; j++) {

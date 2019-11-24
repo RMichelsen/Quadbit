@@ -1,15 +1,14 @@
 #pragma once
 #include <EASTL/unique_ptr.h>
 
-#include "Engine/Rendering/ShaderInstance.h"
+#include "Engine/Rendering/Shaders/ShaderInstance.h"
 #include "Engine/Rendering/RenderTypes.h"
 #include "Engine/Rendering/VulkanTypes.h"
 
 namespace Quadbit {
 	// Forward declarations
-	class MeshPipeline;
+	class PBRPipeline;
 	class ImGuiPipeline;
-	class ComputePipeline;
 	class EntityManager;
 	struct Entity;
 
@@ -34,9 +33,8 @@ namespace Quadbit {
 
 		VkInstance instance_ = VK_NULL_HANDLE;
 		eastl::unique_ptr<QbVkContext> context_;
-		eastl::unique_ptr<MeshPipeline> meshPipeline_;
+		eastl::unique_ptr<PBRPipeline> pbrPipeline_;
 		eastl::unique_ptr<ImGuiPipeline> imGuiPipeline_;
-		eastl::unique_ptr<ComputePipeline> computePipeline_;
 
 		// DEBUG BUILD ONLY
 #ifndef NDEBUG

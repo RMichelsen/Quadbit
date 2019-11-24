@@ -9,8 +9,7 @@
 #include "Engine/Core/Time.h"
 #include "Engine/Entities/EntityManager.h"
 #include "Engine/Rendering/VulkanUtils.h"
-#include "Engine/Rendering/ShaderBytecode.h"
-#include "Engine/Rendering/Pipelines/ComputePipeline.h"
+#include "Engine/Rendering/Shaders/ShaderBytecode.h"
 
 namespace Quadbit {
 	ImGuiPipeline::ImGuiPipeline(QbVkContext& context) : context_(context) {
@@ -25,8 +24,8 @@ namespace Quadbit {
 		pipelineDescription.enableMSAA = true;
 		pipelineDescription.rasterization = QbVkPipelineRasterization::QBVK_PIPELINE_RASTERIZATION_NOCULL;
 
-		pipeline_ = eastl::make_unique<QbVkPipeline>(context_, imguiVert.data(), imguiVert.size(),
-			imguiFrag.data(), imguiFrag.size(), pipelineDescription, 1,
+		pipeline_ = eastl::make_unique<QbVkPipeline>(context_, imguiVert.data(), static_cast<uint32_t>(imguiVert.size()),
+			imguiFrag.data(), static_cast<uint32_t>(imguiFrag.size()), pipelineDescription, 1,
 			eastl::vector<eastl::tuple<VkFormat, uint32_t>> { {
 				{VK_FORMAT_R32G32_SFLOAT, 8},
 				{VK_FORMAT_R32G32_SFLOAT, 8},

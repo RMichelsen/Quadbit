@@ -11,6 +11,8 @@
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.h>
 
+#include "Engine/Core/Logging.h"
+
 #define VK_ERROR_STRING(x) case (int)x: return #x;
 
 #define VK_CHECK(x) { \
@@ -66,8 +68,12 @@ namespace Quadbit {
 		uint32_t index : 16;
 		uint32_t version : 16;
 
-		bool operator==(QbVkResourceHandle<T> other) const {
+		bool operator==(const QbVkResourceHandle<T>& other) const {
 			return index == other.index && version == other.version;
+		}
+
+		bool operator!=(const QbVkResourceHandle<T>& other) const {
+			return index != other.index || version != other.version;
 		}
 	};
 
@@ -81,23 +87,23 @@ namespace Quadbit {
 		template<typename U>
 		T& operator[](QbVkResourceHandle<U> handle) {
 			static_assert(eastl::is_same<T, U>::value, "Resource has a different type than the resource handle passed!");
-			assert(handle.index < Size && "Resource array out of bounds!");
-			assert(handle.version == versions[handle.index] && "Handle passed does not match internal handle!");
+			QB_ASSERT(handle.index < Size && "Resource array out of bounds!");
+			QB_ASSERT(handle.version == versions[handle.index] && "Handle passed does not match internal handle!");
 			return elements[handle.index];
 		}
 
 		template<typename U>
 		void DestroyResource(QbVkResourceHandle<U> handle) {
 			static_assert(eastl::is_same<T, U>::value, "Resource has a different type than the resource handle passed!");
-			assert(handle.index < Size && "Resource array out of bounds!");
-			assert(handle.version == versions[handle.index] && "Handle passed does not match internal handle!");
+			QB_ASSERT(handle.index < Size && "Resource array out of bounds!");
+			QB_ASSERT(handle.version == versions[handle.index] && "Handle passed does not match internal handle!");
 			versions[handle.index]++;
 			freeList.push_back(handle.index);
 		}
 
 		QbVkResourceHandle<T> GetHandle(uint16_t index) {
-			assert(index < (Size - 1) && "Resource array full, too many elements!");
-			assert(index < 65536 && versions[index] < 65536 && "Resource array is out of handles to give out!");
+			QB_ASSERT(index < (Size - 1) && "Resource array full, too many elements!");
+			QB_ASSERT(index < 65536 && versions[index] < 65536 && "Resource array is out of handles to give out!");
 			return QbVkResourceHandle<T> { index, versions[index] };
 		}
 
@@ -110,8 +116,8 @@ namespace Quadbit {
 				next = freeList.front();
 				freeList.pop_front();
 			}
-			assert(next < (Size - 1) && "Resource array full, too many elements!");
-			assert(next < 65536 && versions[next] < 65536 && "Resource array is out of handles to give out!");
+			QB_ASSERT(next < (Size - 1) && "Resource array full, too many elements!");
+			QB_ASSERT(next < 65536 && versions[next] < 65536 && "Resource array is out of handles to give out!");
 			return QbVkResourceHandle<T> {next, versions[next]};
 		}
 	};
@@ -220,31 +226,6 @@ namespace Quadbit {
 	constexpr QbVkDescriptorSetsHandle QBVK_DESCRIPTOR_SETS_NULL_HANDLE = { 65535, 65535 };
 	constexpr QbVkPipelineHandle QBVK_PIPELINE_NULL_HANDLE = { 65535, 65535 };
 
-	struct QbVkComputeDescriptor {
-		VkDescriptorType type;
-		uint32_t count;
-		void* data;
-	};
-
-	struct QbVkRenderDescriptor {
-		VkDescriptorType type;
-		uint32_t count;
-		void* data;
-		VkShaderStageFlagBits shaderStage;
-	};
-
-	struct QbVkComputeInstance {
-		VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
-		VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
-		VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
-		VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
-		VkPipeline pipeline = VK_NULL_HANDLE;
-		VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
-		VkQueryPool queryPool = VK_NULL_HANDLE;
-
-		double msAvgTime = 0.0;
-	};
-
 	enum class QbVkAllocationType {
 		QBVK_ALLOCATION_TYPE_UNKNOWN,
 		QBVK_ALLOCATION_TYPE_FREE,
@@ -335,15 +316,6 @@ namespace Quadbit {
 		VkRenderPass mainRenderPass = VK_NULL_HANDLE;
 
 		eastl::array<RenderingResources, MAX_FRAMES_IN_FLIGHT> renderingResources;
-	};
-
-	struct QbVkRenderMeshInstance {
-		VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
-		VkPipeline pipeline = VK_NULL_HANDLE;
-
-		VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
-		VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
-		eastl::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> descriptorSets{};
 	};
 
 	struct QbVkTransfer {

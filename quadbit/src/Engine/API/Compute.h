@@ -1,6 +1,7 @@
 #pragma once
 
 #include <EASTL/functional.h>
+#include <EASTL/string.h>
 #include <EASTL/vector.h>
 
 #include "Engine/Rendering/VulkanTypes.h"
@@ -12,20 +13,29 @@ namespace Quadbit {
 	public:
 		Compute(QbVkRenderer* const renderer);
 
-		QbVkComputeInstance* CreateComputeInstance(eastl::vector<QbVkComputeDescriptor>& descriptors, const char* shader, const char* shaderFunc,
-			const VkSpecializationInfo* specInfo = nullptr, uint32_t pushConstantRangeSize = 0);
-		void ComputeDispatch(QbVkComputeInstance* instance);
-		void ComputeRecord(const QbVkComputeInstance* instance, eastl::function<void()> func);
+		QbVkPipelineHandle CreatePipeline(const uint32_t* computeBytecode, uint32_t computeSize,
+			const char* kernel, const void* specConstants = nullptr, const uint32_t maxInstances = 1);
+		QbVkPipelineHandle CreatePipeline(const char* computePath, const char* kernel,
+			const void* specConstants = nullptr, const uint32_t maxInstances = 1); 
 
-		QbVkComputeDescriptor CreateComputeDescriptor(VkDescriptorType type, void* descriptor);
+		void BindResource(const QbVkPipelineHandle pipelineHandle, const eastl::string name, 
+			const QbVkBufferHandle bufferHandle, const QbVkDescriptorSetsHandle descriptorsHandle = QBVK_DESCRIPTOR_SETS_NULL_HANDLE);
+		void BindResource(const QbVkPipelineHandle pipelineHandle, const eastl::string name, 
+			const QbVkTextureHandle textureHandle, QbVkDescriptorSetsHandle descriptorsHandle = QBVK_DESCRIPTOR_SETS_NULL_HANDLE);
+		void BindResourceArray(const QbVkPipelineHandle pipelineHandle, const eastl::string name, 
+			const eastl::vector<QbVkBufferHandle> bufferHandles, const QbVkDescriptorSetsHandle descriptorsHandle = QBVK_DESCRIPTOR_SETS_NULL_HANDLE);
+		void BindResourceArray(const QbVkPipelineHandle pipelineHandle, const eastl::string name, 
+			const eastl::vector<QbVkTextureHandle> textureHandles, const QbVkDescriptorSetsHandle descriptorsHandle = QBVK_DESCRIPTOR_SETS_NULL_HANDLE);
 
-		template<typename T>
-		QbVkComputeDescriptor CreateComputeDescriptor(VkDescriptorType type, eastl::vector<T>& descriptors) {
-			return { type, static_cast<uint32_t>(descriptors.size()), descriptors.data() };
-		}
+		void Dispatch(const QbVkPipelineHandle pipelineHandle, uint32_t xGroups, uint32_t yGroups, uint32_t zGroups, 
+			const void* pushConstants = nullptr, uint32_t pushConstantSize = 0, QbVkDescriptorSetsHandle = QBVK_DESCRIPTOR_SETS_NULL_HANDLE);
+		void DispatchX(uint32_t X, const QbVkPipelineHandle pipelineHandle, uint32_t xGroups, uint32_t yGroups, uint32_t zGroups,
+			eastl::vector<const void*> pushConstantArray = {}, uint32_t pushConstantSize = 0, 
+			QbVkDescriptorSetsHandle descriptorsHandle = QBVK_DESCRIPTOR_SETS_NULL_HANDLE);
 
 	private:
 		QbVkRenderer* const renderer_;
+		QbVkResourceManager* const resourceManager_;
 
 	};
 }

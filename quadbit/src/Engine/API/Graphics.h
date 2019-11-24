@@ -7,7 +7,7 @@
 
 #include "Engine/Rendering/RenderTypes.h"
 #include "Engine/Rendering/VulkanTypes.h"
-#include "Engine/Rendering/PipelinePresets.h"
+#include "Engine/Rendering/Pipelines/PipelinePresets.h"
 
 namespace Quadbit {
 	class QbVkRenderer;
@@ -67,8 +67,16 @@ namespace Quadbit {
 			const eastl::vector<eastl::tuple<VkFormat, uint32_t>>& vertexAttributeOverride = {});
 		QbVkPipelineHandle CreatePipeline(const char* vertexPath, const char* fragmentPath, const QbVkPipelineDescription pipelineDescription, const uint32_t maxInstances = 1,
 			const eastl::vector<eastl::tuple<VkFormat, uint32_t>>& vertexAttributeOverride = {});
-		void BindResource(const QbVkPipelineHandle pipelineHandle, const eastl::string name, const QbVkBufferHandle bufferHandle);
-		void BindResource(const QbVkPipelineHandle pipelineHandle, const eastl::string name, const QbVkTextureHandle textureHandle);
+
+		void BindResource(const QbVkPipelineHandle pipelineHandle, const eastl::string name,
+			const QbVkBufferHandle bufferHandle, const QbVkDescriptorSetsHandle descriptorsHandle = QBVK_DESCRIPTOR_SETS_NULL_HANDLE);
+		void BindResource(const QbVkPipelineHandle pipelineHandle, const eastl::string name,
+			const QbVkTextureHandle textureHandle, QbVkDescriptorSetsHandle descriptorsHandle = QBVK_DESCRIPTOR_SETS_NULL_HANDLE);
+		void BindResourceArray(const QbVkPipelineHandle pipelineHandle, const eastl::string name,
+			const eastl::vector<QbVkBufferHandle> bufferHandles, const QbVkDescriptorSetsHandle descriptorsHandle = QBVK_DESCRIPTOR_SETS_NULL_HANDLE);
+		void BindResourceArray(const QbVkPipelineHandle pipelineHandle, const eastl::string name,
+			const eastl::vector<QbVkTextureHandle> textureHandles, const QbVkDescriptorSetsHandle descriptorsHandle = QBVK_DESCRIPTOR_SETS_NULL_HANDLE);
+
 		PBRSceneComponent LoadPBRModel(const char* path);
 
 		template<typename T>
@@ -87,11 +95,6 @@ namespace Quadbit {
 			};
 		}
 		void DestroyMesh(const Entity& entity);
-
-		template<typename T>
-		QbVkRenderDescriptor CreateRenderDescriptor(VkDescriptorType type, eastl::vector<T>& data, VkShaderStageFlagBits shaderStage) {
-			return { type, static_cast<uint32_t>(data.size()), data.data(), shaderStage };
-		}
 
 	private:
 		QbVkRenderer* const renderer_;

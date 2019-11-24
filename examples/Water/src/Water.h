@@ -68,8 +68,6 @@ struct InverseFFTResources {
 	Quadbit::QbVkTextureHandle dSlopeZ{};
 
 	eastl::array<int, 6> specData;
-
-	IFFTPushConstants pushConstants;
 };
 
 struct DisplacementResources {
@@ -81,7 +79,6 @@ class Water : public Quadbit::Game {
 public:
 	void Init() override;
 	void InitializeCompute();
-	void RecordComputeCommands();
 	void Simulate(float deltaTime) override;
 
 private:
@@ -103,11 +100,11 @@ private:
 	InverseFFTResources horizontalIFFTResources_{};
 	InverseFFTResources verticalIFFTResources_{};
 	DisplacementResources displacementResources_{};
-	Quadbit::QbVkComputeInstance* precalcInstance_ = nullptr;
-	Quadbit::QbVkComputeInstance* waveheightInstance_ = nullptr;
-	Quadbit::QbVkComputeInstance* horizontalIFFTInstance_ = nullptr;
-	Quadbit::QbVkComputeInstance* verticalIFFTInstance_ = nullptr;
-	Quadbit::QbVkComputeInstance* displacementInstance_ = nullptr;
+	Quadbit::QbVkPipelineHandle precalcPipeline_ = Quadbit::QBVK_PIPELINE_NULL_HANDLE;
+	Quadbit::QbVkPipelineHandle waveheightPipeline_ = Quadbit::QBVK_PIPELINE_NULL_HANDLE;
+	Quadbit::QbVkPipelineHandle horizontalIFFTPipeline_ = Quadbit::QBVK_PIPELINE_NULL_HANDLE;
+	Quadbit::QbVkPipelineHandle verticalIFFTPipeline_ = Quadbit::QBVK_PIPELINE_NULL_HANDLE;
+	Quadbit::QbVkPipelineHandle displacementPipeline_ = Quadbit::QBVK_PIPELINE_NULL_HANDLE;
 
 	Quadbit::QbVkMappedBuffer<TogglesUBO> togglesUBO_;
 
