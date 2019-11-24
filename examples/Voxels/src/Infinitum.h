@@ -42,7 +42,7 @@ public:
 	void DrawFrame();
 
 private:
-	const Quadbit::QbVkRenderMeshInstance* renderMeshInstance_;
+	Quadbit::QbVkPipelineHandle pipeline_;
 	FastNoiseSIMD* fastnoiseTerrain_;
 	FastNoiseSIMD* fastnoiseRegions_;
 	FastNoiseSIMD* fastnoiseColours_;

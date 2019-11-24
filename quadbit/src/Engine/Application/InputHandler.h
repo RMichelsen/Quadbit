@@ -2,7 +2,7 @@
 
 #include <EASTL/array.h>
 
-#include "Engine/Application/QbInputDefs.h"
+#include "Engine/Application/InputTypes.h"
 
 namespace Quadbit {
 	class InputHandler {

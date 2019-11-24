@@ -100,11 +100,11 @@ namespace Quadbit {
 		eastl::vector<VkWriteDescriptorSet> writeDescSets;
 		for (auto i = 0; i < descriptors.size(); i++) {
 			if (descriptors[i].type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER || descriptors[i].type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER) {
-				writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(computeInstance->descriptorSet, descriptors[i].type, i,
+				writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(computeInstance->descriptorSet, i, descriptors[i].type,
 					static_cast<VkDescriptorBufferInfo*>(descriptors[i].data), descriptors[i].count));
 			}
 			else if (descriptors[i].type == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE || descriptors[i].type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) {
-				writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(computeInstance->descriptorSet, descriptors[i].type, i,
+				writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(computeInstance->descriptorSet, i, descriptors[i].type,
 					static_cast<VkDescriptorImageInfo*>(descriptors[i].data), descriptors[i].count));
 			}
 		}

@@ -5,61 +5,13 @@
 #include <EASTL/vector.h>
 
 #include <vulkan/vulkan.h>
-#include <stb/stb_image.h>
 #include <glm/glm.hpp>
 #include <glm/gtx/compatibility.hpp>
 
-#include "Engine/Rendering/VulkanTypes.h"
 #include "Engine/Core/Logging.h"
 #include "Engine/Rendering/Memory/Allocator.h"
 #include "Engine/Rendering/Memory/ResourceManager.h"
-
-
-
-#include "Engine/Rendering/RenderTypes.h"
-
-#define VK_ERROR_STRING(x) case (int)x: return #x;
-
-#define VK_CHECK(x) { \
-VkResult ret = x; \
-if(ret != VK_SUCCESS) QB_LOG_WARN("VkResult: %s is %s in %s at line %d\n", #x, VulkanErrorToString(x), __FILE__, __LINE__); \
-}
-
-#define VK_VALIDATE(x, msg) { \
-if(!(x)) QB_LOG_WARN("VK: %s - %s\n", msg, #x); \
-}
-
-inline constexpr const char* VulkanErrorToString(VkResult vkResult) {
-	switch (vkResult) {
-		VK_ERROR_STRING(VK_SUCCESS);
-		VK_ERROR_STRING(VK_NOT_READY);
-		VK_ERROR_STRING(VK_TIMEOUT);
-		VK_ERROR_STRING(VK_EVENT_SET);
-		VK_ERROR_STRING(VK_EVENT_RESET);
-		VK_ERROR_STRING(VK_INCOMPLETE);
-		VK_ERROR_STRING(VK_ERROR_OUT_OF_HOST_MEMORY);
-		VK_ERROR_STRING(VK_ERROR_OUT_OF_DEVICE_MEMORY);
-		VK_ERROR_STRING(VK_ERROR_INITIALIZATION_FAILED);
-		VK_ERROR_STRING(VK_ERROR_DEVICE_LOST);
-		VK_ERROR_STRING(VK_ERROR_MEMORY_MAP_FAILED);
-		VK_ERROR_STRING(VK_ERROR_LAYER_NOT_PRESENT);
-		VK_ERROR_STRING(VK_ERROR_EXTENSION_NOT_PRESENT);
-		VK_ERROR_STRING(VK_ERROR_FEATURE_NOT_PRESENT);
-		VK_ERROR_STRING(VK_ERROR_INCOMPATIBLE_DRIVER);
-		VK_ERROR_STRING(VK_ERROR_TOO_MANY_OBJECTS);
-		VK_ERROR_STRING(VK_ERROR_FORMAT_NOT_SUPPORTED);
-		VK_ERROR_STRING(VK_ERROR_SURFACE_LOST_KHR);
-		VK_ERROR_STRING(VK_ERROR_NATIVE_WINDOW_IN_USE_KHR);
-		VK_ERROR_STRING(VK_SUBOPTIMAL_KHR);
-		VK_ERROR_STRING(VK_ERROR_OUT_OF_DATE_KHR);
-		VK_ERROR_STRING(VK_ERROR_INCOMPATIBLE_DISPLAY_KHR);
-		VK_ERROR_STRING(VK_ERROR_VALIDATION_FAILED_EXT);
-		VK_ERROR_STRING(VK_ERROR_INVALID_SHADER_NV);
-		VK_ERROR_STRING(VK_RESULT_BEGIN_RANGE);
-		VK_ERROR_STRING(VK_RESULT_RANGE_SIZE);
-	default: return "UNKNOWN";
-	}
-}
+#include "Engine/Rendering/VulkanTypes.h"
 
 namespace Quadbit::VkUtils {
 	// Wrappers around various Vulkan structs
@@ -214,10 +166,31 @@ namespace Quadbit::VkUtils {
 			return inputAssemblyCreateInfo;
 		}
 
+		inline VkPipelineInputAssemblyStateCreateInfo PipelineInputAssemblyStateCreateInfo(
+			VkPrimitiveTopology topology, VkBool32 primitiveRestart = VK_FALSE) {
+			VkPipelineInputAssemblyStateCreateInfo inputAssemblyCreateInfo{};
+			inputAssemblyCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+			inputAssemblyCreateInfo.topology = topology;
+			inputAssemblyCreateInfo.primitiveRestartEnable = primitiveRestart;
+			return inputAssemblyCreateInfo;
+		}
+
 		inline VkPipelineVertexInputStateCreateInfo PipelineVertexInputStateCreateInfo() {
-			VkPipelineVertexInputStateCreateInfo vertexInputCreateInfo{};
-			vertexInputCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-			return vertexInputCreateInfo;
+			VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
+			vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+			return vertexInputInfo;
+		}
+
+		inline VkPipelineVertexInputStateCreateInfo PipelineVertexInputStateCreateInfo(
+			const eastl::vector<VkVertexInputAttributeDescription>& attributeDescriptions,
+			const VkVertexInputBindingDescription& bindingDescription) {
+			VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
+			vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+			vertexInputInfo.vertexBindingDescriptionCount = 1;
+			vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
+			vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+			vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
+			return vertexInputInfo;
 		}
 
 		inline VkPipelineShaderStageCreateInfo PipelineShaderStageCreateInfo() {
@@ -348,24 +321,32 @@ namespace Quadbit::VkUtils {
 			return descSetLayoutCreateInfo;
 		}
 
+		inline VkDescriptorSetLayoutCreateInfo DescriptorSetLayoutCreateInfo(const eastl::vector<VkDescriptorSetLayoutBinding>& setLayoutBindings) {
+			VkDescriptorSetLayoutCreateInfo descSetLayoutCreateInfo{};
+			descSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+			descSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(setLayoutBindings.size());
+			descSetLayoutCreateInfo.pBindings = setLayoutBindings.data();
+			return descSetLayoutCreateInfo;
+		}
+
 		inline VkDescriptorSetAllocateInfo DescriptorSetAllocateInfo() {
 			VkDescriptorSetAllocateInfo descAllocInfo{};
 			descAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 			return descAllocInfo;
 		}
 
-		inline VkWriteDescriptorSet WriteDescriptorSet(VkDescriptorSet dstSet, VkDescriptorType descType, uint32_t dstBinding, VkDescriptorBufferInfo* bufferInfo, uint32_t descCount = 1) {
+		inline VkWriteDescriptorSet WriteDescriptorSet(VkDescriptorSet dstSet, uint32_t dstBinding, VkDescriptorType descType, VkDescriptorBufferInfo* bufferInfo, uint32_t descCount = 1) {
 			VkWriteDescriptorSet writeDescriptorSet{};
 			writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 			writeDescriptorSet.dstSet = dstSet;
-			writeDescriptorSet.descriptorType = descType;
 			writeDescriptorSet.dstBinding = dstBinding;
+			writeDescriptorSet.descriptorType = descType;
 			writeDescriptorSet.pBufferInfo = bufferInfo;
 			writeDescriptorSet.descriptorCount = descCount;
 			return writeDescriptorSet;
 		}
 
-		inline VkWriteDescriptorSet WriteDescriptorSet(VkDescriptorSet dstSet, VkDescriptorType descType, uint32_t dstBinding, VkDescriptorImageInfo* imageInfo, uint32_t descCount = 1) {
+		inline VkWriteDescriptorSet WriteDescriptorSet(VkDescriptorSet dstSet, uint32_t dstBinding, VkDescriptorType descType, VkDescriptorImageInfo* imageInfo, uint32_t descCount = 1) {
 			VkWriteDescriptorSet writeDescriptorSet{};
 			writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 			writeDescriptorSet.dstSet = dstSet;
@@ -426,6 +407,15 @@ namespace Quadbit::VkUtils {
 			memoryBarrier.srcAccessMask = srcMask;
 			memoryBarrier.dstAccessMask = dstMask;
 			return memoryBarrier;
+		}
+
+		inline VkDescriptorPoolCreateInfo DescriptorPoolCreateInfo(const eastl::vector<VkDescriptorPoolSize>& poolSizes, uint32_t maxSets) {
+			VkDescriptorPoolCreateInfo descriptorPoolInfo{};
+			descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+			descriptorPoolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+			descriptorPoolInfo.pPoolSizes = poolSizes.data();
+			descriptorPoolInfo.maxSets = maxSets;
+			return descriptorPoolInfo;
 		}
 	}
 
@@ -662,6 +652,19 @@ namespace Quadbit::VkUtils {
 		shaderModuleInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 		shaderModuleInfo.codeSize = bytecode.size();
 		shaderModuleInfo.pCode = reinterpret_cast<const uint32_t*>(bytecode.data());
+
+		VkShaderModule shaderModule;
+		VK_CHECK(vkCreateShaderModule(device, &shaderModuleInfo, nullptr, &shaderModule));
+
+		return shaderModule;
+	}
+
+	inline VkShaderModule CreateShaderModule(const eastl::vector<uint32_t>& bytecode, VkDevice& device) {
+		// Creates the shader module using raw bytecode
+		VkShaderModuleCreateInfo shaderModuleInfo{};
+		shaderModuleInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+		shaderModuleInfo.codeSize = bytecode.size();
+		shaderModuleInfo.pCode = bytecode.data();
 
 		VkShaderModule shaderModule;
 		VK_CHECK(vkCreateShaderModule(device, &shaderModuleInfo, nullptr, &shaderModule));
@@ -955,6 +958,22 @@ namespace Quadbit::VkUtils {
 		FlushCommandBuffer(context, commandBuffer);
 	}
 
+	inline VkFormat GetVertexFormatFromSize(const uint32_t size) {
+		switch (size) {
+		case 4:
+			return VK_FORMAT_R32_SFLOAT;
+		case 8:
+			return VK_FORMAT_R32G32_SFLOAT;
+		case 12:
+			return VK_FORMAT_R32G32B32_SFLOAT;
+		case 16:
+			return VK_FORMAT_R32G32B32A32_SFLOAT;
+		default:
+			assert(false && "Vertex input attribute not recognized");
+			return VK_FORMAT_UNDEFINED;
+		}
+	}
+
 	inline eastl::vector<VkVertexInputAttributeDescription> CreateVertexInputAttributeDescription(eastl::vector<QbVkVertexInputAttribute> attributes) {
 		eastl::vector<VkVertexInputAttributeDescription> vertexAttributes;
 
@@ -992,7 +1011,6 @@ namespace Quadbit::VkUtils {
 	}
 
 	inline VkVertexInputBindingDescription GetVertexBindingDescription(eastl::vector<QbVkVertexInputAttribute> attributes) {
-
 		uint32_t stride = 0;
 		for (uint32_t i = 0; i < attributes.size(); i++) {
 			switch (attributes[i]) {

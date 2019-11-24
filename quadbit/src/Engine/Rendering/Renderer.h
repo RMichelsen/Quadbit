@@ -38,8 +38,6 @@ namespace Quadbit {
 		eastl::unique_ptr<ImGuiPipeline> imGuiPipeline_;
 		eastl::unique_ptr<ComputePipeline> computePipeline_;
 
-		//QbVkUserAllocations userAllocations_{};
-
 		// DEBUG BUILD ONLY
 #ifndef NDEBUG
 		VkDebugUtilsMessengerEXT debugMessenger_ = VK_NULL_HANDLE;
@@ -57,6 +55,8 @@ namespace Quadbit {
 
 		void CreateMultisamplingResources();
 		void CreateDepthResources();
+		void CreateShadowmapResources();
+
 		void CreateSwapChain();
 		void RecreateSwapchain();
 		void CreateMainRenderPass();

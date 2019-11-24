@@ -2,8 +2,8 @@
 
 #include <imgui/imgui.h>
 
+#include "Engine/Core/Logging.h"
 #include "Engine/Rendering/VulkanTypes.h"
-#include "Engine/Rendering/VulkanUtils.h"
 
 constexpr int DEFAULT_DEVICE_LOCAL_POOLSIZE = 256 * 1024 * 1024;
 constexpr int DEFAULT_HOST_VISIBLE_POOLSIZE = 128 * 1024 * 1024;
@@ -16,7 +16,10 @@ namespace Quadbit {
 		garbageIndex_(0) {}
 
 	void QbVkAllocator::CreateStagingBuffer(QbVkBuffer& buffer, VkDeviceSize size, const void* data) {
-		VkBufferCreateInfo bufferInfo = VkUtils::Init::BufferCreateInfo(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+		VkBufferCreateInfo bufferInfo{};
+		bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		bufferInfo.size = size;
+		bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 
 		CreateBuffer(buffer, bufferInfo, QbVkMemoryUsage::QBVK_MEMORY_USAGE_CPU_ONLY);
 

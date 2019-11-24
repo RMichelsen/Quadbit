@@ -10,7 +10,7 @@
 
 
 struct MeshGenerationSystem : Quadbit::ComponentSystem {
-	void GreedyMeshGeneration(Quadbit::Graphics* const graphics, const Quadbit::QbVkRenderMeshInstance* rMeshInstance) {
+	void GreedyMeshGeneration(Quadbit::Graphics* const graphics, const Quadbit::QbVkPipelineHandle pipeline) {
 		entityManager_->ParForEachAddTag<Quadbit::RenderTransformComponent, VoxelBlockComponent, MeshGenerationUpdateTag>
 			([&](Quadbit::Entity entity, Quadbit::RenderTransformComponent& transform, VoxelBlockComponent& block, auto& tag) {
 
@@ -20,11 +20,11 @@ struct MeshGenerationSystem : Quadbit::ComponentSystem {
 
 		entityManager_->ForEach<VoxelBlockComponent, MeshReadyTag>
 			([&](Quadbit::Entity entity, VoxelBlockComponent& block, auto& tag) {
-			entityManager_->AddComponent<Quadbit::RenderMeshComponent>(entity, graphics->CreateMesh(block.vertices, sizeof(VoxelVertex), block.indices, rMeshInstance));
+			entityManager_->AddComponent<Quadbit::CustomMeshComponent>(entity, graphics->CreateMesh(block.vertices, sizeof(VoxelVertex), block.indices, pipeline));
 		});
 	}
 
-	void CulledMeshGeneration(Quadbit::Graphics* const graphics, const Quadbit::QbVkRenderMeshInstance* rMeshInstance) {
+	void CulledMeshGeneration(Quadbit::Graphics* const graphics, const Quadbit::QbVkPipelineHandle pipeline) {
 		entityManager_->ParForEachAddTag<Quadbit::RenderTransformComponent, VoxelBlockComponent, MeshGenerationUpdateTag>
 			([&](Quadbit::Entity entity, Quadbit::RenderTransformComponent& transform, VoxelBlockComponent& block, auto& tag) {
 
@@ -34,12 +34,12 @@ struct MeshGenerationSystem : Quadbit::ComponentSystem {
 
 		entityManager_->ForEach<VoxelBlockComponent, MeshReadyTag>
 			([&](Quadbit::Entity entity, VoxelBlockComponent& block, auto& tag) {
-			entityManager_->AddComponent<Quadbit::RenderMeshComponent>(entity, graphics->CreateMesh(block.vertices, sizeof(VoxelVertex), block.indices, rMeshInstance));
+			entityManager_->AddComponent<Quadbit::CustomMeshComponent>(entity, graphics->CreateMesh(block.vertices, sizeof(VoxelVertex), block.indices, pipeline));
 		});
 
 	}
 
-	void Update(float dt, Quadbit::Graphics* const graphics, const Quadbit::QbVkRenderMeshInstance* rMeshInstance) {
-		GreedyMeshGeneration(graphics, rMeshInstance);
+	void Update(float dt, Quadbit::Graphics* const graphics, const Quadbit::QbVkPipelineHandle pipeline) {
+		GreedyMeshGeneration(graphics, pipeline);
 	}
 };

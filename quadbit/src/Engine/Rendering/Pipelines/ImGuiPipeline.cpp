@@ -17,26 +17,26 @@ namespace Quadbit {
 		InitImGui();
 
 		CreateFontTexture();
-		CreateDescriptorPoolAndSets();
-		CreatePipeline();
+
+		QbVkPipelineDescription pipelineDescription;
+		pipelineDescription.colorBlending = QbVkPipelineColorBlending::QBVK_COLORBLENDING_ENABLE;
+		pipelineDescription.depth = QbVkPipelineDepth::QBVK_PIPELINE_DEPTH_DISABLE;
+		pipelineDescription.dynamicState = QbVkPipelineDynamicState::QBVK_DYNAMICSTATE_VIEWPORTSCISSOR;
+		pipelineDescription.enableMSAA = true;
+		pipelineDescription.rasterization = QbVkPipelineRasterization::QBVK_PIPELINE_RASTERIZATION_NOCULL;
+
+		pipeline_ = eastl::make_unique<QbVkPipeline>(context_, imguiVert.data(), imguiVert.size(),
+			imguiFrag.data(), imguiFrag.size(), pipelineDescription, 1,
+			eastl::vector<eastl::tuple<VkFormat, uint32_t>> { {
+				{VK_FORMAT_R32G32_SFLOAT, 8},
+				{VK_FORMAT_R32G32_SFLOAT, 8},
+				{VK_FORMAT_R8G8B8A8_UNORM, 4}
+			} });
+		pipeline_->BindResource("fontSampler", fontTexture_);
 	}
 
 	ImGuiPipeline::~ImGuiPipeline() {
 		ImGui::DestroyContext();
-
-		// Since both the pipeline and layout are destroyed by the swapchain we should check before deleting
-		if (pipeline_ != VK_NULL_HANDLE) {
-			vkDestroyPipeline(context_.device, pipeline_, nullptr);
-		}
-		if (pipelineLayout_ != VK_NULL_HANDLE) {
-			vkDestroyPipelineLayout(context_.device, pipelineLayout_, nullptr);
-		}
-
-		// Since both the pipeline and pipeline layout are destroyed by the swapchain we ignore them here.
-		vkDestroyDescriptorPool(context_.device, descriptorPool_, nullptr);
-
-		// Destroy descript set layout
-		vkDestroyDescriptorSetLayout(context_.device, descriptorSetLayout_, nullptr);
 
 		// Destroy buffers
 		for (auto i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
@@ -92,8 +92,11 @@ namespace Quadbit {
 			return;
 		}
 
-		vkCmdBindPipeline(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
-		vkCmdBindDescriptorSets(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 0, 1, &descriptorSet_, 0, nullptr);
+		pipeline_->Bind(commandbuffer);
+
+		auto& descriptorSets = context_.resourceManager->GetDescriptorSets(pipeline_->descriptorAllocator_, pipeline_->mainDescriptors_);
+		vkCmdBindDescriptorSets(commandbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_->pipelineLayout_, 0, 
+			static_cast<uint32_t>(descriptorSets[resourceIndex].size()), descriptorSets[resourceIndex].data(), 0, nullptr);
 
 		// Set the viewport
 		VkViewport viewport = VkUtils::Init::Viewport(io.DisplaySize.y, io.DisplaySize.x, 0.0f, 1.0f);
@@ -102,7 +105,7 @@ namespace Quadbit {
 		// Update the push constants for scale and translation
 		pushConstBlock_.scale = glm::vec2(2.0f / io.DisplaySize.x, 2.0f / io.DisplaySize.y);
 		pushConstBlock_.translate = glm::vec2(-1.0f);
-		vkCmdPushConstants(commandbuffer, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstBlock), &pushConstBlock_);
+		vkCmdPushConstants(commandbuffer, pipeline_->pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstBlock), &pushConstBlock_);
 
 		if (imDrawData->CmdListsCount > 0) {
 			VkDeviceSize offsets[1] = { 0 };
@@ -126,14 +129,6 @@ namespace Quadbit {
 				vertexOffset += cmdList->VtxBuffer.Size;
 			}
 		}
-	}
-
-	void ImGuiPipeline::RebuildPipeline() {
-		// Destroy old pipeline
-		vkDestroyPipelineLayout(context_.device, pipelineLayout_, nullptr);
-		vkDestroyPipeline(context_.device, pipeline_, nullptr);
-		// Create new pipeline
-		CreatePipeline();
 	}
 
 	void ImGuiPipeline::InitImGui() {
@@ -169,175 +164,6 @@ namespace Quadbit {
 		samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
 
 		fontTexture_ = context_.resourceManager->LoadTexture(textureWidth, textureHeight, fontData, &samplerInfo);
-
-		//fontTexture_ = VkUtils::LoadTexture(context_, textureWidth, textureHeight, fontData, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
-		//	VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		//	VK_IMAGE_ASPECT_COLOR_BIT, QbVkMemoryUsage::QBVK_MEMORY_USAGE_GPU_ONLY, &samplerInfo);
-	}
-
-	void ImGuiPipeline::CreateDescriptorPoolAndSets() {
-		// Create descriptor pool
-		VkDescriptorPoolSize poolSize{};
-		poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		poolSize.descriptorCount = 1;
-
-		// Maxsets here refer to the amount of descriptor sets that can be allocated from the pool
-		VkDescriptorPoolCreateInfo poolInfo{};
-		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		poolInfo.poolSizeCount = 1;
-		poolInfo.pPoolSizes = &poolSize;
-		poolInfo.maxSets = static_cast<uint32_t>(context_.swapchain.images.size());
-		VK_CHECK(vkCreateDescriptorPool(context_.device, &poolInfo, nullptr, &descriptorPool_));
-
-		// Create descriptor set layout
-		// The layout binding here specifies that we're creating an image sampler to be used in the fragment shader
-		VkDescriptorSetLayoutBinding layoutBinding = VkUtils::Init::DescriptorSetLayoutBinding(0,
-			VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-
-		VkDescriptorSetLayoutCreateInfo layoutInfo = VkUtils::Init::DescriptorSetLayoutCreateInfo();
-		layoutInfo.bindingCount = 1;
-		layoutInfo.pBindings = &layoutBinding;
-		VK_CHECK(vkCreateDescriptorSetLayout(context_.device, &layoutInfo, nullptr, &descriptorSetLayout_));
-
-		// Finally, create descriptor set
-		VkDescriptorSetAllocateInfo descAllocInfo = VkUtils::Init::DescriptorSetAllocateInfo();
-		descAllocInfo.descriptorPool = descriptorPool_;
-		descAllocInfo.descriptorSetCount = 1;
-		descAllocInfo.pSetLayouts = &descriptorSetLayout_;
-
-		// Allocate
-		VK_CHECK(vkAllocateDescriptorSets(context_.device, &descAllocInfo, &descriptorSet_));
-
-		// Write
-		auto& descriptor = context_.resourceManager->textures_[fontTexture_].descriptor;
-		VkWriteDescriptorSet writeDesc = VkUtils::Init::WriteDescriptorSet(descriptorSet_, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 0, &descriptor);
-
-		// Update
-		vkUpdateDescriptorSets(context_.device, 1, &writeDesc, 0, nullptr);
-	}
-
-	void ImGuiPipeline::CreatePipeline() {
-		// Create pipeline layout
-		VkPipelineLayoutCreateInfo pipelineLayoutInfo = VkUtils::Init::PipelineLayoutCreateInfo();
-
-		// Specify push constants
-		VkPushConstantRange pushConstantRange{};
-		pushConstantRange.size = sizeof(PushConstBlock);
-		pushConstantRange.offset = 0;
-		pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
-		pipelineLayoutInfo.pushConstantRangeCount = 1;
-		pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
-		pipelineLayoutInfo.setLayoutCount = 1;
-		pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout_;
-		VK_CHECK(vkCreatePipelineLayout(context_.device, &pipelineLayoutInfo, nullptr, &pipelineLayout_));
-
-		// We start off by reading the shader bytecode from disk and creating the modules subsequently
-		VkShaderModule vertShaderModule = VkUtils::CreateShaderModule(imguiVert.data(), static_cast<uint32_t>(imguiVert.size()), context_.device);
-		VkShaderModule fragShaderModule = VkUtils::CreateShaderModule(imguiFrag.data(), static_cast<uint32_t>(imguiFrag.size()), context_.device);
-
-		// This part specifies the two shader types used in the pipeline
-		VkPipelineShaderStageCreateInfo shaderStageInfo[2] = {
-			VkUtils::Init::PipelineShaderStageCreateInfo(),
-			VkUtils::Init::PipelineShaderStageCreateInfo()
-		};
-		shaderStageInfo[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-		shaderStageInfo[0].module = vertShaderModule;
-		shaderStageInfo[0].pName = "main";
-		shaderStageInfo[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-		shaderStageInfo[1].module = fragShaderModule;
-		shaderStageInfo[1].pName = "main";
-
-		// This part specifies the format of the vertex data passed to the vertex shader
-		const eastl::array<VkVertexInputBindingDescription, 1> bindingDescriptions{
-			VkUtils::Init::VertexInputBindingDescription(0, sizeof(ImDrawVert), VK_VERTEX_INPUT_RATE_VERTEX)
-		};
-		const eastl::array<VkVertexInputAttributeDescription, 3> attributeDescriptions{
-			VkUtils::Init::VertexInputAttributeDescription(0, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(ImDrawVert, pos)),
-			VkUtils::Init::VertexInputAttributeDescription(0, 1, VK_FORMAT_R32G32_SFLOAT, offsetof(ImDrawVert, uv)),
-			VkUtils::Init::VertexInputAttributeDescription(0, 2, VK_FORMAT_R8G8B8A8_UNORM, offsetof(ImDrawVert, col)),
-		};
-		VkPipelineVertexInputStateCreateInfo vertexInputInfo =
-			VkUtils::Init::PipelineVertexInputStateCreateInfo();
-		vertexInputInfo.vertexBindingDescriptionCount = static_cast<uint32_t>(bindingDescriptions.size());;
-		vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
-		vertexInputInfo.pVertexBindingDescriptions = bindingDescriptions.data();
-		vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
-
-		// This part specifies the geometry drawn
-		VkPipelineInputAssemblyStateCreateInfo inputAssemblyInfo = VkUtils::Init::PipelineInputAssemblyStateCreateInfo();
-		inputAssemblyInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-
-		// Onto the create info struct as usual
-		VkPipelineViewportStateCreateInfo viewportInfo = VkUtils::Init::PipelineViewportStateCreateInfo();
-		viewportInfo.viewportCount = 1;
-		viewportInfo.scissorCount = 1;
-
-		// This part specifies the rasterization stage
-		VkPipelineRasterizationStateCreateInfo rasterizerInfo = VkUtils::Init::PipelineRasterizationStateCreateInfo();
-		// Standard fill mode polygons
-		rasterizerInfo.polygonMode = VK_POLYGON_MODE_FILL;
-		// No culling for ImGui
-		rasterizerInfo.cullMode = VK_CULL_MODE_NONE;
-		// Counter clockwise triangle faces
-		rasterizerInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-		rasterizerInfo.lineWidth = 1.0f;
-
-		// This part specifies the multisampling stage for ImGui
-		VkPipelineMultisampleStateCreateInfo multisampleInfo =
-			VkUtils::Init::PipelineMultisampleStateCreateInfo();
-		multisampleInfo.sampleShadingEnable = VK_FALSE;
-		multisampleInfo.rasterizationSamples = context_.multisamplingResources.msaaSamples;
-
-		// This part specifies the blending for ImGui
-		VkPipelineColorBlendAttachmentState colorBlendAttachment =
-			VkUtils::Init::PipelineColorBlendAttachmentState(
-				VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-				VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
-				VK_TRUE
-			);
-		colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-		colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-		colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
-		colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-		colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-		colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
-
-		VkPipelineColorBlendStateCreateInfo colorBlendInfo =
-			VkUtils::Init::PipelineColorBlendStateCreateInfo(1, &colorBlendAttachment);
-
-		// This part specifies the depth and stencil testing
-		VkPipelineDepthStencilStateCreateInfo depthStencilInfo =
-			VkUtils::Init::PipelineDepthStencilStateCreateInfo(VK_FALSE, VK_FALSE, VK_COMPARE_OP_LESS_OR_EQUAL);
-
-		// This part specifies the dynamic states of the pipeline,
-		// these are the structs that can be modified with recreating the pipeline.
-		VkPipelineDynamicStateCreateInfo dynamicStateInfo = VkUtils::Init::PipelineDynamicStateCreateInfo();
-		VkDynamicState dynamicStates[] = {
-			VK_DYNAMIC_STATE_VIEWPORT,
-			VK_DYNAMIC_STATE_SCISSOR
-		};
-		dynamicStateInfo.dynamicStateCount = 2;
-		dynamicStateInfo.pDynamicStates = dynamicStates;
-
-		VkGraphicsPipelineCreateInfo pipelineInfo = VkUtils::Init::GraphicsPipelineCreateInfo();
-		pipelineInfo.stageCount = 2;
-		pipelineInfo.pStages = shaderStageInfo;
-		pipelineInfo.pVertexInputState = &vertexInputInfo;
-		pipelineInfo.pInputAssemblyState = &inputAssemblyInfo;
-		pipelineInfo.pViewportState = &viewportInfo;
-		pipelineInfo.pRasterizationState = &rasterizerInfo;
-		pipelineInfo.pMultisampleState = &multisampleInfo;
-		pipelineInfo.pDepthStencilState = &depthStencilInfo;
-		pipelineInfo.pColorBlendState = &colorBlendInfo;
-		pipelineInfo.pDynamicState = &dynamicStateInfo;
-		pipelineInfo.layout = pipelineLayout_;
-		pipelineInfo.renderPass = context_.mainRenderPass;
-
-		VK_CHECK(vkCreateGraphicsPipelines(context_.device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline_));
-
-		vkDestroyShaderModule(context_.device, vertShaderModule, nullptr);
-		vkDestroyShaderModule(context_.device, fragShaderModule, nullptr);
 	}
 
 	void ImGuiPipeline::ImGuiDrawState() {

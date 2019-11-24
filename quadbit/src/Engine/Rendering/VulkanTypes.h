@@ -7,11 +7,55 @@
 #include <EASTL/type_traits.h>
 #include <EASTL/unique_ptr.h>
 #include <EASTL/vector.h>
+
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.h>
 
+#define VK_ERROR_STRING(x) case (int)x: return #x;
 
-inline constexpr int MAX_FRAMES_IN_FLIGHT = 2;
+#define VK_CHECK(x) { \
+VkResult ret = x; \
+if(ret != VK_SUCCESS) QB_LOG_WARN("VkResult: %s is %s in %s at line %d\n", #x, VulkanErrorToString(x), __FILE__, __LINE__); \
+}
+
+#define VK_VALIDATE(x, msg) { \
+if(!(x)) QB_LOG_WARN("VK: %s - %s\n", msg, #x); \
+}
+
+inline constexpr const char* VulkanErrorToString(VkResult vkResult) {
+	switch (vkResult) {
+		VK_ERROR_STRING(VK_SUCCESS);
+		VK_ERROR_STRING(VK_NOT_READY);
+		VK_ERROR_STRING(VK_TIMEOUT);
+		VK_ERROR_STRING(VK_EVENT_SET);
+		VK_ERROR_STRING(VK_EVENT_RESET);
+		VK_ERROR_STRING(VK_INCOMPLETE);
+		VK_ERROR_STRING(VK_ERROR_OUT_OF_HOST_MEMORY);
+		VK_ERROR_STRING(VK_ERROR_OUT_OF_DEVICE_MEMORY);
+		VK_ERROR_STRING(VK_ERROR_INITIALIZATION_FAILED);
+		VK_ERROR_STRING(VK_ERROR_DEVICE_LOST);
+		VK_ERROR_STRING(VK_ERROR_MEMORY_MAP_FAILED);
+		VK_ERROR_STRING(VK_ERROR_LAYER_NOT_PRESENT);
+		VK_ERROR_STRING(VK_ERROR_EXTENSION_NOT_PRESENT);
+		VK_ERROR_STRING(VK_ERROR_FEATURE_NOT_PRESENT);
+		VK_ERROR_STRING(VK_ERROR_INCOMPATIBLE_DRIVER);
+		VK_ERROR_STRING(VK_ERROR_TOO_MANY_OBJECTS);
+		VK_ERROR_STRING(VK_ERROR_FORMAT_NOT_SUPPORTED);
+		VK_ERROR_STRING(VK_ERROR_SURFACE_LOST_KHR);
+		VK_ERROR_STRING(VK_ERROR_NATIVE_WINDOW_IN_USE_KHR);
+		VK_ERROR_STRING(VK_SUBOPTIMAL_KHR);
+		VK_ERROR_STRING(VK_ERROR_OUT_OF_DATE_KHR);
+		VK_ERROR_STRING(VK_ERROR_INCOMPATIBLE_DISPLAY_KHR);
+		VK_ERROR_STRING(VK_ERROR_VALIDATION_FAILED_EXT);
+		VK_ERROR_STRING(VK_ERROR_INVALID_SHADER_NV);
+		VK_ERROR_STRING(VK_RESULT_BEGIN_RANGE);
+		VK_ERROR_STRING(VK_RESULT_RANGE_SIZE);
+	default: return "UNKNOWN";
+	}
+}
+
+inline constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
+inline constexpr size_t MAX_DESCRIPTORSETS_PER_INSTANCE = 4096;
 
 namespace Quadbit {
 	// At the moment we only support 65535 deletions of the same resource slot
@@ -21,6 +65,10 @@ namespace Quadbit {
 	struct QbVkResourceHandle {
 		uint32_t index : 16;
 		uint32_t version : 16;
+
+		bool operator==(QbVkResourceHandle<T> other) const {
+			return index == other.index && version == other.version;
+		}
 	};
 
 	template<typename T, size_t Size>
@@ -152,6 +200,26 @@ namespace Quadbit {
 		VkDescriptorImageInfo descriptor{};
 	};
 
+	struct QbVkDescriptorAllocator {
+		size_t descriptorIndex = 0;
+		VkDescriptorPool pool;
+		QbVkResource<eastl::array<eastl::vector<VkDescriptorSet>, MAX_FRAMES_IN_FLIGHT>, MAX_DESCRIPTORSETS_PER_INSTANCE> setInstances;
+	};
+
+	class QbVkPipeline;
+
+	using QbVkBufferHandle = QbVkResourceHandle<QbVkBuffer>;
+	using QbVkTextureHandle = QbVkResourceHandle<QbVkTexture>;
+	using QbVkDescriptorAllocatorHandle = QbVkResourceHandle<QbVkDescriptorAllocator>;
+	using QbVkDescriptorSetsHandle = QbVkResourceHandle<eastl::array<eastl::vector<VkDescriptorSet>, MAX_FRAMES_IN_FLIGHT>>;
+	using QbVkPipelineHandle = QbVkResourceHandle<eastl::unique_ptr<QbVkPipeline>>;
+
+	constexpr QbVkBufferHandle QBVK_BUFFER_NULL_HANDLE = { 65535, 65535 };
+	constexpr QbVkTextureHandle QBVK_TEXTURE_NULL_HANDLE = { 65535, 65535 };
+	constexpr QbVkDescriptorAllocatorHandle QBVK_DESCRIPTOR_ALLOCATOR_NULL_HANDLE = { 65535, 65535 };
+	constexpr QbVkDescriptorSetsHandle QBVK_DESCRIPTOR_SETS_NULL_HANDLE = { 65535, 65535 };
+	constexpr QbVkPipelineHandle QBVK_PIPELINE_NULL_HANDLE = { 65535, 65535 };
+
 	struct QbVkComputeDescriptor {
 		VkDescriptorType type;
 		uint32_t count;
@@ -225,6 +293,12 @@ namespace Quadbit {
 		VkImageView imageView = VK_NULL_HANDLE;
 	};
 
+	struct ShadowmapResources {
+		QbVkTextureHandle texture = QBVK_TEXTURE_NULL_HANDLE;
+		VkRenderPass renderPass = VK_NULL_HANDLE;
+		eastl::array<VkFramebuffer, 2> framebuffers;
+	};
+
 	struct RenderingResources {
 		VkFramebuffer frameBuffer = VK_NULL_HANDLE;
 		VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
@@ -253,9 +327,11 @@ namespace Quadbit {
 
 		MSAAResources multisamplingResources;
 		DepthResources depthResources{};
+		ShadowmapResources shadowmapResources{};
 		Swapchain swapchain{};
 
 		VkCommandPool commandPool = VK_NULL_HANDLE;
+
 		VkRenderPass mainRenderPass = VK_NULL_HANDLE;
 
 		eastl::array<RenderingResources, MAX_FRAMES_IN_FLIGHT> renderingResources;
@@ -269,14 +345,6 @@ namespace Quadbit {
 		VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
 		eastl::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> descriptorSets{};
 	};
-
-	using QbVkTextureHandle = QbVkResourceHandle<QbVkTexture>;
-	using QbVkBufferHandle = QbVkResourceHandle<QbVkBuffer>;
-	using QbVkDescriptorSetHandle = QbVkResourceHandle<VkDescriptorSet>;
-
-	constexpr QbVkBufferHandle QBVK_BUFFER_NULL_HANDLE = { 65535, 65535 };
-	constexpr QbVkTextureHandle QBVK_TEXTURE_NULL_HANDLE = { 65535, 65535 };
-	constexpr QbVkDescriptorSetHandle QBVK_DESCRIPTORSET_NULL_HANDLE = { 65535, 65535 };
 
 	struct QbVkTransfer {
 		VkDeviceSize size = 0;

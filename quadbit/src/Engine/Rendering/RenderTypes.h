@@ -8,8 +8,8 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/quaternion.hpp>
 
-#include "Engine/Rendering/VulkanTypes.h"
 #include "Engine/Core/Logging.h"
+#include "Engine/Rendering/VulkanTypes.h"
 
 namespace Quadbit {
 	struct SkyGradientVertex {
@@ -97,7 +97,8 @@ namespace Quadbit {
 		float metallicFactor = 0.0f;
 		float roughnessFactor = 0.0f;
 
-		QbVkDescriptorSetHandle descriptorHandle = QBVK_DESCRIPTORSET_NULL_HANDLE;
+		QbVkDescriptorAllocatorHandle descriptorAllocator = QBVK_DESCRIPTOR_ALLOCATOR_NULL_HANDLE;
+		QbVkDescriptorSetsHandle descriptorSets = QBVK_DESCRIPTOR_SETS_NULL_HANDLE;
 	};
 
 	struct QbVkPBRPrimitive {
@@ -129,13 +130,15 @@ namespace Quadbit {
 		}
 	};
 
-	struct RenderMeshComponent {
+	class QbVkPipeline;
+	struct CustomMeshComponent {
 		QbVkResourceHandle<QbVkBuffer> vertexHandle;
 		QbVkResourceHandle<QbVkBuffer> indexHandle;
 		uint32_t indexCount;
 		eastl::array<float, 32> pushConstants;
 		int pushConstantStride;
-		const QbVkRenderMeshInstance* instance;
+		QbVkPipelineHandle pipelineHandle = QBVK_PIPELINE_NULL_HANDLE;
+		QbVkDescriptorSetsHandle descriptorSetsHandle = QBVK_DESCRIPTOR_SETS_NULL_HANDLE;
 
 		template<typename T>
 		T* GetSafePushConstPtr() {
@@ -147,7 +150,7 @@ namespace Quadbit {
 
 	// The deletion delay should be the number of potential frames 
 	// in a row that the mesh could be used by the rendering system
-	struct RenderMeshDeleteComponent {
+	struct CustomMeshDeleteComponent {
 		QbVkBufferHandle vertexHandle;
 		QbVkBufferHandle indexHandle;
 		uint32_t deletionDelay = MAX_FRAMES_IN_FLIGHT;

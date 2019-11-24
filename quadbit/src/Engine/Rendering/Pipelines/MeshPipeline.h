@@ -3,8 +3,11 @@
 #include <EASTL/unique_ptr.h>
 #include <EASTL/vector.h>
 
+#include <tinygltf/tiny_gltf.h>
+
 #include "Engine/Entities/EntityManager.h"
 #include "Engine/Rendering/RenderTypes.h"
+#include "Engine/Rendering/Pipeline.h"
 #include "Engine/Rendering/ShaderInstance.h"
 #include "Engine/Rendering/VulkanTypes.h"
 
@@ -12,44 +15,35 @@ namespace Quadbit {
 	class MeshPipeline {
 	public:
 		MeshPipeline(QbVkContext& context);
-		~MeshPipeline();
-		void RebuildPipeline();
 
+		void RebuildPipeline();
 		void DrawFrame(uint32_t resourceIndex, VkCommandBuffer commandbuffer);
+
+		PBRSceneComponent LoadModel(const char* path);
 
 		Entity GetActiveCamera();
 		void SetCamera(Entity entity);
 		void LoadSkyGradient(glm::vec3 botColour, glm::vec3 topColour);
 
-		const QbVkRenderMeshInstance* CreateInstance(eastl::vector<QbVkRenderDescriptor>& descriptors, eastl::vector<QbVkVertexInputAttribute> vertexAttribs,
-			QbVkShaderInstance& shaderInstance, int pushConstantStride = -1, VkShaderStageFlags pushConstantShaderStage = VK_SHADER_STAGE_VERTEX_BIT,
-			VkBool32 depthTestingEnabled = VK_TRUE);
-
-		void DestroyMesh(RenderMeshComponent& renderMeshComponent);
-		void DestroyInstance(const QbVkRenderMeshInstance* instance);
-
-		//RenderTexturedObjectComponent CreateObject(const char* objPath, const char* texturePath, VkFormat textureFormat);
+		eastl::unique_ptr<QbVkPipeline> pipeline_;
 
 	private:
+		QbVkPBRMaterial ParseMaterial(const tinygltf::Model& model, const tinygltf::Material& material);
+		void ParseNode(const tinygltf::Model& model, const tinygltf::Node& node, PBRSceneComponent& scene,
+			eastl::vector<QbVkVertex>& vertices, eastl::vector<uint32_t>& indices, const eastl::vector<QbVkPBRMaterial> materials, glm::mat4 parentTransform);
+		QbVkPBRMesh ParseMesh(const tinygltf::Model& model, const tinygltf::Mesh& mesh,
+			eastl::vector<QbVkVertex>& vertices, eastl::vector<uint32_t>& indices, const eastl::vector<QbVkPBRMaterial>& materials);
+		QbVkDescriptorSetsHandle WriteMaterialDescriptors(const QbVkPBRMaterial& material);
+		QbVkTextureHandle CreateTextureFromResource(const tinygltf::Model& model, const tinygltf::Material& material, const char* textureName);
+		VkSamplerCreateInfo GetSamplerInfo(const tinygltf::Model& model, int samplerIndex);
+
 		friend class QbVkRenderer;
 
 		QbVkContext& context_;
-
-		VkPipelineLayout pipelineLayout_ = VK_NULL_HANDLE;
-		VkPipeline pipeline_ = VK_NULL_HANDLE;
-		VkDescriptorPool descriptorPool_;
-		VkDescriptorSetLayout descriptorSetLayout_;
-		eastl::array<eastl::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT>, 512> descriptorSets_{};
-		uint32_t textureCount = 0;
-
-		eastl::vector<eastl::unique_ptr<QbVkRenderMeshInstance>> externalInstances_;
 
 		Entity fallbackCamera_ = NULL_ENTITY;
 		Entity userCamera_ = NULL_ENTITY;
 
 		Entity environmentMap_ = NULL_ENTITY;
-
-		void CreateDescriptorPoolAndLayout();
-		void CreatePipeline();
 	};
 }

@@ -15,7 +15,7 @@ namespace Quadbit {
 		Graphics* graphics_ = nullptr;
 		Compute* compute_ = nullptr;
 
-		virtual ~Game() {}
+		virtual ~Game() = default;
 		virtual void Init() = 0;
 		virtual void Simulate(float deltaTime) = 0;
 	};

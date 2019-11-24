@@ -16,7 +16,6 @@ namespace Quadbit {
 		void UpdateBuffers(uint32_t resourceIndex);
 		void ImGuiDrawState();
 		void DrawFrame(uint32_t resourceIndex, VkCommandBuffer commandbuffer);
-		void RebuildPipeline();
 
 	private:
 		// Push constant struct to set UI parameters
@@ -31,14 +30,10 @@ namespace Quadbit {
 		float currentFrametime_;
 		eastl::vector<float> frametimeCache_;
 
-		QbVkTextureHandle fontTexture_{};
+		eastl::unique_ptr<QbVkPipeline> pipeline_;
+		QbVkDescriptorSetsHandle descriptors_;
+		QbVkTextureHandle fontTexture_ = QBVK_TEXTURE_NULL_HANDLE;
 
-		VkDescriptorPool descriptorPool_ = VK_NULL_HANDLE;
-		VkDescriptorSetLayout descriptorSetLayout_ = VK_NULL_HANDLE;
-		VkDescriptorSet descriptorSet_ = VK_NULL_HANDLE;
-
-		VkPipelineLayout pipelineLayout_ = VK_NULL_HANDLE;
-		VkPipeline pipeline_ = VK_NULL_HANDLE;
 		PushConstBlock pushConstBlock_{};
 
 		eastl::array<QbVkBuffer, MAX_FRAMES_IN_FLIGHT> vertexBuffer_;
@@ -46,7 +41,5 @@ namespace Quadbit {
 
 		void InitImGui();
 		void CreateFontTexture();
-		void CreateDescriptorPoolAndSets();
-		void CreatePipeline();
 	};
 }

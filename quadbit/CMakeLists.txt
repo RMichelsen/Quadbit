@@ -8,6 +8,7 @@ find_package(Vulkan REQUIRED)
 
 set(GLM_TEST_ENABLE OFF CACHE BOOL "" FORCE)
 add_subdirectory(dependencies/glm)
+add_subdirectory(dependencies/SPIRV-Cross)
 add_subdirectory(dependencies/imgui)
 add_subdirectory(dependencies/EABase)
 add_subdirectory(dependencies/EASTL)
@@ -15,13 +16,13 @@ add_custom_target(glmNatVis SOURCES dependencies/glm/util/glm.natvis)
 add_custom_target(EASTLNatVis SOURCES dependencies/EASTL/doc/EASTL.natvis)
 
 add_library(Quadbit STATIC
-    src/Engine/Core/TinygltfImpl.cpp
     src/Engine/API/Compute.cpp
     src/Engine/API/Graphics.cpp
     src/Engine/Application/Window.cpp
     src/Engine/Application/InputHandler.cpp
     src/Engine/Core/Entry.cpp
     src/Engine/Entities/EntityManager.cpp
+    src/Engine/Rendering/Pipeline.cpp
     src/Engine/Rendering/Renderer.cpp
     src/Engine/Rendering/ShaderInstance.cpp
     src/Engine/Rendering/Memory/Allocator.cpp
@@ -50,6 +51,7 @@ target_include_directories(Quadbit
         dependencies/tinygltf/include
         dependencies/stb/include
         Vulkan::Vulkan
+        SPIRV-Cross
     )
 
 target_link_libraries(Quadbit
@@ -58,4 +60,5 @@ target_link_libraries(Quadbit
         ImGui
         Vulkan::Vulkan
 		EASTL
+        SPIRV-Cross
     )

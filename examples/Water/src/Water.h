@@ -92,6 +92,7 @@ private:
 	glm::float4 topColour_ = glm::float4(0.15f, 0.7f, 0.8f, 0.0f);
 	glm::float4 botColour_ = glm::float4(0.10f, 0.45f, 0.7f, 0.0f);
 
+	Quadbit::QbVkPipelineHandle pipeline_;
 	Quadbit::Entity skybox;
 
 	eastl::vector<glm::float3> waterVertices_;

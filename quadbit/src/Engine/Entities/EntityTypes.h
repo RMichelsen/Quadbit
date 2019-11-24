@@ -47,7 +47,7 @@ namespace Quadbit {
 	};
 
 	struct ComponentPool {
-		virtual ~ComponentPool() {};
+		virtual ~ComponentPool() = default;
 		virtual void RemoveIfExists(EntityID id) = 0;
 	};
 }

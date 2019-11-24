@@ -2,49 +2,22 @@
 
 #include <EASTL/algorithm.h>
 
-#include <filesystem>
+#include <stb/stb_image.h>
+
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/quaternion.hpp>
 
 #include "Engine/Rendering/VulkanUtils.h"
+#include "Engine/Rendering/Memory/Allocator.h"
 
 namespace Quadbit {
 	PerFrameTransfers::PerFrameTransfers(const QbVkContext& context) : count(0) {
 		commandBuffer = VkUtils::CreatePersistentCommandBuffer(context);
 	}
 
-	QbVkResourceManager::QbVkResourceManager(QbVkContext& context) : context_(context), transferQueue_(PerFrameTransfers(context)) {
-		// Create descriptor pool and layout
-		VkDescriptorPoolSize poolSize = VkUtils::Init::DescriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_DESCRIPTORSET_COUNT);
-
-		VkDescriptorPoolCreateInfo poolInfo{};
-		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		poolInfo.poolSizeCount = 1;
-		poolInfo.pPoolSizes = &poolSize;
-		poolInfo.maxSets = MAX_DESCRIPTORSET_COUNT;
-
-		VK_CHECK(vkCreateDescriptorPool(context_.device, &poolInfo, nullptr, &materialDescriptorPool_));
-
-
-		std::vector<VkDescriptorSetLayoutBinding> descSetLayoutBindings;
-		descSetLayoutBindings.push_back(VkUtils::Init::DescriptorSetLayoutBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT));
-		descSetLayoutBindings.push_back(VkUtils::Init::DescriptorSetLayoutBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT));
-		descSetLayoutBindings.push_back(VkUtils::Init::DescriptorSetLayoutBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT));
-		descSetLayoutBindings.push_back(VkUtils::Init::DescriptorSetLayoutBinding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT));
-		descSetLayoutBindings.push_back(VkUtils::Init::DescriptorSetLayoutBinding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT));
-
-		VkDescriptorSetLayoutCreateInfo descSetLayoutCreateInfo = VkUtils::Init::DescriptorSetLayoutCreateInfo();
-		descSetLayoutCreateInfo.pBindings = descSetLayoutBindings.data();
-		descSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(descSetLayoutBindings.size());
-
-		VK_CHECK(vkCreateDescriptorSetLayout(context_.device, &descSetLayoutCreateInfo, nullptr, &materialDescriptorSetLayout_));
-
-		// Create an empty texture for use when a material has empty slots
-		auto samplerInfo = VkUtils::Init::SamplerCreateInfo(VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_TRUE, 16.0f, VK_COMPARE_OP_ALWAYS, VK_SAMPLER_MIPMAP_MODE_LINEAR);
-		emptyTexture_ = CreateTexture(1, 1, &samplerInfo);
-	}
+	QbVkResourceManager::QbVkResourceManager(QbVkContext& context) : context_(context), transferQueue_(PerFrameTransfers(context)) {}
 
 	QbVkResourceManager::~QbVkResourceManager() {
 		// Destroy staging buffers...
@@ -65,18 +38,14 @@ namespace Quadbit {
 				DestroyResource<QbVkTexture>(textures_.GetHandle(i));
 			}
 		}
-		// Destroy descriptor pool and layout
-		vkDestroyDescriptorSetLayout(context_.device, materialDescriptorSetLayout_, nullptr);
-		vkDestroyDescriptorPool(context_.device, materialDescriptorPool_, nullptr);
-	}
+		// Destroy descriptor set allocators
+		for (uint16_t i = 0; i < descriptorAllocators_.resourceIndex; i++) {
+			if (eastl::find(descriptorAllocators_.freeList.begin(), descriptorAllocators_.freeList.end(), i) == descriptorAllocators_.freeList.end()) {
+				DestroyResource<QbVkDescriptorAllocator>(descriptorAllocators_.GetHandle(i));
+			}
+		}
 
-	QbVkBufferHandle QbVkResourceManager::CreateGPUBuffer(VkDeviceSize size, VkBufferUsageFlags bufferUsage, QbVkMemoryUsage memoryUsage) {
-		auto bufferInfo = VkUtils::Init::BufferCreateInfo(size, bufferUsage);
-		auto handle = buffers_.GetNextHandle();
-
-		context_.allocator->CreateBuffer(buffers_[handle], bufferInfo, memoryUsage);
-		buffers_[handle].descriptor = { buffers_[handle].buf, 0, VK_WHOLE_SIZE };
-		return handle;
+		vkFreeCommandBuffers(context_.device, context_.commandPool, 1, &transferQueue_.commandBuffer);
 	}
 
 	void QbVkResourceManager::TransferDataToGPU(const void* data, VkDeviceSize size, QbVkBufferHandle destination) {
@@ -92,6 +61,48 @@ namespace Quadbit {
 		context_.allocator->CreateStagingBuffer(transferQueue_.stagingBuffers[transferQueue_.count], size, data);
 		transferQueue_.transfers[transferQueue_.count] = { size, destination };
 		transferQueue_.count++;
+	}
+
+	bool QbVkResourceManager::TransferQueuedDataToGPU(uint32_t resourceIndex) {
+		if (transferQueue_.count == 0) return false;
+
+		VkCommandBufferBeginInfo commandBufferInfo = VkUtils::Init::CommandBufferBeginInfo();
+		commandBufferInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+		VK_CHECK(vkBeginCommandBuffer(transferQueue_.commandBuffer, &commandBufferInfo));
+
+		for (uint32_t i = 0; i < transferQueue_.count; i++) {
+			// Issue copy command
+			VkBufferCopy copyRegion{};
+			copyRegion.srcOffset = 0;
+			copyRegion.dstOffset = 0;
+			copyRegion.size = transferQueue_[i].size;
+			vkCmdCopyBuffer(transferQueue_.commandBuffer, transferQueue_.stagingBuffers[i].buf, buffers_[transferQueue_[i].destinationBuffer].buf, 1, &copyRegion);
+		}
+
+		// End recording
+		VK_CHECK(vkEndCommandBuffer(transferQueue_.commandBuffer));
+
+		VkSubmitInfo submitInfo = VkUtils::Init::SubmitInfo();
+		submitInfo.commandBufferCount = 1;
+		submitInfo.pCommandBuffers = &transferQueue_.commandBuffer;
+		submitInfo.signalSemaphoreCount = 1;
+		eastl::array<VkSemaphore, 1> transferSemaphore{ context_.renderingResources[resourceIndex].transferSemaphore };
+		submitInfo.pSignalSemaphores = transferSemaphore.data();
+
+		// Submit to queue
+		VK_CHECK(vkQueueSubmit(context_.graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE));
+
+		transferQueue_.Reset();
+		return true;
+	}
+
+	QbVkBufferHandle QbVkResourceManager::CreateGPUBuffer(VkDeviceSize size, VkBufferUsageFlags bufferUsage, QbVkMemoryUsage memoryUsage) {
+		auto bufferInfo = VkUtils::Init::BufferCreateInfo(size, bufferUsage);
+		auto handle = buffers_.GetNextHandle();
+
+		context_.allocator->CreateBuffer(buffers_[handle], bufferInfo, memoryUsage);
+		buffers_[handle].descriptor = { buffers_[handle].buf, 0, VK_WHOLE_SIZE };
+		return handle;
 	}
 
 	QbVkBufferHandle QbVkResourceManager::CreateVertexBuffer(const void* vertices, uint32_t vertexStride, uint32_t vertexCount) {
@@ -112,31 +123,13 @@ namespace Quadbit {
 		return handle;
 	}
 
-	QbVkTextureHandle QbVkResourceManager::CreateStorageTexture(uint32_t width, uint32_t height, VkFormat format, VkSamplerCreateInfo* samplerInfo) {
-		auto handle = textures_.GetNextHandle();
-		auto& texture = textures_[handle];
-
-		auto imageCreateInfo = VkUtils::Init::ImageCreateInfo(width, height, format, 
-			VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_SAMPLE_COUNT_1_BIT);
-		context_.allocator->CreateImage(texture.image, imageCreateInfo, QbVkMemoryUsage::QBVK_MEMORY_USAGE_GPU_ONLY);
-		texture.descriptor.imageView = VkUtils::CreateImageView(context_, texture.image.imgHandle, format, VK_IMAGE_ASPECT_COLOR_BIT);
-		texture.descriptor.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-		if (samplerInfo != nullptr) VK_CHECK(vkCreateSampler(context_.device, samplerInfo, nullptr, &texture.descriptor.sampler));
-
-		// Transition the image layout to the desired layout
-		VkUtils::TransitionImageLayout(context_, texture.image.imgHandle, VK_IMAGE_ASPECT_COLOR_BIT, 
-			VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
-
-		return handle;
-	}
-
 	QbVkTextureHandle QbVkResourceManager::CreateTexture(uint32_t width, uint32_t height, VkSamplerCreateInfo* samplerInfo) {
 		auto handle = textures_.GetNextHandle();
 		auto& texture = textures_[handle];
 
-		auto imageCreateInfo = VkUtils::Init::ImageCreateInfo(width, height, VK_FORMAT_R8G8B8A8_UNORM, 
+		auto imageInfo = VkUtils::Init::ImageCreateInfo(width, height, VK_FORMAT_R8G8B8A8_UNORM, 
 			VK_IMAGE_TILING_LINEAR, VK_IMAGE_USAGE_SAMPLED_BIT, VK_SAMPLE_COUNT_1_BIT);
-		context_.allocator->CreateImage(texture.image, imageCreateInfo, QbVkMemoryUsage::QBVK_MEMORY_USAGE_GPU_ONLY);
+		context_.allocator->CreateImage(texture.image, imageInfo, QbVkMemoryUsage::QBVK_MEMORY_USAGE_GPU_ONLY);
 		texture.descriptor.imageView = VkUtils::CreateImageView(context_, texture.image.imgHandle, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
 		texture.descriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		if (samplerInfo != nullptr) VK_CHECK(vkCreateSampler(context_.device, samplerInfo, nullptr, &texture.descriptor.sampler));
@@ -144,6 +137,40 @@ namespace Quadbit {
 		// Transition the image layout to the desired layout
 		VkUtils::TransitionImageLayout(context_, texture.image.imgHandle, VK_IMAGE_ASPECT_COLOR_BIT, 
 			VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_HOST_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+
+		return handle;
+	}
+
+	QbVkTextureHandle QbVkResourceManager::CreateTexture(VkImageCreateInfo* imageInfo, VkSamplerCreateInfo* samplerInfo) {
+		auto handle = textures_.GetNextHandle();
+		auto& texture = textures_[handle];
+
+		context_.allocator->CreateImage(texture.image, *imageInfo, QbVkMemoryUsage::QBVK_MEMORY_USAGE_GPU_ONLY);
+		texture.descriptor.imageView = VkUtils::CreateImageView(context_, texture.image.imgHandle, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+		texture.descriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		if (samplerInfo != nullptr) VK_CHECK(vkCreateSampler(context_.device, samplerInfo, nullptr, &texture.descriptor.sampler));
+
+		// Transition the image layout to the desired layout
+		VkUtils::TransitionImageLayout(context_, texture.image.imgHandle, VK_IMAGE_ASPECT_COLOR_BIT,
+			VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_HOST_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+
+		return handle;
+	}
+
+	QbVkTextureHandle QbVkResourceManager::CreateStorageTexture(uint32_t width, uint32_t height, VkFormat format, VkSamplerCreateInfo* samplerInfo) {
+		auto handle = textures_.GetNextHandle();
+		auto& texture = textures_[handle];
+
+		auto imageCreateInfo = VkUtils::Init::ImageCreateInfo(width, height, format,
+			VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_SAMPLE_COUNT_1_BIT);
+		context_.allocator->CreateImage(texture.image, imageCreateInfo, QbVkMemoryUsage::QBVK_MEMORY_USAGE_GPU_ONLY);
+		texture.descriptor.imageView = VkUtils::CreateImageView(context_, texture.image.imgHandle, format, VK_IMAGE_ASPECT_COLOR_BIT);
+		texture.descriptor.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+		if (samplerInfo != nullptr) VK_CHECK(vkCreateSampler(context_.device, samplerInfo, nullptr, &texture.descriptor.sampler));
+
+		// Transition the image layout to the desired layout
+		VkUtils::TransitionImageLayout(context_, texture.image.imgHandle, VK_IMAGE_ASPECT_COLOR_BIT,
+			VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 
 		return handle;
 	}
@@ -194,338 +221,87 @@ namespace Quadbit {
 		return handle;
 	}
 
-	PBRSceneComponent QbVkResourceManager::LoadModel(const char* path) {
+	QbVkTextureHandle QbVkResourceManager::GetEmptyTexture() {
+		if (emptyTexture_ != QBVK_TEXTURE_NULL_HANDLE) return emptyTexture_;
 
-		auto fsPath = std::filesystem::path(path);
-		eastl::string extension = eastl::string(fsPath.extension().string().c_str());
-		eastl::string directoryPath = eastl::string(fsPath.remove_filename().string().c_str());
-		PBRSceneComponent scene;
-
-		std::string err, warn;
-		tinygltf::TinyGLTF loader;
-		tinygltf::Model model;
-
-		bool loaded = false;
-		if (extension.compare(".gltf") == 0) {
-			loaded = loader.LoadASCIIFromFile(&model, &err, &warn, path);
-		}
-		else if (extension.compare(".glb") == 0) {
-			loaded = loader.LoadBinaryFromFile(&model, &err, &warn, path);
-		}
-		if (!loaded) {
-			QB_LOG_ERROR("Failed to load model at %s\n", path);
-		}
-
-		// For now we only support loading single scenes
-		assert(model.scenes.size() == 1 && "Failed to parse model, only one scene allowed!");
-
-		// Parse materials
-		eastl::vector<QbVkPBRMaterial> materials;
-		for (const auto& material : model.materials) {
-			materials.push_back(ParseMaterial(model, material));
-		}
-
-		eastl::vector<QbVkVertex> vertices;
-		eastl::vector<uint32_t> indices;
-		// Parse nodes recursively
-		for (const auto& node : model.scenes[model.defaultScene].nodes) {
-			ParseNode(model, model.nodes[node], scene, vertices, indices, materials, glm::mat4(1.0f));
-		}
-
-		scene.vertexHandle = CreateVertexBuffer(vertices.data(), sizeof(QbVkVertex), static_cast<uint32_t>(vertices.size()));
-		scene.indexHandle = CreateIndexBuffer(indices);
-
-		return scene;
+		// Create an empty texture for use when a material has empty slots
+		auto samplerInfo = VkUtils::Init::SamplerCreateInfo(VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_TRUE, 16.0f, VK_COMPARE_OP_ALWAYS, VK_SAMPLER_MIPMAP_MODE_LINEAR);
+		emptyTexture_ = CreateTexture(1, 1, &samplerInfo);
+		return emptyTexture_;
 	}
 
-	bool QbVkResourceManager::TransferQueuedDataToGPU(uint32_t resourceIndex) {
-		if (transferQueue_.count == 0) return false;
+	// Max instances here refers to the maximum number shader resource instances
+	QbVkDescriptorAllocatorHandle QbVkResourceManager::CreateDescriptorAllocator(const eastl::vector<VkDescriptorSetLayout>& setLayouts,
+		const eastl::vector<VkDescriptorPoolSize>& poolSizes, const uint32_t maxInstances) {
 
-		VkCommandBufferBeginInfo commandBufferInfo = VkUtils::Init::CommandBufferBeginInfo();
-		commandBufferInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-		VK_CHECK(vkBeginCommandBuffer(transferQueue_.commandBuffer, &commandBufferInfo));
+		auto allocatorHandle = descriptorAllocators_.GetNextHandle();
+		auto& allocator = descriptorAllocators_[allocatorHandle];
 
-		for (uint32_t i = 0; i < transferQueue_.count; i++) {
-			// Issue copy command
-			VkBufferCopy copyRegion{};
-			copyRegion.srcOffset = 0;
-			copyRegion.dstOffset = 0;
-			copyRegion.size = transferQueue_[i].size;
-			vkCmdCopyBuffer(transferQueue_.commandBuffer, transferQueue_.stagingBuffers[i].buf, buffers_[transferQueue_[i].destinationBuffer].buf, 1, &copyRegion);
-		}
+		auto setCount = static_cast<uint32_t>(setLayouts.size());
+		auto poolInfo = VkUtils::Init::DescriptorPoolCreateInfo(poolSizes, setCount * MAX_FRAMES_IN_FLIGHT * maxInstances);
+		VK_CHECK(vkCreateDescriptorPool(context_.device, &poolInfo, nullptr, &allocator.pool));
 
-		// End recording
-		VK_CHECK(vkEndCommandBuffer(transferQueue_.commandBuffer));
+		// We will now allocate the maximum number of descriptor sets up front
+		// so when the user starts requesting descriptor sets to be written we 
+		// hand out handles of pre-allocated descriptor sets
+		for (uint32_t i = 0; i < maxInstances; i++) {
+			auto& sets = allocator.setInstances.elements[i];
+			eastl::vector<VkDescriptorSetLayout> layouts;
 
-		VkSubmitInfo submitInfo = VkUtils::Init::SubmitInfo();
-		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &transferQueue_.commandBuffer;
-		submitInfo.signalSemaphoreCount = 1;
-		eastl::array<VkSemaphore, 1> transferSemaphore{ context_.renderingResources[resourceIndex].transferSemaphore };
-		submitInfo.pSignalSemaphores = transferSemaphore.data();
-
-		// Submit to queue
-		VK_CHECK(vkQueueSubmit(context_.graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE));
-
-		transferQueue_.Reset();
-		return true;
-	}
-	
-	VkSamplerCreateInfo QbVkResourceManager::GetSamplerInfo(const tinygltf::Model& model, int samplerIndex) {
-		VkSamplerCreateInfo samplerCreateInfo{};
-		samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-		samplerCreateInfo.magFilter = VK_FILTER_LINEAR;
-		samplerCreateInfo.minFilter = VK_FILTER_LINEAR;
-		samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-		samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-		samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-		samplerCreateInfo.anisotropyEnable = VK_TRUE;
-		samplerCreateInfo.maxAnisotropy = 16.0f;
-		samplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
-		samplerCreateInfo.compareEnable = VK_FALSE;
-		samplerCreateInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-		samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-		samplerCreateInfo.maxLod = 0.0f;
-
-		if (samplerIndex > -1) {
-			auto& sampler = model.samplers[samplerIndex];
-			// Hardcoded conversiosn from OpenGL constants...
-			samplerCreateInfo.magFilter = (sampler.magFilter == 9728 || sampler.magFilter == 9984 || sampler.magFilter == 9986) ? VK_FILTER_NEAREST : VK_FILTER_LINEAR;
-			samplerCreateInfo.minFilter = (sampler.minFilter == 9728 || sampler.minFilter == 9984 || sampler.minFilter == 9986) ? VK_FILTER_NEAREST : VK_FILTER_LINEAR;
-			switch (sampler.wrapS) {
-			case 10497: { samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT; break; }
-			case 33071: { samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE; break; }
-			case 33648: { samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT; break; }
+			for (int j = 0; j < setCount; j++) {
+				layouts.push_back(setLayouts[j]);
 			}
-			switch (sampler.wrapT) {
-			case 10497: { samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT; break; }
-			case 33071: { samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE; break; }
-			case 33648: { samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT; break; }
-			}
-			samplerCreateInfo.addressModeW = samplerCreateInfo.addressModeV;
-		}
 
-		return samplerCreateInfo;
-	}
-
-	QbVkDescriptorSetHandle QbVkResourceManager::GetDescriptorSetHandle(QbVkPBRMaterial& material) {
-		std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, materialDescriptorSetLayout_);
-		VkDescriptorSetAllocateInfo descSetallocInfo = VkUtils::Init::DescriptorSetAllocateInfo();
-		descSetallocInfo.descriptorPool = materialDescriptorPool_;
-		descSetallocInfo.descriptorSetCount = MAX_FRAMES_IN_FLIGHT;
-		descSetallocInfo.pSetLayouts = layouts.data();
-
-		auto descriptorHandle = materialDescriptorSets_.GetNextHandle();
-		auto& descriptorSet = materialDescriptorSets_[descriptorHandle];
-
-		VK_CHECK(vkAllocateDescriptorSets(context_.device, &descSetallocInfo, &descriptorSet));
-
-		std::vector<VkWriteDescriptorSet> writeDescSets;
-
-		auto& baseColorDescriptor = (material.textureIndices.baseColorTextureIndex > -1) ?
-			textures_[material.baseColorTexture].descriptor :
-			textures_[emptyTexture_].descriptor;
-
-		auto& metallicRoughnessDescriptor = (material.textureIndices.metallicRoughnessTextureIndex > -1) ?
-			textures_[material.metallicRoughnessTexture].descriptor : 
-			textures_[emptyTexture_].descriptor;
-
-		auto& normalDescriptor = (material.textureIndices.normalTextureIndex > -1) ?
-			textures_[material.normalTexture].descriptor :
-			textures_[emptyTexture_].descriptor;
-
-		auto& occlusionDescriptor = (material.textureIndices.occlusionTextureIndex > -1) ?
-			textures_[material.occlusionTexture].descriptor :
-			textures_[emptyTexture_].descriptor;
-
-		auto& emissiveDescriptor = (material.textureIndices.emissiveTextureIndex > -1) ?
-			textures_[material.emissiveTexture].descriptor :
-			textures_[emptyTexture_].descriptor;
-
-		writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 0, &baseColorDescriptor));
-		writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &metallicRoughnessDescriptor));
-		writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, &normalDescriptor));
-		writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3, &occlusionDescriptor));
-		writeDescSets.push_back(VkUtils::Init::WriteDescriptorSet(descriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4, &emissiveDescriptor));
-		vkUpdateDescriptorSets(context_.device, static_cast<uint32_t>(writeDescSets.size()), writeDescSets.data(), 0, nullptr);
-
-		return descriptorHandle;
-	}
-
-	QbVkTextureHandle QbVkResourceManager::CreateTextureFromResource(const tinygltf::Model& model, const tinygltf::Material& material, const char* textureName) {
-		auto& texture = model.textures[material.values.at(textureName).TextureIndex()];
-		auto& image = model.images[texture.source];
-
-		auto samplerInfo = GetSamplerInfo(model, texture.sampler);
-		return LoadTexture(image.width, image.height, image.image.data(), &samplerInfo);
-	}
-
-	QbVkPBRMaterial QbVkResourceManager::ParseMaterial(const tinygltf::Model& model, const tinygltf::Material& material) {
-		QbVkPBRMaterial mat{};
-		if (material.values.find("baseColorTexture") != material.values.end()) {
-			mat.baseColorTexture = CreateTextureFromResource(model, material, "baseColorTexture");
-			mat.textureIndices.baseColorTextureIndex = material.values.at("baseColorTexture").TextureTexCoord();
-		}
-		if (material.values.find("metallicRoughnessTexture") != material.values.end()) {
-			mat.metallicRoughnessTexture = CreateTextureFromResource(model, material, "metallicRoughnessTexture");
-			mat.textureIndices.metallicRoughnessTextureIndex = material.values.at("metallicRoughnessTexture").TextureTexCoord();
-		}
-		if (material.values.find("normalTexture") != material.values.end()) {
-			mat.normalTexture = CreateTextureFromResource(model, material, "normalTexture");
-			mat.textureIndices.normalTextureIndex = material.values.at("normalTexture").TextureTexCoord();
-		}
-		if (material.values.find("occlusionTexture") != material.values.end()) {
-			mat.occlusionTexture = CreateTextureFromResource(model, material, "occlusionTexture");
-			mat.textureIndices.occlusionTextureIndex = material.values.at("occlusionTexture").TextureTexCoord();
-		}
-		if (material.values.find("emissiveTexture") != material.values.end()) {
-			mat.occlusionTexture = CreateTextureFromResource(model, material, "emissiveTexture");
-			mat.textureIndices.occlusionTextureIndex = material.values.at("emissiveTexture").TextureTexCoord();
-		}
-		if (material.values.find("baseColorFactor") != material.values.end()) {
-			mat.baseColorFactor = glm::make_vec4(material.values.at("baseColorFactor").ColorFactor().data());
-		}
-		if (material.values.find("emissiveFactor") != material.values.end()) {
-			mat.emissiveFactor = glm::vec4(glm::make_vec3(material.values.at("emissiveFactor").ColorFactor().data()), 1.0f);
-		}
-		if (material.values.find("metallicFactor") != material.values.end()) {
-			mat.metallicFactor = static_cast<float>(material.values.at("metallicFactor").Factor());
-		}
-		if (material.values.find("roughnessFactor") != material.values.end()) {
-			mat.roughnessFactor = static_cast<float>(material.values.at("roughnessFactor").Factor());
-		}
-		mat.descriptorHandle = GetDescriptorSetHandle(mat);
-		return mat;
-	}
-
-	void QbVkResourceManager::ParseNode(const tinygltf::Model& model, const tinygltf::Node& node, PBRSceneComponent& scene,
-		eastl::vector<QbVkVertex>& vertices, eastl::vector<uint32_t>& indices, const eastl::vector<QbVkPBRMaterial> materials, glm::mat4 parentTransform) {
-		// Construct transform matrix from node data and parent data
-		glm::mat4 translation = (node.translation.size() == 3) ?
-			glm::translate(glm::mat4(1.0f), glm::vec3(glm::make_vec3(node.translation.data()))) : glm::mat4(1.0f);
-		glm::mat4 rotation = (node.rotation.size() == 4) ?
-			glm::mat4_cast(glm::make_quat(node.rotation.data())) : glm::mat4(1.0f);
-		glm::mat4 scale = (node.scale.size() == 3) ?
-			glm::scale(glm::mat4(1.0f), glm::vec3(glm::make_vec3(node.scale.data()))) : glm::mat4(1.0f);
-		glm::mat4 nodeTransform = (node.matrix.size() == 16) ?
-			translation * rotation * scale * glm::mat4(glm::make_mat4x4(node.matrix.data())) :
-			translation * rotation * scale * glm::mat4(1.0f);
-		glm::mat4 transform = parentTransform * nodeTransform;
-
-		// Let parent transform data propagate down through children on recurse
-		if (node.children.size() > 0) {
-			for (const auto& node : node.children) {
-				ParseNode(model, model.nodes[node], scene, vertices, indices, materials, transform);
+			for (int j = 0; j < MAX_FRAMES_IN_FLIGHT; j++) {
+				sets[j].resize(setCount);
+				VkDescriptorSetAllocateInfo descSetallocInfo = VkUtils::Init::DescriptorSetAllocateInfo();
+				descSetallocInfo.descriptorPool = allocator.pool;
+				descSetallocInfo.descriptorSetCount = setCount;
+				descSetallocInfo.pSetLayouts = layouts.data();
+				VK_CHECK(vkAllocateDescriptorSets(context_.device, &descSetallocInfo, sets[j].data()));
 			}
 		}
 
-		// Parse mesh if node contains a mesh
-		if (node.mesh > -1) {
-			QbVkPBRMesh mesh = ParseMesh(model, model.meshes[node.mesh], vertices, indices, materials);
-			mesh.localTransform = transform;
-			scene.meshes.push_back(mesh);
+		return allocatorHandle;
+	}
+
+	QbVkDescriptorSetsHandle QbVkResourceManager::GetNextDescriptorSetsHandle(const QbVkDescriptorAllocatorHandle allocatorHandle) {
+		auto& allocator = descriptorAllocators_[allocatorHandle];
+		return allocator.setInstances.GetNextHandle();
+	}
+
+	const eastl::array<eastl::vector<VkDescriptorSet>, MAX_FRAMES_IN_FLIGHT>& QbVkResourceManager::GetDescriptorSets(
+		const QbVkDescriptorAllocatorHandle allocatorHandle, const QbVkDescriptorSetsHandle setsHandle) {
+		return descriptorAllocators_[allocatorHandle].setInstances[setsHandle];
+	}
+
+	void QbVkResourceManager::WriteDescriptor(QbVkDescriptorAllocatorHandle allocatorHandle, QbVkDescriptorSetsHandle descriptorSetsHandle, 
+		QbVkBufferHandle bufferHandle, VkDescriptorType descriptorType, uint32_t set, uint32_t binding, uint32_t descriptorCount) {
+
+		auto& allocator = descriptorAllocators_[allocatorHandle];
+		auto& descriptorSets = allocator.setInstances[descriptorSetsHandle];
+
+		for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+			eastl::array<VkWriteDescriptorSet, 1> writeDescSets = {
+				VkUtils::Init::WriteDescriptorSet(descriptorSets[set][i], binding, descriptorType,
+				&buffers_[bufferHandle].descriptor, descriptorCount)
+			};
+			vkUpdateDescriptorSets(context_.device, static_cast<uint32_t>(writeDescSets.size()), writeDescSets.data(), 0, nullptr);
 		}
 	}
 
-	QbVkPBRMesh QbVkResourceManager::ParseMesh(const tinygltf::Model& model, const tinygltf::Mesh& mesh,
-		eastl::vector<QbVkVertex>& vertices, eastl::vector<uint32_t>& indices, const eastl::vector<QbVkPBRMaterial>& materials) {
-		QbVkPBRMesh qbMesh{};
+	void QbVkResourceManager::WriteDescriptor(QbVkDescriptorAllocatorHandle allocatorHandle, QbVkDescriptorSetsHandle descriptorSetsHandle, 
+		QbVkTextureHandle textureHandle, VkDescriptorType descriptorType, uint32_t set, uint32_t binding, uint32_t descriptorCount) {
 
-		for (const auto& primitive : mesh.primitives) {
-			assert(primitive.attributes.find("POSITION") != primitive.attributes.end());
-			assert(primitive.mode == TINYGLTF_MODE_TRIANGLES);
+		auto& allocator = descriptorAllocators_[allocatorHandle];
+		auto& descriptorSets = allocator.setInstances[descriptorSetsHandle];
 
-			const auto vertexCount = model.accessors[primitive.attributes.find("POSITION")->second].count;
-
-			const auto vertexOffset = static_cast<uint32_t>(vertices.size());
-			const auto indexOffset = static_cast<uint32_t>(indices.size());
-
-			int positionStride = 0;
-			int normalStride = 0;
-			int uv0Stride = 0;
-			int uv1Stride = 0;
-			const float* positions = nullptr;
-			const float* normals = nullptr;
-			const float* uvs0 = nullptr;
-			const float* uvs1 = nullptr;
-
-			for (const auto& [name, index] : primitive.attributes) {
-				const auto& accessor = model.accessors[index];
-				const auto& bufferView = model.bufferViews[accessor.bufferView];
-				const auto& buffer = model.buffers[bufferView.buffer];
-
-				if (name.compare("POSITION") == 0) {
-					positions = reinterpret_cast<const float*>(&buffer.data[accessor.byteOffset + bufferView.byteOffset]);
-					positionStride = accessor.ByteStride(bufferView) / sizeof(float);
-					assert(positions != nullptr && positionStride > 0);
-				}
-				else if (name.compare("NORMAL") == 0) {
-					normals = reinterpret_cast<const float*>(&buffer.data[accessor.byteOffset + bufferView.byteOffset]);
-					normalStride = accessor.ByteStride(bufferView) / sizeof(float);
-					assert(normals != nullptr && normalStride > 0);
-				}
-				else if (name.compare("TEXCOORD_0") == 0) {
-					uvs0 = reinterpret_cast<const float*>(&buffer.data[accessor.byteOffset + bufferView.byteOffset]);
-					uv0Stride = accessor.ByteStride(bufferView) / sizeof(float);
-					assert(uvs0 != nullptr && uv0Stride > 0);
-				}
-				else if (name.compare("TEXCOORD_1") == 0) {
-					uvs1 = reinterpret_cast<const float*>(&buffer.data[accessor.byteOffset + bufferView.byteOffset]);
-					uv1Stride = accessor.ByteStride(bufferView) / sizeof(float);
-					assert(uvs1 != nullptr && uv1Stride > 0);
-				}
-			}
-
-			for (int i = 0; i < vertexCount; i++) {
-				QbVkVertex vertex{};
-				vertex.position = glm::make_vec3(&positions[i * positionStride]);
-				if (normals != nullptr) vertex.normal = glm::normalize(glm::make_vec3(&normals[i * normalStride]));
-				if (uvs0 != nullptr) vertex.uv0 = glm::make_vec2(&uvs0[i * uv0Stride]);
-				if (uvs1 != nullptr) vertex.uv1 = glm::make_vec2(&uvs1[i * uv1Stride]);
-				vertices.push_back(vertex);
-			}
-
-			// TODO: Fallback to draw without indexes if not available
-			assert(primitive.indices > -1);
-
-			const auto& accessor = model.accessors[primitive.indices];
-			const auto& bufferView = model.bufferViews[accessor.bufferView];
-			const auto& buffer = model.buffers[bufferView.buffer];
-			const auto indexCount = accessor.count;
-
-			assert((accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE ||
-				accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT ||
-				accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
-				&& "Indexbuffer type not supported, supported types are uint8, uint16, uint32");
-
-			const void* indexBuffer = &buffer.data[accessor.byteOffset + bufferView.byteOffset];
-			if (accessor.componentType == TINYGLTF_PARAMETER_TYPE_UNSIGNED_BYTE) {
-				const uint8_t* buf = static_cast<const uint8_t*>(indexBuffer);
-				for (auto i = 0; i < indexCount; i++) {
-					indices.push_back(buf[i]);
-				}
-			}
-			else if (accessor.componentType == TINYGLTF_PARAMETER_TYPE_UNSIGNED_SHORT) {
-				const uint16_t* buf = static_cast<const uint16_t*>(indexBuffer);
-				for (auto i = 0; i < indexCount; i++) {
-					indices.push_back(buf[i]);
-				}
-			}
-			else if (accessor.componentType == TINYGLTF_PARAMETER_TYPE_UNSIGNED_INT) {
-				const uint32_t* buf = static_cast<const uint32_t*>(indexBuffer);
-				for (auto i = 0; i < indexCount; i++) {
-					indices.push_back(buf[i]);
-				}
-			}
-
-			QbVkPBRPrimitive qbPrimitive;
-			qbPrimitive.vertexOffset = vertexOffset;
-			qbPrimitive.indexOffset = indexOffset;
-			qbPrimitive.indexCount = static_cast<uint32_t>(indices.size()) - indexOffset;
-			qbPrimitive.material = materials[primitive.material];
-			qbMesh.primitives.push_back(qbPrimitive);
+		for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+			eastl::array<VkWriteDescriptorSet, 1> writeDescSets = {
+				VkUtils::Init::WriteDescriptorSet(descriptorSets[set][i], binding, descriptorType,
+				&textures_[textureHandle].descriptor, descriptorCount)
+			};
+			vkUpdateDescriptorSets(context_.device, static_cast<uint32_t>(writeDescSets.size()), writeDescSets.data(), 0, nullptr);
 		}
-
-		return qbMesh;
 	}
 }

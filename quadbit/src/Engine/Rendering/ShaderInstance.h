@@ -12,6 +12,7 @@ namespace Quadbit {
 
 		QbVkShaderInstance(QbVkContext& context) : context_(context) {}
 		~QbVkShaderInstance();
+		void AddShader(const eastl::vector<uint32_t>& shaderBytecode, const char* shaderEntry, VkShaderStageFlagBits shaderStage);
 		void AddShader(const uint32_t* shaderBytecode, const uint32_t shaderSize, const char* shaderEntry, VkShaderStageFlagBits shaderStage);
 		void AddShader(const char* shaderPath, const char* shaderEntry, VkShaderStageFlagBits shaderStage);
 

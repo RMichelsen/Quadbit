@@ -12,6 +12,7 @@
 #include "Engine/Rendering/Pipelines/ComputePipeline.h"
 #include "Engine/Rendering/Pipelines/MeshPipeline.h"
 #include "Engine/Rendering/Pipelines/ImGuiPipeline.h"
+#include "Engine/Rendering/Pipeline.h"
 
 
 #ifndef NDEBUG
@@ -46,11 +47,6 @@ inline constexpr const char* DEVICE_EXT_NAMES[DEVICE_EXT_COUNT]{
 };
 
 namespace Quadbit {
-	//QbVkRenderer& QbVkRenderer::Instance() {
-	//	static QbVkRenderer renderer;
-	//	return renderer;
-	//}
-
 	QbVkRenderer::QbVkRenderer(HINSTANCE hInstance, HWND hwnd, InputHandler* inputHandler, EntityManager* entityManager) :
 	    localHandle_(hInstance), 
 		windowHandle_(hwnd), 
@@ -93,15 +89,13 @@ namespace Quadbit {
 		// We need to start off by waiting for the GPU to be idle
 		VK_CHECK(vkDeviceWaitIdle(context_->device));
 
-		// Destroy user-created images and buffers
-		//for (const auto& texture : userAllocations_.textures) DestroyResource(texture);
-		//for (const auto& buffer : userAllocations_.buffers) DestroyResource(buffer);
-		//for (const auto& sampler : userAllocations_.samplers) vkDestroySampler(context_->device, sampler, nullptr);
-
 		// Destroy pipelines
 		meshPipeline_.reset();
 		imGuiPipeline_.reset();
 		computePipeline_.reset();
+
+		// Destroy persistent buffers and textures from the resource manager
+		context_->resourceManager.reset();
 
 		// Destroy rendering resources
 		for (const auto& renderingResource : context_->renderingResources) {
@@ -132,9 +126,6 @@ namespace Quadbit {
 
 		// Destroy render passes
 		vkDestroyRenderPass(context_->device, context_->mainRenderPass, nullptr);
-
-		// Destroy persistent buffers and textures from the resource manager
-		context_->resourceManager.reset();
 
 		// Empty garbage and destroy allocator
 		context_->allocator->EmptyGarbage();
@@ -438,6 +429,65 @@ namespace Quadbit {
 			VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT);
 	}
 
+	void QbVkRenderer::CreateShadowmapResources() {
+		// Prepare the shadowmap texture
+		VkImageCreateInfo imageInfo = VkUtils::Init::ImageCreateInfo(2048, 2048, VK_FORMAT_R8G8B8A8_UNORM,
+			VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+
+		VkSamplerCreateInfo samplerInfo = VkUtils::Init::SamplerCreateInfo(VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, 
+			VK_FALSE, 1.0f, VK_COMPARE_OP_NEVER, VK_SAMPLER_MIPMAP_MODE_LINEAR);
+		samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+
+		context_->shadowmapResources.texture = context_->resourceManager->CreateTexture(&imageInfo, &samplerInfo);
+
+		// Prepare the offscreen renderpass
+		VkAttachmentDescription attachmentDescription{};
+		attachmentDescription.format = VkUtils::FindDepthFormat(*context_);
+		attachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
+		attachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		attachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		attachmentDescription.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		attachmentDescription.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		attachmentDescription.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		attachmentDescription.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+
+		VkAttachmentReference depthReference{};
+		depthReference.attachment = 0;
+		depthReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+		VkSubpassDescription subpassDescription{};
+		subpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+		subpassDescription.colorAttachmentCount = 0;
+		subpassDescription.pDepthStencilAttachment = &depthReference;
+
+		eastl::array<VkSubpassDependency, 2> dependencies;
+		dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+		dependencies[0].dstSubpass = 0;
+		dependencies[0].srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		dependencies[0].dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+		dependencies[0].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		dependencies[0].dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+		dependencies[1].srcSubpass = 0;
+		dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+		dependencies[1].srcStageMask = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+		dependencies[1].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		dependencies[1].srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		dependencies[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+		VkRenderPassCreateInfo renderPassInfo = VkUtils::Init::RenderPassCreateInfo();
+		renderPassInfo.attachmentCount = 1;
+		renderPassInfo.pAttachments = &attachmentDescription;
+		renderPassInfo.subpassCount = 1;
+		renderPassInfo.pSubpasses = &subpassDescription;
+		renderPassInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
+		renderPassInfo.pDependencies = dependencies.data();
+
+		VK_CHECK(vkCreateRenderPass(context_->device, &renderPassInfo, nullptr, &context_->shadowmapResources.renderPass));
+	}
+
 	void QbVkRenderer::CreateSwapChain() {
 		canRender_ = false;
 
@@ -554,9 +604,6 @@ namespace Quadbit {
 
 		// Mesh Pipeline
 		meshPipeline_->RebuildPipeline();
-
-		// ImGui Pipeline (Debug only)
-		imGuiPipeline_->RebuildPipeline();
 
 		// Requery the surface capabilities
 		VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(context_->gpu->physicalDevice, context_->surface, &context_->gpu->surfaceCapabilities));

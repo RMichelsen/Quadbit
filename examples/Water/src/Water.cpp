@@ -8,7 +8,7 @@
 
 void Water::Init() {
 	// Create skybox
-	graphics_->LoadSkyGradient(glm::vec3(1.0f, 1.0f, 1.0f), glm::vec3(0.1f, 0.4f, 0.8f));
+	//graphics_->LoadSkyGradient(glm::vec3(1.0f, 1.0f, 1.0f), glm::vec3(0.1f, 0.4f, 0.8f));
 
 	InitializeCompute();
 
@@ -37,27 +37,38 @@ void Water::Init() {
 	togglesUBO_ = graphics_->CreateMappedGPUBuffer<TogglesUBO>(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 	togglesUBO_->useNormalMap = 0;
 
-	eastl::vector<Quadbit::QbVkRenderDescriptor> renderDescriptors {
-		graphics_->CreateRenderDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, graphics_->GetDescriptorPtr(displacementResources_.displacementMap), VK_SHADER_STAGE_VERTEX_BIT),
-		graphics_->CreateRenderDescriptor(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, graphics_->GetDescriptorPtr(displacementResources_.normalMap), VK_SHADER_STAGE_FRAGMENT_BIT),
-		graphics_->CreateRenderDescriptor(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, graphics_->GetDescriptorPtr(togglesUBO_), VK_SHADER_STAGE_FRAGMENT_BIT),
-	};
+	Quadbit::QbVkPipelineDescription pipelineDescription;
+	pipelineDescription.colorBlending = Quadbit::QbVkPipelineColorBlending::QBVK_COLORBLENDING_DISABLE;
+	pipelineDescription.depth = Quadbit::QbVkPipelineDepth::QBVK_PIPELINE_DEPTH_ENABLE;
+	pipelineDescription.dynamicState = Quadbit::QbVkPipelineDynamicState::QBVK_DYNAMICSTATE_VIEWPORTSCISSOR;
+	pipelineDescription.enableMSAA = true;
+	pipelineDescription.rasterization = Quadbit::QbVkPipelineRasterization::QBVK_PIPELINE_RASTERIZATION_DEFAULT;
+	pipeline_ = graphics_->CreatePipeline("Resources/Shaders/Compiled/water_vert.spv", "Resources/Shaders/Compiled/water_frag.spv", pipelineDescription);
+	graphics_->BindResource(pipeline_, "normal_map", displacementResources_.normalMap);
+	graphics_->BindResource(pipeline_, "displacement_map", displacementResources_.displacementMap);
+	graphics_->BindResource(pipeline_, "UBO", togglesUBO_.handle);
+	
+	//eastl::vector<Quadbit::QbVkRenderDescriptor> renderDescriptors {
+	//	graphics_->CreateRenderDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, graphics_->GetDescriptorPtr(displacementResources_.displacementMap), VK_SHADER_STAGE_VERTEX_BIT),
+	//	graphics_->CreateRenderDescriptor(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, graphics_->GetDescriptorPtr(displacementResources_.normalMap), VK_SHADER_STAGE_FRAGMENT_BIT),
+	//	graphics_->CreateRenderDescriptor(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, graphics_->GetDescriptorPtr(togglesUBO_), VK_SHADER_STAGE_FRAGMENT_BIT),
+	//};
 
-	Quadbit::QbVkShaderInstance shaderInstance = graphics_->CreateShaderInstance();
-	shaderInstance.AddShader("Resources/Shaders/Compiled/water_vert.spv", "main", VK_SHADER_STAGE_VERTEX_BIT);
-	shaderInstance.AddShader("Resources/Shaders/Compiled/water_frag.spv", "main", VK_SHADER_STAGE_FRAGMENT_BIT);
+	//Quadbit::QbVkShaderInstance shaderInstance = graphics_->CreateShaderInstance();
+	//shaderInstance.AddShader("Resources/Shaders/Compiled/water_vert.spv", "main", VK_SHADER_STAGE_VERTEX_BIT);
+	//shaderInstance.AddShader("Resources/Shaders/Compiled/water_frag.spv", "main", VK_SHADER_STAGE_FRAGMENT_BIT);
 
-	const Quadbit::QbVkRenderMeshInstance* rMeshInstance = graphics_->CreateRenderMeshInstance(renderDescriptors,
-		{
-			Quadbit::QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_POSITION 
-		},
-		shaderInstance
-	);
+	//const Quadbit::QbVkRenderMeshInstance* rMeshInstance = graphics_->CreateRenderMeshInstance(renderDescriptors,
+	//	{
+	//		Quadbit::QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_POSITION 
+	//	},
+	//	shaderInstance
+	//);
 
 	for(auto i = 0; i < WATER_RESOLUTION * 2; i += WATER_RESOLUTION) {
 		for(auto j = 0; j < WATER_RESOLUTION * 2; j += WATER_RESOLUTION) {
 			auto entity = entityManager_->Create();
-			entityManager_->AddComponent<Quadbit::RenderMeshComponent>(entity, graphics_->CreateMesh(waterVertices_, sizeof(glm::float3), waterIndices_, rMeshInstance));
+			entityManager_->AddComponent<Quadbit::CustomMeshComponent>(entity, graphics_->CreateMesh(waterVertices_, sizeof(glm::float3), waterIndices_, pipeline_));
 			entityManager_->AddComponent<Quadbit::RenderTransformComponent>(entity, Quadbit::RenderTransformComponent(1.0f, { i, 0.0f, j }, { 0, 0, 0, 1 }));
 		}
 	}

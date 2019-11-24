@@ -333,7 +333,7 @@ namespace Quadbit {
 
 		EntityManager* entityManager_ = nullptr;
 
-		virtual ~ComponentSystem() {}
+		virtual ~ComponentSystem() = default;
 
 		void UpdateStart() {
 			tStart = clock::now();
