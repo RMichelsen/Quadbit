@@ -49,6 +49,15 @@ namespace Quadbit {
 		vkFreeCommandBuffers(context_.device, context_.commandPool, 1, &transferQueue_.commandBuffer);
 	}
 
+	void QbVkResourceManager::RebuildPipelines() {
+		// Rebuild all active pipelines
+		for (uint16_t i = 0; i < pipelines_.resourceIndex; i++) {
+			if (eastl::find(pipelines_.freeList.begin(), pipelines_.freeList.end(), i) == pipelines_.freeList.end()) {
+				pipelines_[pipelines_.GetHandle(i)]->Rebuild();
+			}
+		}
+	}
+
 	void QbVkResourceManager::TransferDataToGPU(const void* data, VkDeviceSize size, QbVkBufferHandle destination) {
 		// If its the first transfer of the frame, we destroy the staging buffers from the previous transfer frame
 		if (transferQueue_.count == 0) {

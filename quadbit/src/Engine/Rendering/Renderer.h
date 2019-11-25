@@ -1,7 +1,10 @@
 #pragma once
+
+#include <Windows.h>
+#include <EASTL/hash_map.h>
+#include <EASTL/string.h>
 #include <EASTL/unique_ptr.h>
 
-#include "Engine/Rendering/Shaders/ShaderInstance.h"
 #include "Engine/Rendering/RenderTypes.h"
 #include "Engine/Rendering/VulkanTypes.h"
 

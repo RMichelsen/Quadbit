@@ -4,6 +4,7 @@
 #include <EASTL/vector.h>
 
 #include "Engine/Core/Time.h"
+#include "Engine/Application/InputHandler.h"
 #include "Engine/Entities/EntityManager.h"
 #include "Engine/Entities/SystemDispatch.h"
 #include "Engine/Rendering/RenderTypes.h"
@@ -12,6 +13,7 @@
 #include "Engine/Rendering/Pipelines/PBRPipeline.h"
 #include "Engine/Rendering/Pipelines/ImGuiPipeline.h"
 #include "Engine/Rendering/Pipelines/Pipeline.h"
+#include "Engine/Rendering/Shaders/ShaderCompiler.h"
 
 
 #ifndef NDEBUG
@@ -75,7 +77,7 @@ namespace Quadbit {
 		CreateDepthResources();
 		CreateMainRenderPass();
 
-		// Resource Manager
+		context_->shaderCompiler = eastl::make_unique<QbVkShaderCompiler>(*context_);
 		context_->resourceManager = eastl::make_unique<QbVkResourceManager>(*context_);
 
 		// Pipelines
@@ -221,6 +223,14 @@ namespace Quadbit {
 
 		// Increment (and mod) resource index to get the next resource
 		resourceIndex = (resourceIndex + 1) % MAX_FRAMES_IN_FLIGHT;
+
+		// Rebuild shaders if requested
+		if (context_->inputHandler->keyState_[0x10] && context_->inputHandler->controlKeysPressed_.enter) {
+			QB_LOG_INFO("Recompiling shaders and rebuilding pipelines!\n");
+			vkDeviceWaitIdle(context_->device);
+			context_->resourceManager->RebuildPipelines();
+			pbrPipeline_->pipeline_->Rebuild();
+		}
 	}
 
 	void QbVkRenderer::DestroyResource(QbVkBuffer buffer) {

@@ -24,6 +24,40 @@ namespace Quadbit {
 		uint32_t size;
 	};
 
+	struct GraphicsResources {
+		eastl::string vertexPath;
+		eastl::string vertexEntry;
+		eastl::string fragmentPath;
+		eastl::string fragmentEntry;
+	};
+	
+	struct ComputeResources {
+		eastl::string computePath;
+		eastl::string computeEntry;
+		VkCommandBuffer commandBuffer;
+		VkFence computeFence;
+		VkCommandPool commandPool;
+		VkQueryPool queryPool;
+		double msAvgTime;
+	};
+
+	struct PersistentPipelineInfo {
+		eastl::vector<VkVertexInputAttributeDescription> attributeDescriptions;
+		VkVertexInputBindingDescription inputBindingDescription;
+		VkPipelineVertexInputStateCreateInfo vertexInputInfo;
+		VkPipelineInputAssemblyStateCreateInfo inputAssemblyInfo;
+		VkPipelineViewportStateCreateInfo viewportInfo;
+		VkPipelineMultisampleStateCreateInfo multisampleInfo;
+		VkPipelineColorBlendAttachmentState colorBlendingAttachment;
+		VkPipelineColorBlendStateCreateInfo colorBlendInfo;
+		VkPipelineRasterizationStateCreateInfo rasterizationInfo;
+		VkPipelineDepthStencilStateCreateInfo depthStencilInfo;
+		VkPipelineDynamicStateCreateInfo dynamicStateInfo;
+		eastl::vector<VkSpecializationMapEntry> specializationConstants;
+		eastl::vector<unsigned char> specConstantsRawData;
+		VkSpecializationInfo specInfo{};
+	};
+
 	class QbVkPipeline {
 	public:
 		VkPipeline pipeline_ = VK_NULL_HANDLE;
@@ -33,16 +67,17 @@ namespace Quadbit {
 		eastl::vector<VkDescriptorSetLayout> descriptorSetLayouts_;
 		QbVkDescriptorSetsHandle mainDescriptors_ = QBVK_DESCRIPTOR_SETS_NULL_HANDLE;
 
-		QbVkPipeline(QbVkContext& context, const uint32_t* vertexBytecode, uint32_t vertexSize, 
-			const uint32_t* fragmentBytecode, uint32_t fragmentSize, const QbVkPipelineDescription pipelineDescription, 
+		QbVkPipeline(QbVkContext& context, const char* vertexPath, const char* vertexEntry,
+			const char* fragmentPath, const char* fragmentEntry, const QbVkPipelineDescription pipelineDescription, 
 			const uint32_t maxInstances = 1, const eastl::vector<eastl::tuple<VkFormat, uint32_t>>& vertexAttributeOverride = {});
-		QbVkPipeline(QbVkContext& context, const uint32_t* computeBytecode, uint32_t computeSize, const char* kernel, 
+		QbVkPipeline(QbVkContext& context, const char* computePath, const char* computeEntry, 
 			const void* specConstants = nullptr, const uint32_t maxInstances = 1);
 		~QbVkPipeline();
 
 		QbVkDescriptorSetsHandle GetNextDescriptorSetsHandle();
 
 		// General purpose actions
+		void Rebuild();
 		void Bind(VkCommandBuffer& commandBuffer);
 		void BindDescriptorSets(VkCommandBuffer& commandBuffer, uint32_t resourceIndex, QbVkDescriptorSetsHandle descriptorSets = QBVK_DESCRIPTOR_SETS_NULL_HANDLE);
 
@@ -66,13 +101,11 @@ namespace Quadbit {
 		QbVkContext& context_;
 		eastl::hash_map<eastl::string, ResourceInformation> resourceInfo_;
 
-		// Only for compute pipelines:
-		VkCommandBuffer commandBuffer_;
+		PersistentPipelineInfo persistentPipelineInfo_;
+
+		eastl::unique_ptr<GraphicsResources> graphicsResources_;
 		bool compute_ = false;
-		VkFence computeFence_;
-		VkCommandPool commandPool_;
-		VkQueryPool queryPool_;
-		double msAvgTime_;
+		eastl::unique_ptr<ComputeResources> computeResources_;
 
 		void ParseShader(const spirv_cross::Compiler& compiler, const spirv_cross::ShaderResources& resources,
 			eastl::vector<eastl::vector<VkDescriptorSetLayoutBinding>>& setLayoutBindings,

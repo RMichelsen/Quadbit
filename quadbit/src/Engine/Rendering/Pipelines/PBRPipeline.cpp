@@ -1,7 +1,6 @@
 #include "PBRPipeline.h"
 
 #include <string>
-#include <filesystem>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -47,8 +46,10 @@ namespace Quadbit {
 		pipelineDescription.enableMSAA = true;
 		pipelineDescription.rasterization = QbVkPipelineRasterization::QBVK_PIPELINE_RASTERIZATION_DEFAULT;
 
-		pipeline_ = eastl::make_unique<QbVkPipeline>(context_, defaultVert.data(), static_cast<uint32_t>(defaultVert.size()),
-			defaultFrag.data(), static_cast<uint32_t>(defaultFrag.size()), pipelineDescription, 1024);
+		//pipeline_ = eastl::make_unique<QbVkPipeline>(context_, defaultVert.data(), static_cast<uint32_t>(defaultVert.size()),
+		//	defaultFrag.data(), static_cast<uint32_t>(defaultFrag.size()), pipelineDescription, 1024);
+		pipeline_ = eastl::make_unique<QbVkPipeline>(context_, "resources/quadbit/default_vert.glsl", "main", 
+			"resources/quadbit/default_frag.glsl", "main", pipelineDescription, 1024);
 	}
 
 	void PBRPipeline::RebuildPipeline() {
@@ -177,8 +178,7 @@ namespace Quadbit {
 
 	PBRSceneComponent PBRPipeline::LoadModel(const char* path)
 	{
-		auto fsPath = std::filesystem::path(path);
-		eastl::string extension = eastl::string(fsPath.extension().string().c_str());
+		eastl::string extension = VkUtils::GetFileExtension(path);
 		PBRSceneComponent scene;
 
 		std::string err, warn;

@@ -4,10 +4,12 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 project(Quadbit_Projects)
 
-if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-    add_compile_options()
+if (MSVC)
+    # add_compile_options(/GR-) # Disable RTTI
+    add_compile_options(/EHsc)
 else()
-    add_compile_options()
+    # add_compile_options(-fno-rtti) # Disable RTTI
+    add_compile_options(-fno-exceptions)
 endif()
 
 # Add library

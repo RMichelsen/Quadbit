@@ -7,11 +7,24 @@ project(Quadbit VERSION 0.1 LANGUAGES CXX)
 find_package(Vulkan REQUIRED)
 
 set(GLM_TEST_ENABLE OFF CACHE BOOL "" FORCE)
+
 add_subdirectory(dependencies/glm)
-add_subdirectory(dependencies/SPIRV-Cross)
 add_subdirectory(dependencies/imgui)
 add_subdirectory(dependencies/EABase)
 add_subdirectory(dependencies/EASTL)
+add_subdirectory(dependencies/SPIRV-Cross)
+
+# For glslang
+set(BUILD_EXTERNAL OFF CACHE BOOL "" FORCE)
+set(ENABLE_GLSLANG_BINARIES OFF CACHE BOOL "" FORCE)
+set(SKIP_GLSLANG_INSTALL ON CACHE BOOL "" FORCE)
+set(ENABLE_CTEST OFF CACHE BOOL "" FORCE)
+set(ENABLE_HLSL OFF CACHE BOOL "" FORCE)
+set(ENABLE_PCH OFF CACHE BOOL "" FORCE)
+set(ENABLE_OPT OFF CACHE BOOL "" FORCE)
+
+add_subdirectory(dependencies/glslang)
+
 add_custom_target(glmNatVis SOURCES dependencies/glm/util/glm.natvis)
 add_custom_target(EASTLNatVis SOURCES dependencies/EASTL/doc/EASTL.natvis)
 
@@ -24,6 +37,7 @@ add_library(Quadbit STATIC
     src/Engine/Entities/EntityManager.cpp
     src/Engine/Rendering/Renderer.cpp
     src/Engine/Rendering/Shaders/ShaderInstance.cpp
+    src/Engine/Rendering/Shaders/ShaderCompiler.cpp
     src/Engine/Rendering/Memory/Allocator.cpp
     src/Engine/Rendering/Memory/Pool.cpp
     src/Engine/Rendering/Memory/ResourceManager.cpp
@@ -49,8 +63,8 @@ target_include_directories(Quadbit
     PRIVATE
         dependencies/tinygltf/include
         dependencies/stb/include
-        Vulkan::Vulkan
         SPIRV-Cross
+        glslang
     )
 
 target_link_libraries(Quadbit
@@ -60,4 +74,6 @@ target_link_libraries(Quadbit
         Vulkan::Vulkan
 		EASTL
         SPIRV-Cross
+        glslang
+        SPIRV
     )

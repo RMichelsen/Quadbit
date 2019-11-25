@@ -31,7 +31,7 @@ void Infinitum::Init() {
 	pipelineDescription.dynamicState = Quadbit::QbVkPipelineDynamicState::QBVK_DYNAMICSTATE_VIEWPORTSCISSOR;
 	pipelineDescription.enableMSAA = true;
 	pipelineDescription.rasterization = Quadbit::QbVkPipelineRasterization::QBVK_PIPELINE_RASTERIZATION_DEFAULT;
-	pipeline_ = graphics_->CreatePipeline("Resources/Shaders/Compiled/voxel_vert.spv", "Resources/Shaders/Compiled/voxel_frag.spv", pipelineDescription);
+	pipeline_ = graphics_->CreatePipeline("Resources/Shaders/Compiled/voxel_vert.spv", "main", "Resources/Shaders/Compiled/voxel_frag.spv", "main", pipelineDescription);
 
 	player_ = entityManager_->Create();
 	entityManager_->AddComponent<Quadbit::RenderTransformComponent>(player_, Quadbit::RenderTransformComponent(1.0f, glm::vec3(16.0f, 30.0f, 16.0f), glm::quat()));

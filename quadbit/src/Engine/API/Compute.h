@@ -13,8 +13,6 @@ namespace Quadbit {
 	public:
 		Compute(QbVkRenderer* const renderer);
 
-		QbVkPipelineHandle CreatePipeline(const uint32_t* computeBytecode, uint32_t computeSize,
-			const char* kernel, const void* specConstants = nullptr, const uint32_t maxInstances = 1);
 		QbVkPipelineHandle CreatePipeline(const char* computePath, const char* kernel,
 			const void* specConstants = nullptr, const uint32_t maxInstances = 1); 
 

@@ -92,25 +92,16 @@ namespace Quadbit {
 	}
 
 	// Max instances here refers to the maximum number shader resource instances
-	QbVkPipelineHandle Graphics::CreatePipeline(const uint32_t* vertexBytecode, uint32_t vertexSize,
-		const uint32_t* fragmentBytecode, uint32_t fragmentSize, const QbVkPipelineDescription pipelineDescription, 
-		const uint32_t maxInstances, const eastl::vector<eastl::tuple<VkFormat, uint32_t>>& vertexAttributeOverride) {
-
+	QbVkPipelineHandle Graphics::CreatePipeline(const char* vertexPath, const char* vertexEntry, const char* fragmentPath, const char* fragmentEntry,
+		const QbVkPipelineDescription pipelineDescription, const uint32_t maxInstances, const eastl::vector<eastl::tuple<VkFormat, uint32_t>>& vertexAttributeOverride) {
 		auto handle = resourceManager_->pipelines_.GetNextHandle();
-		resourceManager_->pipelines_[handle] = eastl::make_unique<QbVkPipeline>(*renderer_->context_, vertexBytecode, vertexSize,
-			fragmentBytecode, fragmentSize, pipelineDescription, maxInstances, vertexAttributeOverride);
+		resourceManager_->pipelines_[handle] = eastl::make_unique<QbVkPipeline>(*renderer_->context_, vertexPath, vertexEntry,
+			fragmentPath, fragmentEntry, pipelineDescription, maxInstances, vertexAttributeOverride);
+		
+		auto& pipeline = resourceManager_->pipelines_[handle];
+		pipeline->Rebuild();
 
 		return handle;
-	}
-
-	QbVkPipelineHandle Graphics::CreatePipeline(const char* vertexPath, const char* fragmentPath, const QbVkPipelineDescription pipelineDescription, 
-		const uint32_t maxInstances, const eastl::vector<eastl::tuple<VkFormat, uint32_t>>& vertexAttributeOverride) {
-		auto vertexBytecode = VkUtils::ReadShader(vertexPath);
-		auto fragmentBytecode = VkUtils::ReadShader(fragmentPath);
-
-		return CreatePipeline(reinterpret_cast<uint32_t*>(vertexBytecode.data()), static_cast<uint32_t>(vertexBytecode.size() / sizeof(uint32_t)),
-			reinterpret_cast<uint32_t*>(fragmentBytecode.data()), static_cast<uint32_t>(fragmentBytecode.size() / sizeof(uint32_t)), pipelineDescription,
-			maxInstances, vertexAttributeOverride);
 	}
 
 	void Graphics::BindResource(const QbVkPipelineHandle pipelineHandle, const eastl::string name,

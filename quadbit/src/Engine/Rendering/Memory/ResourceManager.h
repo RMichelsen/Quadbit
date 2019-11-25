@@ -41,6 +41,8 @@ namespace Quadbit {
 		QbVkResourceManager(QbVkContext& context);
 		~QbVkResourceManager();
 
+		void RebuildPipelines();
+
 		void TransferDataToGPU(const void* data, VkDeviceSize size, QbVkBufferHandle destination);
 		bool TransferQueuedDataToGPU(uint32_t resourceIndex);
 

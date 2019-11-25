@@ -689,6 +689,16 @@ namespace Quadbit::VkUtils {
 		return (format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT);
 	}
 
+	inline eastl::string GetFileExtension(const eastl::string& filePath) {
+		auto filename = filePath.substr(filePath.find_last_of("\\/"));
+		const auto sep = filename.rfind('.');
+		return (sep == eastl::string::npos) ? "" : filename.substr(sep);
+	}
+
+	inline eastl::string GetFilePath(const eastl::string& filePath) {
+		return filePath.substr(0, filePath.find_last_of("\\/"));
+	}
+
 	inline eastl::vector<char> ReadShader(const char* filename) {
 		FILE* pFile = fopen(filename, "rb");
 		if (pFile == nullptr) {

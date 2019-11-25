@@ -24,13 +24,22 @@ namespace Quadbit {
 		pipelineDescription.enableMSAA = true;
 		pipelineDescription.rasterization = QbVkPipelineRasterization::QBVK_PIPELINE_RASTERIZATION_NOCULL;
 
-		pipeline_ = eastl::make_unique<QbVkPipeline>(context_, imguiVert.data(), static_cast<uint32_t>(imguiVert.size()),
-			imguiFrag.data(), static_cast<uint32_t>(imguiFrag.size()), pipelineDescription, 1,
+		//pipeline_ = eastl::make_unique<QbVkPipeline>(context_, imguiVert.data(), static_cast<uint32_t>(imguiVert.size()),
+		//	imguiFrag.data(), static_cast<uint32_t>(imguiFrag.size()), pipelineDescription, 1,
+		//	eastl::vector<eastl::tuple<VkFormat, uint32_t>> { {
+		//		{VK_FORMAT_R32G32_SFLOAT, 8},
+		//		{VK_FORMAT_R32G32_SFLOAT, 8},
+		//		{VK_FORMAT_R8G8B8A8_UNORM, 4}
+		//	} });
+
+		pipeline_ = eastl::make_unique<QbVkPipeline>(context_, "resources/quadbit/imgui_vert.glsl", "main", 
+			"resources/quadbit/imgui_frag.glsl", "main", pipelineDescription, 1,
 			eastl::vector<eastl::tuple<VkFormat, uint32_t>> { {
 				{VK_FORMAT_R32G32_SFLOAT, 8},
-				{VK_FORMAT_R32G32_SFLOAT, 8},
-				{VK_FORMAT_R8G8B8A8_UNORM, 4}
+				{ VK_FORMAT_R32G32_SFLOAT, 8 },
+				{ VK_FORMAT_R8G8B8A8_UNORM, 4 }
 			} });
+
 		pipeline_->BindResource("fontSampler", fontTexture_);
 	}
 

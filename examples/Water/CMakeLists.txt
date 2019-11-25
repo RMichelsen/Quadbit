@@ -16,3 +16,7 @@ target_link_libraries(Water
 add_custom_command(TARGET Water PRE_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy_directory
                        ${CMAKE_CURRENT_SOURCE_DIR}/resources/ $<TARGET_FILE_DIR:Water>/resources)
+
+add_custom_command(TARGET Water PRE_BUILD
+                   COMMAND ${CMAKE_COMMAND} -E copy_directory
+                       ${CMAKE_CURRENT_SOURCE_DIR}/../../quadbit/resources $<TARGET_FILE_DIR:Water>/resources/quadbit)

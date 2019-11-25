@@ -7,26 +7,17 @@
 #include "Engine/Rendering/Renderer.h"
 #include "Engine/Rendering/Memory/ResourceManager.h"
 #include "Engine/Rendering/VulkanUtils.h"
+#include "Engine/Rendering/Shaders/ShaderCompiler.h"
 
 namespace Quadbit {
 	Compute::Compute(QbVkRenderer* const renderer) : renderer_(renderer), resourceManager_(renderer->context_->resourceManager.get()) { }
 
-	QbVkPipelineHandle Compute::CreatePipeline(const uint32_t* computeBytecode, uint32_t computeSize, 
-		const char* kernel, const void* specConstants, const uint32_t maxInstances) {
-
-		auto handle = resourceManager_->pipelines_.GetNextHandle();
-		resourceManager_->pipelines_[handle] = eastl::make_unique<QbVkPipeline>(*renderer_->context_, computeBytecode,
-			computeSize, kernel, specConstants, maxInstances);
-
-		return handle;
-	}
-
 	QbVkPipelineHandle Compute::CreatePipeline(const char* computePath, const char* kernel, 
 		const void* specConstants, const uint32_t maxInstances) {
-		auto computeBytecode = VkUtils::ReadShader(computePath);
+		auto handle = resourceManager_->pipelines_.GetNextHandle();
+		resourceManager_->pipelines_[handle] = eastl::make_unique<QbVkPipeline>(*renderer_->context_, computePath, kernel, specConstants, maxInstances);
 
-		return CreatePipeline(reinterpret_cast<uint32_t*>(computeBytecode.data()), static_cast<uint32_t>(computeBytecode.size() / sizeof(uint32_t)), 
-			kernel, specConstants, maxInstances);
+		return handle;
 	}
 
 	void Compute::BindResource(const QbVkPipelineHandle pipelineHandle, const eastl::string name, 

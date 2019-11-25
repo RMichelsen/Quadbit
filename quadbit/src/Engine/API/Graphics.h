@@ -62,11 +62,8 @@ namespace Quadbit {
 		QbVkShaderInstance CreateShaderInstance();
 		QbVkBufferHandle CreateVertexBuffer(const void* vertices, uint32_t vertexStride, uint32_t vertexCount);
 		QbVkBufferHandle CreateIndexBuffer(const eastl::vector<uint32_t>& indices);
-		QbVkPipelineHandle CreatePipeline(const uint32_t* vertexBytecode, uint32_t vertexSize,
-			const uint32_t* fragmentBytecode, uint32_t fragmentSize, const QbVkPipelineDescription pipelineDescription, const uint32_t maxInstances = 1,
-			const eastl::vector<eastl::tuple<VkFormat, uint32_t>>& vertexAttributeOverride = {});
-		QbVkPipelineHandle CreatePipeline(const char* vertexPath, const char* fragmentPath, const QbVkPipelineDescription pipelineDescription, const uint32_t maxInstances = 1,
-			const eastl::vector<eastl::tuple<VkFormat, uint32_t>>& vertexAttributeOverride = {});
+		QbVkPipelineHandle CreatePipeline(const char* vertexPath, const char* vertexEntry, const char* fragmentPath, const char* fragmentEntry,
+			const QbVkPipelineDescription pipelineDescription, const uint32_t maxInstances = 1, const eastl::vector<eastl::tuple<VkFormat, uint32_t>>& vertexAttributeOverride = {});
 
 		void BindResource(const QbVkPipelineHandle pipelineHandle, const eastl::string name,
 			const QbVkBufferHandle bufferHandle, const QbVkDescriptorSetsHandle descriptorsHandle = QBVK_DESCRIPTOR_SETS_NULL_HANDLE);

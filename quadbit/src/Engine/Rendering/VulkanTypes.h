@@ -4,9 +4,11 @@
 
 #include <EASTL/array.h>
 #include <EASTL/deque.h>
+#include <EASTL/hash_map.h>
+#include <EASTL/string.h>
 #include <EASTL/type_traits.h>
-#include <EASTL/unique_ptr.h>
 #include <EASTL/vector.h>
+#include <EASTL/unique_ptr.h>
 
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.h>
@@ -290,6 +292,7 @@ namespace Quadbit {
 	};
 
 	class QbVkAllocator;
+	class QbVkShaderCompiler;
 	class QbVkResourceManager;
 	class EntityManager;
 	class InputHandler;
@@ -299,12 +302,15 @@ namespace Quadbit {
 
 		eastl::unique_ptr<GPU> gpu;
 		eastl::unique_ptr<QbVkAllocator> allocator;
+		eastl::unique_ptr<QbVkShaderCompiler> shaderCompiler;
 		eastl::unique_ptr<QbVkResourceManager> resourceManager;
 		VkDevice device = VK_NULL_HANDLE;
 		VkSurfaceKHR surface = VK_NULL_HANDLE;
 		VkQueue graphicsQueue = VK_NULL_HANDLE;
 		VkQueue presentQueue = VK_NULL_HANDLE;
 		VkQueue computeQueue = VK_NULL_HANDLE;
+
+		eastl::array<RenderingResources, MAX_FRAMES_IN_FLIGHT> renderingResources;
 
 		MSAAResources multisamplingResources;
 		DepthResources depthResources{};
@@ -315,7 +321,7 @@ namespace Quadbit {
 
 		VkRenderPass mainRenderPass = VK_NULL_HANDLE;
 
-		eastl::array<RenderingResources, MAX_FRAMES_IN_FLIGHT> renderingResources;
+		eastl::hash_map<eastl::string, double> computeAvgTimes;
 	};
 
 	struct QbVkTransfer {
@@ -330,5 +336,11 @@ namespace Quadbit {
 		T* operator->() {
 			return data;
 		}
+	};
+
+	enum class QbVkShaderType {
+		QBVK_SHADER_TYPE_FRAGMENT,
+		QBVK_SHADER_TYPE_VERTEX,
+		QBVK_SHADER_TYPE_COMPUTE
 	};
 }

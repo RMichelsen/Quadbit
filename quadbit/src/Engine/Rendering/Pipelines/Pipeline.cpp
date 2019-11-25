@@ -7,19 +7,31 @@
 #include "Engine/Rendering/Shaders/ShaderInstance.h"
 #include "Engine/Rendering/VulkanUtils.h"
 #include "Engine/Rendering/Memory/ResourceManager.h"
+#include "Engine/Rendering/Shaders/ShaderCompiler.h"
 
 namespace Quadbit {
     // Max instances here refers to the maximum number shader resource instances
-	QbVkPipeline::QbVkPipeline(QbVkContext& context, const uint32_t* vertexBytecode, uint32_t vertexSize,
-        const uint32_t* fragmentBytecode, uint32_t fragmentSize, const QbVkPipelineDescription pipelineDescription, 
+	QbVkPipeline::QbVkPipeline(QbVkContext& context, const char* vertexPath, const char* vertexEntry,
+        const char* fragmentPath, const char* fragmentEntry, const QbVkPipelineDescription pipelineDescription,
         const uint32_t maxInstances, const eastl::vector<eastl::tuple<VkFormat, uint32_t>>& vertexAttributeOverride) : context_(context) {
 
-        QbVkShaderInstance shaderInstance(context_);
-        shaderInstance.AddShader(vertexBytecode, vertexSize, "main", VK_SHADER_STAGE_VERTEX_BIT);
-        shaderInstance.AddShader(fragmentBytecode, fragmentSize, "main", VK_SHADER_STAGE_FRAGMENT_BIT);
+        graphicsResources_ = eastl::make_unique<GraphicsResources>();
+        graphicsResources_->vertexPath = vertexPath;
+        graphicsResources_->vertexEntry = vertexEntry;
+        graphicsResources_->fragmentPath = fragmentPath;
+        graphicsResources_->fragmentEntry = fragmentEntry;
 
-        spirv_cross::Compiler vertexCompiler(vertexBytecode, vertexSize);
-        spirv_cross::Compiler fragmentCompiler(fragmentBytecode, fragmentSize);
+        auto vertexBytecode = context_.shaderCompiler->CompileShader(vertexPath, QbVkShaderType::QBVK_SHADER_TYPE_VERTEX);
+        auto fragmentBytecode = context_.shaderCompiler->CompileShader(fragmentPath, QbVkShaderType::QBVK_SHADER_TYPE_FRAGMENT);
+        QB_ASSERT(!vertexBytecode.empty() && "Can't continue pipeline creation, shader compilation failed!");
+        QB_ASSERT(!fragmentBytecode.empty() && "Can't continue pipeline creation, shader compilation failed!");
+
+        QbVkShaderInstance shaderInstance(context_);
+        shaderInstance.AddShader(vertexBytecode.data(), vertexBytecode.size(), vertexEntry, VK_SHADER_STAGE_VERTEX_BIT);
+        shaderInstance.AddShader(fragmentBytecode.data(), fragmentBytecode.size(), fragmentEntry, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+        spirv_cross::Compiler vertexCompiler(vertexBytecode.data(), vertexBytecode.size());
+        spirv_cross::Compiler fragmentCompiler(fragmentBytecode.data(), fragmentBytecode.size());
         const auto vertexResources = vertexCompiler.get_shader_resources();
         const auto fragmentResources = fragmentCompiler.get_shader_resources();
         
@@ -64,7 +76,6 @@ namespace Quadbit {
         };
         eastl::sort(vertexInput.begin(), vertexInput.end(), compare);
 
-        eastl::vector<VkVertexInputAttributeDescription> attributeDescriptions;
         auto offset = 0;
         for (int i = 0; i < vertexInput.size(); i++) {
             // Override the VkFormat in case necessary
@@ -72,21 +83,21 @@ namespace Quadbit {
                 auto format = eastl::get<VkFormat>(vertexAttributeOverride[i]);
                 auto size = eastl::get<uint32_t>(vertexAttributeOverride[i]);
                 auto attribute = VkUtils::Init::VertexInputAttributeDescription(0, vertexInput[i].location, format, offset);
-                attributeDescriptions.push_back(attribute);
+                persistentPipelineInfo_.attributeDescriptions.push_back(attribute);
                 offset += size;
                 continue;
             }
             auto attribute = 
                 VkUtils::Init::VertexInputAttributeDescription(0, vertexInput[i].location, VkUtils::GetVertexFormatFromSize(vertexInput[i].size), offset);
-            attributeDescriptions.push_back(attribute);
+            persistentPipelineInfo_.attributeDescriptions.push_back(attribute);
             offset += vertexInput[i].size;
         }
-        VkVertexInputBindingDescription inputBindingDescription = VkUtils::Init::VertexInputBindingDescription(0, offset, VK_VERTEX_INPUT_RATE_VERTEX);
+        persistentPipelineInfo_.inputBindingDescription = VkUtils::Init::VertexInputBindingDescription(0, offset, VK_VERTEX_INPUT_RATE_VERTEX);
 
-        VkPipelineVertexInputStateCreateInfo vertexInputInfo =
-            VkUtils::Init::PipelineVertexInputStateCreateInfo(attributeDescriptions, inputBindingDescription);
+        persistentPipelineInfo_.vertexInputInfo =
+            VkUtils::Init::PipelineVertexInputStateCreateInfo(persistentPipelineInfo_.attributeDescriptions, persistentPipelineInfo_.inputBindingDescription);
 
-        VkPipelineInputAssemblyStateCreateInfo inputAssemblyInfo =
+        persistentPipelineInfo_.inputAssemblyInfo =
             VkUtils::Init::PipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 
         VkViewport viewport{};
@@ -97,20 +108,19 @@ namespace Quadbit {
         viewport.maxDepth = 1.0f;
         scissor.extent = context_.swapchain.extent;
 
-        VkPipelineViewportStateCreateInfo viewportInfo = VkUtils::Init::PipelineViewportStateCreateInfo();
-        viewportInfo.viewportCount = 1;
-        viewportInfo.pViewports = &viewport;
-        viewportInfo.scissorCount = 1;
-        viewportInfo.pScissors = &scissor;
+        persistentPipelineInfo_.viewportInfo = VkUtils::Init::PipelineViewportStateCreateInfo();
+        persistentPipelineInfo_.viewportInfo.viewportCount = 1;
+        persistentPipelineInfo_.viewportInfo.pViewports = &viewport;
+        persistentPipelineInfo_.viewportInfo.scissorCount = 1;
+        persistentPipelineInfo_.viewportInfo.pScissors = &scissor;
 
-        VkPipelineMultisampleStateCreateInfo multisampleInfo =
-            VkUtils::Init::PipelineMultisampleStateCreateInfo();
-        multisampleInfo.minSampleShading = 1.0f;
-        multisampleInfo.rasterizationSamples = pipelineDescription.enableMSAA ? context_.multisamplingResources.msaaSamples : VK_SAMPLE_COUNT_1_BIT;
+        persistentPipelineInfo_.multisampleInfo = VkUtils::Init::PipelineMultisampleStateCreateInfo();
+        persistentPipelineInfo_.multisampleInfo.minSampleShading = 1.0f;
+        persistentPipelineInfo_.multisampleInfo.rasterizationSamples = pipelineDescription.enableMSAA ? context_.multisamplingResources.msaaSamples : VK_SAMPLE_COUNT_1_BIT;
 
-        auto colorBlendingInfo = Presets::GetColorBlending(pipelineDescription.colorBlending);
-        VkPipelineColorBlendStateCreateInfo colorBlendInfo = 
-            VkUtils::Init::PipelineColorBlendStateCreateInfo(1, &colorBlendingInfo);
+        persistentPipelineInfo_.colorBlendingAttachment = Presets::GetColorBlending(pipelineDescription.colorBlending);
+        persistentPipelineInfo_.colorBlendInfo =
+            VkUtils::Init::PipelineColorBlendStateCreateInfo(1, &persistentPipelineInfo_.colorBlendingAttachment);
 
         VkPipelineLayoutCreateInfo pipelineLayoutInfo = VkUtils::Init::PipelineLayoutCreateInfo();
         pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(descriptorSetLayouts_.size());
@@ -136,57 +146,63 @@ namespace Quadbit {
         pipelineLayoutInfo.pPushConstantRanges = (!pushConstantRanges.empty()) ? pushConstantRanges.data() : nullptr;
         VK_CHECK(vkCreatePipelineLayout(context_.device, &pipelineLayoutInfo, nullptr, &pipelineLayout_));
 
-        auto rasterizationInfo = Presets::GetRasterization(pipelineDescription.rasterization);
-        auto depthInfo = Presets::GetDepth(pipelineDescription.depth);
-        auto dynamicStateInfo = Presets::GetDynamicState(pipelineDescription.dynamicState);;
+        persistentPipelineInfo_.rasterizationInfo = Presets::GetRasterization(pipelineDescription.rasterization);
+        persistentPipelineInfo_.depthStencilInfo = Presets::GetDepth(pipelineDescription.depth);
+        persistentPipelineInfo_.dynamicStateInfo = Presets::GetDynamicState(pipelineDescription.dynamicState);;
 
         VkGraphicsPipelineCreateInfo pipelineInfo = VkUtils::Init::GraphicsPipelineCreateInfo();
         pipelineInfo.stageCount = 2;
         pipelineInfo.pStages = shaderInstance.stages.data();
-        pipelineInfo.pVertexInputState = &vertexInputInfo;
-        pipelineInfo.pInputAssemblyState = &inputAssemblyInfo;
-        pipelineInfo.pViewportState = &viewportInfo;
-        pipelineInfo.pRasterizationState = &rasterizationInfo;
-        pipelineInfo.pMultisampleState = &multisampleInfo;
-        pipelineInfo.pDepthStencilState = &depthInfo;
-        pipelineInfo.pColorBlendState = &colorBlendInfo;
-        pipelineInfo.pDynamicState = &dynamicStateInfo;
+        pipelineInfo.pVertexInputState = &persistentPipelineInfo_.vertexInputInfo;
+        pipelineInfo.pInputAssemblyState = &persistentPipelineInfo_.inputAssemblyInfo;
+        pipelineInfo.pViewportState = &persistentPipelineInfo_.viewportInfo;
+        pipelineInfo.pRasterizationState = &persistentPipelineInfo_.rasterizationInfo;
+        pipelineInfo.pMultisampleState = &persistentPipelineInfo_.multisampleInfo;
+        pipelineInfo.pDepthStencilState = &persistentPipelineInfo_.depthStencilInfo;
+        pipelineInfo.pColorBlendState = &persistentPipelineInfo_.colorBlendInfo;
+        pipelineInfo.pDynamicState = &persistentPipelineInfo_.dynamicStateInfo;
         pipelineInfo.layout = pipelineLayout_;
         pipelineInfo.renderPass = context_.mainRenderPass;
 
         VK_CHECK(vkCreateGraphicsPipelines(context_.device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline_));
 	}
 
-    QbVkPipeline::QbVkPipeline(QbVkContext& context, const uint32_t* computeBytecode, uint32_t computeSize, 
-        const char* kernel, const void* specConstants, const uint32_t maxInstances) : context_(context) {
-
+    QbVkPipeline::QbVkPipeline(QbVkContext& context, const char* computePath, const char* computeEntry,
+        const void* specConstants, const uint32_t maxInstances) : context_(context) {
         compute_ = true;
+
+        computeResources_ = eastl::make_unique<ComputeResources>();
+        computeResources_->computePath = computePath;
+        computeResources_->computeEntry = computeEntry;
 
         // Fence for compute sync
         VkFenceCreateInfo fenceCreateInfo = VkUtils::Init::FenceCreateInfo();
-        VK_CHECK(vkCreateFence(context_.device, &fenceCreateInfo, nullptr, &computeFence_));
+        VK_CHECK(vkCreateFence(context_.device, &fenceCreateInfo, nullptr, &computeResources_->computeFence));
 
         // Create command pool
         VkCommandPoolCreateInfo cmdPoolCreateInfo = VkUtils::Init::CommandPoolCreateInfo();
         cmdPoolCreateInfo.queueFamilyIndex = context_.gpu->computeFamilyIdx;
         cmdPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-        VK_CHECK(vkCreateCommandPool(context_.device, &cmdPoolCreateInfo, nullptr, &commandPool_));
+        VK_CHECK(vkCreateCommandPool(context_.device, &cmdPoolCreateInfo, nullptr, &computeResources_->commandPool));
 
         // Create command buffer
-        VkCommandBufferAllocateInfo cmdBufferAllocateInfo = VkUtils::Init::CommandBufferAllocateInfo(commandPool_, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
-        VK_CHECK(vkAllocateCommandBuffers(context_.device, &cmdBufferAllocateInfo, &commandBuffer_));
+        VkCommandBufferAllocateInfo cmdBufferAllocateInfo = VkUtils::Init::CommandBufferAllocateInfo(computeResources_->commandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
+        VK_CHECK(vkAllocateCommandBuffers(context_.device, &cmdBufferAllocateInfo, &computeResources_->commandBuffer));
 
         // Create query pool for timestamp statistics
         VkQueryPoolCreateInfo queryPoolCreateInfo{};
         queryPoolCreateInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
         queryPoolCreateInfo.queryType = VK_QUERY_TYPE_TIMESTAMP;
         queryPoolCreateInfo.queryCount = 128;
-        VK_CHECK(vkCreateQueryPool(context_.device, &queryPoolCreateInfo, nullptr, &queryPool_));
+        VK_CHECK(vkCreateQueryPool(context_.device, &queryPoolCreateInfo, nullptr, &computeResources_->queryPool));
 
+
+        auto bytecode = context_.shaderCompiler->CompileShader(computePath, QbVkShaderType::QBVK_SHADER_TYPE_COMPUTE);
+        QB_ASSERT(!bytecode.empty() && "Can't continue pipeline creation, shader compilation failed!");
         QbVkShaderInstance shaderInstance(context_);
-        shaderInstance.AddShader(computeBytecode, computeSize, kernel, VK_SHADER_STAGE_COMPUTE_BIT);
+        shaderInstance.AddShader(bytecode.data(), bytecode.size(), computeEntry, VK_SHADER_STAGE_COMPUTE_BIT);
 
-        spirv_cross::Compiler compiler(computeBytecode, computeSize);
+        spirv_cross::Compiler compiler(bytecode.data(), bytecode.size());
         const auto resources = compiler.get_shader_resources();
 
         // Build the descriptor set layout
@@ -224,8 +240,6 @@ namespace Quadbit {
 
         // Check for specialization constants
         // Only supports 4-byte specialization constants
-        VkSpecializationInfo specInfo{};
-        eastl::vector<VkSpecializationMapEntry> specializationConstants;
         if (specConstants != nullptr) {
             auto constants = compiler.get_specialization_constants();
             for (const auto& sc : constants) {
@@ -239,15 +253,21 @@ namespace Quadbit {
                 entry.constantID = sc.constant_id;
                 entry.offset = sizeof(uint32_t) * sc.constant_id;
                 entry.size = sizeof(uint32_t);
-                specializationConstants.push_back(entry);
+                persistentPipelineInfo_.specializationConstants.push_back(entry);
             }
 
-            specInfo.dataSize = specializationConstants.size() * sizeof(uint32_t);
-            specInfo.mapEntryCount = static_cast<uint32_t>(specializationConstants.size());
-            specInfo.pData = specConstants;
-            specInfo.pMapEntries = specializationConstants.data();
+            // We copy the specialization constant data to a local buffer to be
+            // reused when rebuilding the pipeline
+            auto byteSize = persistentPipelineInfo_.specializationConstants.size() * sizeof(uint32_t);
+            persistentPipelineInfo_.specConstantsRawData.resize(byteSize);
+            memcpy(persistentPipelineInfo_.specConstantsRawData.data(), specConstants, byteSize);
 
-            shaderInstance.stages[0].pSpecializationInfo = &specInfo;
+            persistentPipelineInfo_.specInfo.dataSize = byteSize;
+            persistentPipelineInfo_.specInfo.mapEntryCount = static_cast<uint32_t>(persistentPipelineInfo_.specializationConstants.size());
+            persistentPipelineInfo_.specInfo.pData = persistentPipelineInfo_.specConstantsRawData.data();
+            persistentPipelineInfo_.specInfo.pMapEntries = persistentPipelineInfo_.specializationConstants.data();
+
+            shaderInstance.stages[0].pSpecializationInfo = &persistentPipelineInfo_.specInfo;
         }
 
         VkPipelineLayoutCreateInfo pipelineLayoutInfo = VkUtils::Init::PipelineLayoutCreateInfo();
@@ -274,10 +294,59 @@ namespace Quadbit {
         }
 
         if (compute_) {
-            vkFreeCommandBuffers(context_.device, commandPool_, 1, &commandBuffer_);
-            vkDestroyCommandPool(context_.device, commandPool_, nullptr);
-            vkDestroyFence(context_.device, computeFence_, nullptr);
-            vkDestroyQueryPool(context_.device, queryPool_, nullptr);
+            vkFreeCommandBuffers(context_.device, computeResources_->commandPool, 1, &computeResources_->commandBuffer);
+            vkDestroyCommandPool(context_.device, computeResources_->commandPool, nullptr);
+            vkDestroyFence(context_.device, computeResources_->computeFence, nullptr);
+            vkDestroyQueryPool(context_.device, computeResources_->queryPool, nullptr);
+        }
+    }
+
+    void QbVkPipeline::Rebuild() {
+        if (!compute_) {
+            auto vertexBytecode = context_.shaderCompiler->CompileShader(graphicsResources_->vertexPath.c_str(), 
+                QbVkShaderType::QBVK_SHADER_TYPE_VERTEX);
+            auto fragmentBytecode = context_.shaderCompiler->CompileShader(graphicsResources_->fragmentPath.c_str(), 
+                QbVkShaderType::QBVK_SHADER_TYPE_FRAGMENT);
+            if (vertexBytecode.empty() || fragmentBytecode.empty()) {
+                return;
+            }
+
+            QbVkShaderInstance shaderInstance(context_);
+            shaderInstance.AddShader(vertexBytecode.data(), vertexBytecode.size(), graphicsResources_->vertexEntry.c_str(), VK_SHADER_STAGE_VERTEX_BIT);
+            shaderInstance.AddShader(fragmentBytecode.data(), fragmentBytecode.size(), graphicsResources_->fragmentEntry.c_str(), VK_SHADER_STAGE_FRAGMENT_BIT);
+
+            VkGraphicsPipelineCreateInfo pipelineInfo = VkUtils::Init::GraphicsPipelineCreateInfo();
+            pipelineInfo.stageCount = 2;
+            pipelineInfo.pStages = shaderInstance.stages.data();
+            pipelineInfo.pVertexInputState = &persistentPipelineInfo_.vertexInputInfo;
+            pipelineInfo.pInputAssemblyState = &persistentPipelineInfo_.inputAssemblyInfo;
+            pipelineInfo.pViewportState = &persistentPipelineInfo_.viewportInfo;
+            pipelineInfo.pRasterizationState = &persistentPipelineInfo_.rasterizationInfo;
+            pipelineInfo.pMultisampleState = &persistentPipelineInfo_.multisampleInfo;
+            pipelineInfo.pDepthStencilState = &persistentPipelineInfo_.depthStencilInfo;
+            pipelineInfo.pColorBlendState = &persistentPipelineInfo_.colorBlendInfo;
+            pipelineInfo.pDynamicState = &persistentPipelineInfo_.dynamicStateInfo;
+            pipelineInfo.layout = pipelineLayout_;
+            pipelineInfo.renderPass = context_.mainRenderPass;
+
+            vkDestroyPipeline(context_.device, pipeline_, nullptr);
+            VK_CHECK(vkCreateGraphicsPipelines(context_.device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline_));
+        }
+        else {
+            auto bytecode = context_.shaderCompiler->CompileShader(computeResources_->computePath.c_str(), QbVkShaderType::QBVK_SHADER_TYPE_COMPUTE);
+            if (bytecode.empty()) {
+                return;
+            }
+            QbVkShaderInstance shaderInstance(context_);
+            shaderInstance.AddShader(bytecode.data(), bytecode.size(), computeResources_->computeEntry.c_str(), VK_SHADER_STAGE_COMPUTE_BIT);
+
+            VkComputePipelineCreateInfo computePipelineCreateInfo = VkUtils::Init::ComputePipelineCreateInfo();
+            computePipelineCreateInfo.layout = pipelineLayout_;
+            shaderInstance.stages[0].pSpecializationInfo = &persistentPipelineInfo_.specInfo;
+            computePipelineCreateInfo.stage = shaderInstance.stages[0];
+
+            vkDestroyPipeline(context_.device, pipeline_, nullptr);
+            VK_CHECK(vkCreateComputePipelines(context_.device, nullptr, 1, &computePipelineCreateInfo, nullptr, &pipeline_));
         }
     }
 
@@ -318,41 +387,43 @@ namespace Quadbit {
         QB_ASSERT(compute_);
 
         VkCommandBufferBeginInfo cmdBufInfo = VkUtils::Init::CommandBufferBeginInfo();
-        VK_CHECK(vkBeginCommandBuffer(commandBuffer_, &cmdBufInfo));
-        vkCmdResetQueryPool(commandBuffer_, queryPool_, 0, 128);
-        vkCmdWriteTimestamp(commandBuffer_, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, queryPool_, 0);
+        VK_CHECK(vkBeginCommandBuffer(computeResources_->commandBuffer, &cmdBufInfo));
+        vkCmdResetQueryPool(computeResources_->commandBuffer, computeResources_->queryPool, 0, 128);
+        vkCmdWriteTimestamp(computeResources_->commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, computeResources_->queryPool, 0);
 
-        Bind(commandBuffer_);
-        BindDescriptorSets(commandBuffer_, 0, descriptorsHandle);
+        Bind(computeResources_->commandBuffer);
+        BindDescriptorSets(computeResources_->commandBuffer, 0, descriptorsHandle);
         if (pushConstantSize > 0 && pushConstants != nullptr) {
-            vkCmdPushConstants(commandBuffer_, pipelineLayout_, VK_SHADER_STAGE_COMPUTE_BIT, 0, pushConstantSize, pushConstants);
+            vkCmdPushConstants(computeResources_->commandBuffer, pipelineLayout_, VK_SHADER_STAGE_COMPUTE_BIT, 0, pushConstantSize, pushConstants);
         }
 
-        vkCmdDispatch(commandBuffer_, xGroups, yGroups, zGroups);
+        vkCmdDispatch(computeResources_->commandBuffer, xGroups, yGroups, zGroups);
 
         if (descriptorsHandle != QBVK_DESCRIPTOR_SETS_NULL_HANDLE || mainDescriptors_ != QBVK_DESCRIPTOR_SETS_NULL_HANDLE) {
-            vkCmdPipelineBarrier(commandBuffer_, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 1, &memoryBarrier, 0, nullptr, 0, nullptr);
+            vkCmdPipelineBarrier(computeResources_->commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 1, &memoryBarrier, 0, nullptr, 0, nullptr);
         }
 
-        vkCmdWriteTimestamp(commandBuffer_, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, queryPool_, 1);
-        VK_CHECK(vkEndCommandBuffer(commandBuffer_));
+        vkCmdWriteTimestamp(computeResources_->commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, computeResources_->queryPool, 1);
+        VK_CHECK(vkEndCommandBuffer(computeResources_->commandBuffer));
 
         VkSubmitInfo computeSubmitInfo = VkSubmitInfo{};
         computeSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
         computeSubmitInfo.commandBufferCount = 1;
-        computeSubmitInfo.pCommandBuffers = &commandBuffer_;
+        computeSubmitInfo.pCommandBuffers = &computeResources_->commandBuffer;
 
-        VK_CHECK(vkQueueSubmit(context_.computeQueue, 1, &computeSubmitInfo, computeFence_));
+        VK_CHECK(vkQueueSubmit(context_.computeQueue, 1, &computeSubmitInfo, computeResources_->computeFence));
 
-        VK_CHECK(vkWaitForFences(context_.device, 1, &computeFence_, VK_TRUE, eastl::numeric_limits<uint64_t>().max()));
-        VK_CHECK(vkResetFences(context_.device, 1, &computeFence_));
+        VK_CHECK(vkWaitForFences(context_.device, 1, &computeResources_->computeFence, VK_TRUE, eastl::numeric_limits<uint64_t>().max()));
+        VK_CHECK(vkResetFences(context_.device, 1, &computeResources_->computeFence));
 
         uint64_t timestamps[2]{};
-        VK_CHECK(vkGetQueryPoolResults(context_.device, queryPool_, 0, 2, sizeof(timestamps), timestamps, sizeof(uint64_t), VK_QUERY_RESULT_64_BIT));
+        VK_CHECK(vkGetQueryPoolResults(context_.device, computeResources_->queryPool, 0, 2, sizeof(timestamps), timestamps, sizeof(uint64_t), VK_QUERY_RESULT_64_BIT));
 
         double computeStart = double(timestamps[0]) * context_.gpu->deviceProps.limits.timestampPeriod * 1e-6;
         double computeEnd = double(timestamps[1]) * context_.gpu->deviceProps.limits.timestampPeriod * 1e-6;
-        msAvgTime_ = msAvgTime_ * 0.95 + (computeEnd - computeStart) * 0.05;
+        computeResources_->msAvgTime = computeResources_->msAvgTime * 0.95 + (computeEnd - computeStart) * 0.05;
+        context_.computeAvgTimes[computeResources_->computePath] = computeResources_->msAvgTime;
     }
 
     // DispatchX is meant to solve a performance issue where multiple passes are necessary,
@@ -366,44 +437,46 @@ namespace Quadbit {
         QB_ASSERT(compute_);
 
         VkCommandBufferBeginInfo cmdBufInfo = VkUtils::Init::CommandBufferBeginInfo();
-        VK_CHECK(vkBeginCommandBuffer(commandBuffer_, &cmdBufInfo));
-        vkCmdResetQueryPool(commandBuffer_, queryPool_, 0, 128);
-        vkCmdWriteTimestamp(commandBuffer_, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, queryPool_, 0);
+        VK_CHECK(vkBeginCommandBuffer(computeResources_->commandBuffer, &cmdBufInfo));
+        vkCmdResetQueryPool(computeResources_->commandBuffer, computeResources_->queryPool, 0, 128);
+        vkCmdWriteTimestamp(computeResources_->commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, computeResources_->queryPool, 0);
 
-        Bind(commandBuffer_);
-        BindDescriptorSets(commandBuffer_, 0, descriptorsHandle);
+        Bind(computeResources_->commandBuffer);
+        BindDescriptorSets(computeResources_->commandBuffer, 0, descriptorsHandle);
 
         for (uint32_t i = 0; i < X; i++) {
             if (pushConstantSize > 0 && !pushConstantArray.empty()) {
                 QB_ASSERT(pushConstantArray.size() == X);
-                vkCmdPushConstants(commandBuffer_, pipelineLayout_, VK_SHADER_STAGE_COMPUTE_BIT, 0, pushConstantSize, pushConstantArray[i]);
+                vkCmdPushConstants(computeResources_->commandBuffer, pipelineLayout_, VK_SHADER_STAGE_COMPUTE_BIT, 0, pushConstantSize, pushConstantArray[i]);
             }
-            vkCmdDispatch(commandBuffer_, xGroups, yGroups, zGroups);
+            vkCmdDispatch(computeResources_->commandBuffer, xGroups, yGroups, zGroups);
         }
 
         if (descriptorsHandle != QBVK_DESCRIPTOR_SETS_NULL_HANDLE || mainDescriptors_ != QBVK_DESCRIPTOR_SETS_NULL_HANDLE) {
-            vkCmdPipelineBarrier(commandBuffer_, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 1, &memoryBarrier, 0, nullptr, 0, nullptr);
+            vkCmdPipelineBarrier(computeResources_->commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 1, &memoryBarrier, 0, nullptr, 0, nullptr);
         }
 
-        vkCmdWriteTimestamp(commandBuffer_, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, queryPool_, 1);
-        VK_CHECK(vkEndCommandBuffer(commandBuffer_));
+        vkCmdWriteTimestamp(computeResources_->commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, computeResources_->queryPool, 1);
+        VK_CHECK(vkEndCommandBuffer(computeResources_->commandBuffer));
 
         VkSubmitInfo computeSubmitInfo = VkSubmitInfo{};
         computeSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
         computeSubmitInfo.commandBufferCount = 1;
-        computeSubmitInfo.pCommandBuffers = &commandBuffer_;
+        computeSubmitInfo.pCommandBuffers = &computeResources_->commandBuffer;
 
-        VK_CHECK(vkQueueSubmit(context_.computeQueue, 1, &computeSubmitInfo, computeFence_));
+        VK_CHECK(vkQueueSubmit(context_.computeQueue, 1, &computeSubmitInfo, computeResources_->computeFence));
 
-        VK_CHECK(vkWaitForFences(context_.device, 1, &computeFence_, VK_TRUE, eastl::numeric_limits<uint64_t>().max()));
-        VK_CHECK(vkResetFences(context_.device, 1, &computeFence_));
+        VK_CHECK(vkWaitForFences(context_.device, 1, &computeResources_->computeFence, VK_TRUE, eastl::numeric_limits<uint64_t>().max()));
+        VK_CHECK(vkResetFences(context_.device, 1, &computeResources_->computeFence));
 
         uint64_t timestamps[2]{};
-        VK_CHECK(vkGetQueryPoolResults(context_.device, queryPool_, 0, 2, sizeof(timestamps), timestamps, sizeof(uint64_t), VK_QUERY_RESULT_64_BIT));
+        VK_CHECK(vkGetQueryPoolResults(context_.device, computeResources_->queryPool, 0, 2, sizeof(timestamps), timestamps, sizeof(uint64_t), VK_QUERY_RESULT_64_BIT));
 
         double computeStart = double(timestamps[0]) * context_.gpu->deviceProps.limits.timestampPeriod * 1e-6;
         double computeEnd = double(timestamps[1]) * context_.gpu->deviceProps.limits.timestampPeriod * 1e-6;
-        msAvgTime_ = msAvgTime_ * 0.95 + (computeEnd - computeStart) * 0.05;
+        computeResources_->msAvgTime = computeResources_->msAvgTime * 0.95 + (computeEnd - computeStart) * 0.05;
+        context_.computeAvgTimes[computeResources_->computePath] = computeResources_->msAvgTime;
     }
 
     void QbVkPipeline::BindResource(const QbVkDescriptorSetsHandle descriptorSetsHandle, const eastl::string name, const QbVkBufferHandle bufferHandle) {
@@ -542,7 +615,7 @@ namespace Quadbit {
         }
     }
 
-    void QbVkPipeline::ParseShader(const spirv_cross::Compiler& compiler, const spirv_cross::ShaderResources& resources, 
+    void QbVkPipeline::ParseShader(const spirv_cross::Compiler& compiler, const spirv_cross::ShaderResources& resources,
         eastl::vector<eastl::vector<VkDescriptorSetLayoutBinding>>& setLayoutBindings,
         eastl::vector<VkDescriptorPoolSize>& poolSizes, VkShaderStageFlags shaderStage) {
 

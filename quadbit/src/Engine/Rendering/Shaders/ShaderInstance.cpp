@@ -9,8 +9,8 @@ namespace Quadbit {
 		}
 	}
 
-	void QbVkShaderInstance::AddShader(const uint32_t* shaderBytecode, const uint32_t shaderSize, const char* shaderEntry, VkShaderStageFlagBits shaderStage) {
-		VkShaderModule shaderModule = VkUtils::CreateShaderModule(shaderBytecode, shaderSize, context_.device);
+	void QbVkShaderInstance::AddShader(const uint32_t* shaderBytecode, const size_t shaderSize, const char* shaderEntry, VkShaderStageFlagBits shaderStage) {
+		VkShaderModule shaderModule = VkUtils::CreateShaderModule(shaderBytecode, static_cast<uint32_t>(shaderSize), context_.device);
 
 		VkPipelineShaderStageCreateInfo shader = VkUtils::Init::PipelineShaderStageCreateInfo();
 		shader.stage = shaderStage;

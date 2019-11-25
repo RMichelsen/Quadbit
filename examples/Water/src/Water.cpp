@@ -40,7 +40,7 @@ void Water::Init() {
 	pipelineDescription.dynamicState = Quadbit::QbVkPipelineDynamicState::QBVK_DYNAMICSTATE_VIEWPORTSCISSOR;
 	pipelineDescription.enableMSAA = true;
 	pipelineDescription.rasterization = Quadbit::QbVkPipelineRasterization::QBVK_PIPELINE_RASTERIZATION_DEFAULT;
-	pipeline_ = graphics_->CreatePipeline("Resources/Shaders/Compiled/water_vert.spv", "Resources/Shaders/Compiled/water_frag.spv", pipelineDescription);
+	pipeline_ = graphics_->CreatePipeline("Resources/Shaders/water_vert.glsl", "main", "Resources/Shaders/water_frag.glsl", "main", pipelineDescription);
 	graphics_->BindResource(pipeline_, "normal_map", displacementResources_.normalMap);
 	graphics_->BindResource(pipeline_, "displacement_map", displacementResources_.displacementMap);
 	graphics_->BindResource(pipeline_, "UBO", togglesUBO_.handle);
@@ -132,7 +132,7 @@ void Water::InitPrecalcComputeInstance() {
 	precalcResources_.h0TildeConj = graphics_->CreateStorageTexture(WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT);
 
 
-	precalcPipeline_ = compute_->CreatePipeline("Resources/Shaders/Compiled/precalc_comp.spv", "main");
+	precalcPipeline_ = compute_->CreatePipeline("Resources/Shaders/precalc_comp.glsl", "main");
 	compute_->BindResource(precalcPipeline_, "UBO", precalcResources_.ubo.handle);
 	compute_->BindResource(precalcPipeline_, "h0tilde", precalcResources_.h0Tilde);
 	compute_->BindResource(precalcPipeline_, "h0tilde_conj", precalcResources_.h0TildeConj);
@@ -154,7 +154,7 @@ void Water::InitWaveheightComputeInstance() {
 	waveheightResources_.h0TildeSlopeX = graphics_->CreateStorageTexture(WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT);
 	waveheightResources_.h0TildeSlopeZ = graphics_->CreateStorageTexture(WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT);
 
-	waveheightPipeline_ = compute_->CreatePipeline("Resources/Shaders/Compiled/waveheight_comp.spv", "main");
+	waveheightPipeline_ = compute_->CreatePipeline("Resources/Shaders/waveheight_comp.glsl", "main");
 	compute_->BindResource(waveheightPipeline_, "UBO", waveheightResources_.ubo.handle);
 	compute_->BindResource(waveheightPipeline_, "h0tilde", precalcResources_.h0Tilde);
 	compute_->BindResource(waveheightPipeline_, "h0tilde_conj", precalcResources_.h0TildeConj);
@@ -205,8 +205,8 @@ void Water::InitInverseFFTComputeInstances() {
 		verticalIFFTResources_.dSlopeZ
 	};
 
-	horizontalIFFTPipeline_ = compute_->CreatePipeline("Resources/Shaders/Compiled/ifft_comp.spv", "main", horizontalIFFTResources_.specData.data());
-	verticalIFFTPipeline_ = compute_->CreatePipeline("Resources/Shaders/Compiled/ifft_comp.spv", "main", verticalIFFTResources_.specData.data());
+	horizontalIFFTPipeline_ = compute_->CreatePipeline("Resources/Shaders/ifft_comp.glsl", "main", horizontalIFFTResources_.specData.data());
+	verticalIFFTPipeline_ = compute_->CreatePipeline("Resources/Shaders/ifft_comp.glsl", "main", verticalIFFTResources_.specData.data());
 
 	compute_->BindResourceArray(horizontalIFFTPipeline_, "input_images", waveheightImageArray);
 	compute_->BindResourceArray(horizontalIFFTPipeline_, "output_images", horizontalImageArray);
@@ -220,7 +220,7 @@ void Water::InitDisplacementInstance() {
 	auto samplerInfo = graphics_->CreateImageSamplerInfo(VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_TRUE, 16.0f, VK_COMPARE_OP_ALWAYS, VK_SAMPLER_MIPMAP_MODE_LINEAR);
 	displacementResources_.normalMap = graphics_->CreateStorageTexture(WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT, &samplerInfo);
 
-	displacementPipeline_ = compute_->CreatePipeline("Resources/Shaders/Compiled/displacement_comp.spv", "main");
+	displacementPipeline_ = compute_->CreatePipeline("Resources/Shaders/displacement_comp.glsl", "main");
 	compute_->BindResource(displacementPipeline_, "Dx", verticalIFFTResources_.dX);
 	compute_->BindResource(displacementPipeline_, "Dy", verticalIFFTResources_.dY);
 	compute_->BindResource(displacementPipeline_, "Dz", verticalIFFTResources_.dZ);
