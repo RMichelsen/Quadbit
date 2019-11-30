@@ -16,10 +16,10 @@ Quadbit is a Vulkan game engine written in C++
 
 # Examples
 ## Runtime water generation using inverse Fourier transforms in compute shaders
-![](examples/media/Water.gif)
+![](Examples/Media/Water.gif)
 
 ## Voxel generation with ambient occlusion and PhysX
-![](examples/media/Voxels_AO.png)
+![](Examples/Media/Voxels_AO.png)
 
 # Libraries and Dependencies
 - [Vulkan](https://www.khronos.org/vulkan/)
