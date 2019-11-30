@@ -1,10 +1,18 @@
 #pragma once
+#include <EASTL/unique_ptr.h>
+#include <EASTL/vector.h>
+
 #include <Windows.h>
+#include <FastNoiseSIMD/FastNoiseSIMD.h>
 
-#include "Extern/FastNoiseSIMD/FastNoiseSIMD.h"
-
-#include "Engine/Rendering/QbVkRenderer.h"
+#include "Engine/Core/Entry.h"
+#include "Engine/Core/Game.h"
 #include "Engine/Entities/EntityManager.h"
+#include "Engine/Rendering/Renderer.h"
+
+constexpr char* NOISE_TYPES[] = { "Value", "ValueFractal", "Perlin", "PerlinFractal", "Simplex", "SimplexFractal", "WhiteNoise", "Cellular", "Cubic", "CubicFractal" };
+constexpr char* FRACTAL_TYPES[] = { "FBM", "Billow", "RigidMulti" };
+constexpr char* PERTURB_TYPES[] = { "None", "Gradient", "Gradient Fractal", "Normalize", "Gradient + Normalize", "Gradient Fractal + Normalize" };
 
 struct FastNoiseSettings {
 	int seed = 4646;
@@ -18,34 +26,35 @@ struct FastNoiseSettings {
 	int timer = 0;
 };
 
-class Infinitum {
+class Infinitum : public Quadbit::Game {
 public:
-	Infinitum(HINSTANCE hInstance, HWND hwnd) {
-		renderer_ = std::make_unique<Quadbit::QbVkRenderer>(hInstance, hwnd);
-	}
-	~Infinitum() {
+	virtual ~Infinitum() override {
 		delete fastnoiseTerrain_;
 		delete fastnoiseRegions_;
 		delete fastnoiseColours_;
 	}
 
-	inline static FastNoiseSettings terrainSettings_;
-	inline static FastNoiseSettings colourSettings_;
+	FastNoiseSettings terrainSettings_;
+	FastNoiseSettings colourSettings_;
 
-	void Test();
-	void Init();
-	void Simulate(float deltaTime);
+	void Init() override;
+	void Simulate(float deltaTime) override;
 	void DrawFrame();
 
 private:
-	std::unique_ptr<Quadbit::QbVkRenderer> renderer_;
-	std::shared_ptr<Quadbit::QbVkRenderMeshInstance> renderMeshInstance_;
+	Quadbit::QbVkPipelineHandle pipeline_;
 	FastNoiseSIMD* fastnoiseTerrain_;
 	FastNoiseSIMD* fastnoiseRegions_;
 	FastNoiseSIMD* fastnoiseColours_;
 
-	std::vector<Quadbit::Entity> chunks_;
+	eastl::vector<Quadbit::Entity> chunks_;
 
 	Quadbit::Entity camera_;
 	Quadbit::Entity player_;
+
+	void DrawImGui();
 };
+
+eastl::unique_ptr<Quadbit::Game> Quadbit::CreateGame() {
+	return eastl::make_unique<Infinitum>();
+}

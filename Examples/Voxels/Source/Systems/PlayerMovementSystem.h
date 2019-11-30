@@ -4,10 +4,8 @@
 #include <glm/glm.hpp>
 #include <glm/vec3.hpp>
 
-#include "Engine/Core/InputHandler.h"
 #include "Engine/Entities/EntityManager.h"
-#include "Engine/Entities/ComponentSystem.h"
-#include "Engine/Rendering/QbVkRenderer.h"
+#include "Engine/Rendering/Renderer.h"
 
 #include "../Data/Components.h"
 

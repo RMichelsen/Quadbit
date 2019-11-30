@@ -1,8 +1,14 @@
 #pragma once
 
+#include <Windows.h>
 #include <glm/gtx/compatibility.hpp>
+#include <EASTL/array.h>
+#include <EASTL/unique_ptr.h>
+#include <EASTL/vector.h>
 
-#include "Engine/Rendering/QbVkRenderer.h"
+#include "Engine/Core/Entry.h"
+#include "Engine/Core/Game.h"
+#include "Engine/Rendering/Renderer.h"
 #include "Engine/Entities/EntityManager.h"
 
 constexpr int WATER_RESOLUTION = 512;
@@ -31,23 +37,23 @@ struct alignas(16) TogglesUBO {
 };
 
 struct PreCalculatedResources {
-	std::vector<glm::float4> precalcUniformRandoms;
+	eastl::vector<glm::float4> precalcUniformRandoms;
 
-	Quadbit::QbVkBuffer ubo;
-	Quadbit::QbVkBuffer uniformRandomsStorageBuffer;
+	Quadbit::QbVkUniformBuffer<PrecalcUBO> ubo;
+	Quadbit::QbVkBufferHandle uniformRandomsStorageBuffer;
 
-	Quadbit::QbVkTexture h0Tilde;
-	Quadbit::QbVkTexture h0TildeConj;
+	Quadbit::QbVkTextureHandle h0Tilde;
+	Quadbit::QbVkTextureHandle h0TildeConj;
 };
 
 struct WaveheightResources {
-	Quadbit::QbVkBuffer ubo;
+	Quadbit::QbVkUniformBuffer<WaveheightUBO> ubo;
 
-	Quadbit::QbVkTexture h0TildeTx;
-	Quadbit::QbVkTexture h0TildeTy;
-	Quadbit::QbVkTexture h0TildeTz;
-	Quadbit::QbVkTexture h0TildeSlopeX;
-	Quadbit::QbVkTexture h0TildeSlopeZ;
+	Quadbit::QbVkTextureHandle h0TildeTx;
+	Quadbit::QbVkTextureHandle h0TildeTy;
+	Quadbit::QbVkTextureHandle h0TildeTz;
+	Quadbit::QbVkTextureHandle h0TildeSlopeX;
+	Quadbit::QbVkTextureHandle h0TildeSlopeZ;
 };
 
 struct IFFTPushConstants {
@@ -55,63 +61,52 @@ struct IFFTPushConstants {
 };
 
 struct InverseFFTResources {
-	Quadbit::QbVkTexture dX{};
-	Quadbit::QbVkTexture dY{};
-	Quadbit::QbVkTexture dZ{};
-	Quadbit::QbVkTexture dSlopeX{};
-	Quadbit::QbVkTexture dSlopeZ{};
+	Quadbit::QbVkTextureHandle dX{};
+	Quadbit::QbVkTextureHandle dY{};
+	Quadbit::QbVkTextureHandle dZ{};
+	Quadbit::QbVkTextureHandle dSlopeX{};
+	Quadbit::QbVkTextureHandle dSlopeZ{};
 
-	std::array<int, 6> specData;
-
-	IFFTPushConstants pushConstants;
+	eastl::array<int, 6> specData;
 };
 
 struct DisplacementResources {
-	Quadbit::QbVkTexture displacementMap;
-	Quadbit::QbVkTexture normalMap;
+	Quadbit::QbVkTextureHandle displacementMap;
+	Quadbit::QbVkTextureHandle normalMap;
 };
 
-class Water {
+class Water : public Quadbit::Game {
 public:
-	inline static float step_;
-	inline static float repeat_;
-
-	inline static bool useNormalMap_ = true;
-	inline static float colourIntensity_ = 0.0f;
-	inline static glm::float4 topColour_ = glm::float4(0.15f, 0.7f, 0.8f, 0.0f);
-	inline static glm::float4 botColour_ = glm::float4(0.10f, 0.45f, 0.7f, 0.0f);
-
-	Water(HINSTANCE hInstance, HWND hwnd) {
-		renderer_ = std::make_unique<Quadbit::QbVkRenderer>(hInstance, hwnd);
-	}
-
-	void Init();
+	void Init() override;
 	void InitializeCompute();
-	void RecordComputeCommands();
-	void Simulate(float deltaTime);
-	void DrawFrame();
+	void Simulate(float deltaTime) override;
 
 private:
+	float step_ = 1.0f;
+	float repeat_ = 200.0f;
+	bool useNormalMap_ = true;
+	float colourIntensity_ = 0.0f;
+	glm::float4 topColour_ = glm::float4(0.15f, 0.7f, 0.8f, 0.0f);
+	glm::float4 botColour_ = glm::float4(0.10f, 0.45f, 0.7f, 0.0f);
 
+	Quadbit::QbVkPipelineHandle pipeline_;
 	Quadbit::Entity skybox;
 
-	std::unique_ptr<Quadbit::QbVkRenderer> renderer_;
-
-	std::vector<glm::float3> waterVertices_;
-	std::vector<uint32_t> waterIndices_;
+	eastl::vector<glm::float3> waterVertices_;
+	eastl::vector<uint32_t> waterIndices_;
 
 	PreCalculatedResources precalcResources_{};
 	WaveheightResources waveheightResources_{};
 	InverseFFTResources horizontalIFFTResources_{};
 	InverseFFTResources verticalIFFTResources_{};
 	DisplacementResources displacementResources_{};
-	std::shared_ptr<Quadbit::QbVkComputeInstance> precalcInstance_;
-	std::shared_ptr<Quadbit::QbVkComputeInstance> waveheightInstance_;
-	std::shared_ptr<Quadbit::QbVkComputeInstance> horizontalIFFTInstance_;
-	std::shared_ptr<Quadbit::QbVkComputeInstance> verticalIFFTInstance_;
-	std::shared_ptr<Quadbit::QbVkComputeInstance> displacementInstance_;
+	Quadbit::QbVkPipelineHandle precalcPipeline_ = Quadbit::QBVK_PIPELINE_NULL_HANDLE;
+	Quadbit::QbVkPipelineHandle waveheightPipeline_ = Quadbit::QBVK_PIPELINE_NULL_HANDLE;
+	Quadbit::QbVkPipelineHandle horizontalIFFTPipeline_ = Quadbit::QBVK_PIPELINE_NULL_HANDLE;
+	Quadbit::QbVkPipelineHandle verticalIFFTPipeline_ = Quadbit::QBVK_PIPELINE_NULL_HANDLE;
+	Quadbit::QbVkPipelineHandle displacementPipeline_ = Quadbit::QBVK_PIPELINE_NULL_HANDLE;
 
-	Quadbit::QbVkBuffer togglesUBO_;
+	Quadbit::QbVkUniformBuffer<TogglesUBO> togglesUBO_;
 
 	void InitPrecalcComputeInstance();
 	void InitWaveheightComputeInstance();
@@ -119,4 +114,9 @@ private:
 	void InitDisplacementInstance();
 	void UpdateWaveheightUBO(float deltaTime);
 	void UpdateTogglesUBO(float deltaTime);
+	void DrawImGui();
 };
+
+eastl::unique_ptr<Quadbit::Game> Quadbit::CreateGame() {
+	return eastl::make_unique<Water>();
+}

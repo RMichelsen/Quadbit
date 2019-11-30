@@ -1,6 +1,7 @@
 #pragma once
 
-#include <vector>
+#include <EASTL/array.h>
+#include <EASTL/vector.h>
 #include <iostream>
 #include <fstream>
 
@@ -12,7 +13,7 @@
 #include "CommonUtils.h"
 
 namespace MagicaVoxImporter {
-	constexpr std::array<uint32_t, 256> default_palette = {
+	constexpr eastl::array<uint32_t, 256> default_palette = {
 		0x00000000, 0xffffffff, 0xffccffff, 0xff99ffff, 0xff66ffff, 0xff33ffff, 0xff00ffff, 0xffffccff, 0xffccccff, 0xff99ccff, 0xff66ccff, 0xff33ccff, 0xff00ccff, 0xffff99ff, 0xffcc99ff, 0xff9999ff,
 		0xff6699ff, 0xff3399ff, 0xff0099ff, 0xffff66ff, 0xffcc66ff, 0xff9966ff, 0xff6666ff, 0xff3366ff, 0xff0066ff, 0xffff33ff, 0xffcc33ff, 0xff9933ff, 0xff6633ff, 0xff3333ff, 0xff0033ff, 0xffff00ff,
 		0xffcc00ff, 0xff9900ff, 0xff6600ff, 0xff3300ff, 0xff0000ff, 0xffffffcc, 0xffccffcc, 0xff99ffcc, 0xff66ffcc, 0xff33ffcc, 0xff00ffcc, 0xffffcccc, 0xffcccccc, 0xff99cccc, 0xff66cccc, 0xff33cccc,
@@ -32,7 +33,7 @@ namespace MagicaVoxImporter {
 	};
 
 	struct MagicaChunkHeader {
-		std::array<char, 4> identifier;
+		eastl::array<char, 4> identifier;
 		int numBytesChunkContent;
 		int numBytesChildrenChunks;
 	};
@@ -48,9 +49,9 @@ namespace MagicaVoxImporter {
 	};
 
 	struct MagicaVoxelModel {
-		std::vector<Voxel> voxels;
+		eastl::vector<Voxel> voxels;
 		glm::int3 extents;
-		std::array<MagicaVoxelColour, 256> palette;
+		eastl::array<MagicaVoxelColour, 256> palette;
 		bool customPalette;
 	};
 
@@ -81,9 +82,9 @@ namespace MagicaVoxImporter {
 			return {};
 		}
 
-		std::array<char, 4> identifier;
+		eastl::array<char, 4> identifier;
 		model.read(identifier.data(), 4);
-		if(identifier != std::array { 'V', 'O', 'X', ' '}) {
+		if (identifier != eastl::array<char, 4> { {'V', 'O', 'X', ' ' } }) {
 			printf("Wrong identifier, can't load file\n");
 			return {};
 		}
@@ -96,17 +97,17 @@ namespace MagicaVoxImporter {
 		}
 
 		auto header = ReadMagicaChunkHeader(model);
-		if(header.identifier != std::array{ 'M', 'A', 'I', 'N' }) {
+		if (header.identifier != eastl::array<char, 4> { {'M', 'A', 'I', 'N'} }) {
 			printf("Unrecognized chunk ID, can't load file\n");
 			return {};
 		}
 
 		header = ReadMagicaChunkHeader(model);
-		if(header.identifier == std::array{ 'P', 'A', 'C', 'K' }) {
+		if (header.identifier == eastl::array<char, 4> { {'P', 'A', 'C', 'K'} }) {
 			printf("Voxel importer only supports single models, can't load file\n");
 			return {};
 		}
-		else if(header.identifier != std::array{ 'S', 'I', 'Z', 'E' }) {
+		else if(header.identifier != eastl::array<char, 4> { {'S', 'I', 'Z', 'E'} }) {
 			printf("Unrecognized chunk ID, can't load file\n");
 			return {};
 		}
@@ -117,7 +118,7 @@ namespace MagicaVoxImporter {
 		model.read(reinterpret_cast<char*>(&extents.y), 4);
 
 		header = ReadMagicaChunkHeader(model);
-		if(header.identifier != std::array{ 'X', 'Y', 'Z', 'I' }) {
+		if(header.identifier != eastl::array<char, 4> { {'X', 'Y', 'Z', 'I'} }) {
 			printf("Unrecognized chunk ID, can't load file\n");
 			return {};
 		}
@@ -135,7 +136,7 @@ namespace MagicaVoxImporter {
 		model.seekg(static_cast<uint64_t>(numVoxels) * 4, std::ios_base::cur);
 
 		header = ReadMagicaChunkHeader(model);
-		if(header.identifier == std::array{ 'R', 'G', 'B', 'A' }) {
+		if(header.identifier == eastl::array<char, 4> { {'R', 'G', 'B', 'A'} }) {
 			voxelModel.customPalette = true;
 
 			for(auto i = 0; i < 0xFF; i++) {

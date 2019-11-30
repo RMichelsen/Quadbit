@@ -1,25 +1,32 @@
-#include <PCH.h>
 #include "Window.h"
 
+#include <cstdio>
+#include <windowsx.h>
+#include <imgui/imgui.h>
+
+#include "Engine/Application/InputHandler.h"
 #include "Engine/Core/Time.h"
-#include "Engine/Core/InputHandler.h"
+#include "Engine/Core/Logging.h"
 
 namespace Quadbit {
-	Window::Window(HINSTANCE hInstance, int nCmdShow, WNDPROC windowProc) {
+	Window::Window(HINSTANCE hInstance, int nCmdShow) {
 		this->instance_ = hInstance;
 
 		// No Windows bitmap-stretching
 		SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_SYSTEM_AWARE);
 
-		if(!SetupWindow(nCmdShow, windowProc)) {
+		if (!SetupWindow(nCmdShow, WndProc)) {
 			QB_LOG_ERROR("Failed to setup win32 Window\n");
 			return;
 		}
-		if(!InputHandler::Initialize()) {
-			QB_LOG_ERROR("Failed to setup the input handler\n");
+		if (!RegisterRawInputDevices(&RAW_INPUT_DEVICES[0], 2, sizeof(RAWINPUTDEVICE))) {
+			QB_LOG_ERROR("Failed to register input devices\n");
 			return;
 		}
-		if(!SetupConsole()) {
+
+		inputHandler_ = eastl::make_unique<InputHandler>();
+
+		if (!SetupConsole()) {
 			QB_LOG_ERROR("Failed to setup the console\n");
 			return;
 		}
@@ -31,20 +38,27 @@ namespace Quadbit {
 	}
 
 	bool Window::ProcessMessages() {
+		// Start a new ImGui frame
+		ImGuiIO& io = ImGui::GetIO();
+		io.DeltaTime = Time::deltaTime;
+		io.MousePos = ImVec2(static_cast<float>(inputHandler_->mousePos_.x), static_cast<float>(inputHandler_->mousePos_.y));
+		io.MouseDown[0] = inputHandler_->mouseButtonActive_.left;
+		io.MouseDown[1] = inputHandler_->mouseButtonActive_.right;
+
+		ImGui::NewFrame();
 		Time::UpdateTimer();
-		InputHandler::Update();
+		inputHandler_->NewFrame();
 		MSG msg;
-		while(PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+		while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
-			if(msg.message == WM_QUIT) {
+			if (msg.message == WM_QUIT) {
 				return false;
 			}
 		}
 		return true;
 	}
-
-
+	
 	bool Window::SetupWindow(int nCmdShow, WNDPROC windowProc) {
 		// Could make these parameters but fine as const for now
 		const char* windowClassName = "Quadbit_Class";
@@ -60,7 +74,7 @@ namespace Quadbit {
 		windowClass.hCursor = LoadCursor(NULL, IDC_ARROW);
 
 		// Register window class
-		if(!RegisterClassEx(&windowClass)) {
+		if (!RegisterClassEx(&windowClass)) {
 			return false;
 		}
 
@@ -76,19 +90,60 @@ namespace Quadbit {
 			NULL,
 			NULL,
 			instance_,
-			NULL
+			this
 		);
-		if(hwnd_ == NULL) return false;
+		if (hwnd_ == NULL) return false;
 		ShowWindow(hwnd_, nCmdShow);
 
 		return true;
 	}
 
 	bool Window::SetupConsole() {
-		if(!AllocConsole()) return false;
-		if(!freopen("CONIN$", "r", stdin)) return false;
-		if(!freopen("CONOUT$", "w", stdout)) return false;
-		if(!freopen("CONOUT$", "w", stderr)) return false;
+		if (!AllocConsole()) return false;
+		if (!freopen("CONIN$", "r", stdin)) return false;
+		if (!freopen("CONOUT$", "w", stdout)) return false;
+		if (!freopen("CONOUT$", "w", stderr)) return false;
 		return true;
+	}
+
+	LRESULT CALLBACK Window::WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+		Window* window;
+		if (uMsg == WM_NCCREATE) {
+			window = static_cast<Window*>(reinterpret_cast<LPCREATESTRUCT>(lParam)->lpCreateParams);
+			SetLastError(0);
+			if (!SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(window))) {
+				if (GetLastError() != 0) return FALSE;
+			}
+		}
+		else
+			window = reinterpret_cast<Window*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
+
+		switch (uMsg) {
+		case WM_DESTROY:
+			PostQuitMessage(0);
+			break;
+		case WM_INPUT: {
+			uint32_t inputSize = 0;
+			GetRawInputData((HRAWINPUT)lParam, RID_INPUT, nullptr, &inputSize, sizeof(RAWINPUTHEADER));
+			LPBYTE rawInput = new BYTE[inputSize];
+			if (GetRawInputData((HRAWINPUT)lParam, RID_INPUT, rawInput, &inputSize, sizeof(RAWINPUTHEADER)) != inputSize) {
+				QB_LOG_ERROR("GetRawInputData didn't return correct size!\n");
+			}
+			else {
+				window->inputHandler_->ProcessRawInput((RAWINPUT*)rawInput, window->hwnd_);
+				delete[] rawInput;
+			}
+			break;
+		}
+		case WM_LBUTTONDOWN:
+		case WM_RBUTTONDOWN:
+		case WM_MBUTTONDOWN:
+		case WM_LBUTTONUP:
+		case WM_RBUTTONUP:
+		case WM_MBUTTONUP:
+		case WM_MOUSEMOVE:
+			window->inputHandler_->mousePos_ = POINT{ GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
+		}
+		return DefWindowProc(hwnd, uMsg, wParam, lParam);
 	}
 }

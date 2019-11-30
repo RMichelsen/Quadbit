@@ -1,12 +1,12 @@
 #include "Water.h"
-#include <random>
 
-#include "Engine/Global/ImGuiState.h"
+#include <random>
+#include <EASTL/sort.h>
+#include <imgui/imgui.h>
+
+#include "Engine/Entities/EntityTypes.h"
 
 void Water::Init() {
-	// Create skybox
-	renderer_->LoadEnvironmentMap("Resources/Textures/encoded_sunset_skybox.ktx", VK_FORMAT_BC3_UNORM_BLOCK);
-
 	InitializeCompute();
 
 	// Initialize vertices and indices for the water mesh
@@ -30,51 +30,29 @@ void Water::Init() {
 		}
 	}
 
-
 	// Create UBO
-	renderer_->CreateGPUBuffer(togglesUBO_, sizeof(TogglesUBO), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, Quadbit::QBVK_MEMORY_USAGE_CPU_TO_GPU);
-	TogglesUBO* ubo = reinterpret_cast<TogglesUBO*>(togglesUBO_.alloc.data);
-	ubo->useNormalMap = 0;
+	togglesUBO_ = graphics_->CreateUniformBuffer<TogglesUBO>();
+	auto* toggles = graphics_->GetUniformBufferPtr(togglesUBO_);
+	toggles->useNormalMap = 0;
 
-	std::vector<Quadbit::QbVkRenderDescriptor> renderDescriptors {
-		renderer_->CreateRenderDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, displacementResources_.displacementMap.descriptor, VK_SHADER_STAGE_VERTEX_BIT),
-		renderer_->CreateRenderDescriptor(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, displacementResources_.normalMap.descriptor, VK_SHADER_STAGE_FRAGMENT_BIT),
-		renderer_->CreateRenderDescriptor(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, togglesUBO_.descriptor, VK_SHADER_STAGE_FRAGMENT_BIT),
-		renderer_->CreateRenderDescriptor(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, renderer_->GetEnvironmentMapDescriptor(), VK_SHADER_STAGE_FRAGMENT_BIT)
-	};
-
-	std::shared_ptr<Quadbit::QbVkRenderMeshInstance> rMeshInstance = renderer_->CreateRenderMeshInstance(renderDescriptors,
-		{
-			Quadbit::QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_POSITION 
-		},
-		"Resources/Shaders/Compiled/water_vert.spv", "main", "Resources/Shaders/Compiled/water_frag.spv", "main"
-	);
-
-	auto& entityManager = Quadbit::EntityManager::Instance();
+	Quadbit::QbVkPipelineDescription pipelineDescription;
+	pipelineDescription.colourBlending = Quadbit::QbVkPipelineColourBlending::QBVK_COLOURBLENDING_DISABLE;
+	pipelineDescription.depth = Quadbit::QbVkPipelineDepth::QBVK_PIPELINE_DEPTH_ENABLE;
+	pipelineDescription.dynamicState = Quadbit::QbVkPipelineDynamicState::QBVK_DYNAMICSTATE_VIEWPORTSCISSOR;
+	pipelineDescription.enableMSAA = true;
+	pipelineDescription.rasterization = Quadbit::QbVkPipelineRasterization::QBVK_PIPELINE_RASTERIZATION_DEFAULT;
+	pipeline_ = graphics_->CreatePipeline("Assets/Water/Shaders/water_vert.glsl", "main", "Assets/Water/Shaders/water_frag.glsl", "main", pipelineDescription);
+	graphics_->BindResource(pipeline_, "normal_map", displacementResources_.normalMap);
+	graphics_->BindResource(pipeline_, "displacement_map", displacementResources_.displacementMap);
+	graphics_->BindResource(pipeline_, "UBO", togglesUBO_.handle);
 
 	for(auto i = 0; i < WATER_RESOLUTION * 2; i += WATER_RESOLUTION) {
 		for(auto j = 0; j < WATER_RESOLUTION * 2; j += WATER_RESOLUTION) {
-			auto entity = entityManager.Create();
-			entity.AddComponent<Quadbit::RenderMeshComponent>(renderer_->CreateMesh(waterVertices_, sizeof(glm::float3), waterIndices_, rMeshInstance));
-			entity.AddComponent<Quadbit::RenderTransformComponent>(Quadbit::RenderTransformComponent(1.0f, { i, 0.0f, j }, { 0, 0, 0, 1 }));
+			auto entity = entityManager_->Create();
+			entityManager_->AddComponent<Quadbit::CustomMeshComponent>(entity, graphics_->CreateMesh(waterVertices_, sizeof(glm::float3), waterIndices_, pipeline_));
+			entityManager_->AddComponent<Quadbit::RenderTransformComponent>(entity, Quadbit::RenderTransformComponent(1.0f, { i, 0.0f, j }, { 0, 0, 0, 1 }));
 		}
 	}
-
-	// Some ImGui debug stuff 
-	// (Can be extended to modify wind and amplitudes, but will need to recreate the initial precalcs every time that happens)
-	step_ = 1.0f;
-	repeat_ = 200.0f;
-	Quadbit::ImGuiState::Inject([]() {
-		ImGui::SetNextWindowSize(ImVec2(300, 100), ImGuiCond_FirstUseEver);
-		ImGui::Begin("Water Debug", nullptr);
-		ImGui::Checkbox("Use Normal Map?", &useNormalMap_);
-		ImGui::SliderFloat("Step size", &step_, 0.1f, 10.0f, "%.3f");
-		ImGui::SliderFloat("Cycle length", &repeat_, 10.0f, 500.0f, "%.3f");
-		ImGui::SliderFloat("Colour Intensity", &colourIntensity_, 0.01f, 1.0f, "%.3f");
-		ImGui::ColorPicker4("Top colour", reinterpret_cast<float*>(&topColour_));
-		ImGui::ColorPicker4("Bot colour", reinterpret_cast<float*>(&botColour_));
-		ImGui::End();
-		});
 }
 
 void Water::InitializeCompute() {
@@ -86,57 +64,7 @@ void Water::InitializeCompute() {
 	InitInverseFFTComputeInstances();
 	InitDisplacementInstance();
 
-	RecordComputeCommands();
-	renderer_->ComputeDispatch(precalcInstance_);
-}
-
-// This function records all the compute commands that will be run by each individual compute shader
-// The barriers are there to make sure images are only written/read from when they are available
-void Water::RecordComputeCommands() {
-	// Global memory barrier used throughout
-	VkMemoryBarrier memoryBarrier = renderer_->CreateMemoryBarrier(VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
-
-	renderer_->ComputeRecord(precalcInstance_, [&]() {
-		vkCmdBindPipeline(precalcInstance_->commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, precalcInstance_->pipeline);
-		vkCmdBindDescriptorSets(precalcInstance_->commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, precalcInstance_->pipelineLayout, 0, 1, &precalcInstance_->descriptorSet, 0, 0);
-		vkCmdDispatch(precalcInstance_->commandBuffer, WATER_RESOLUTION / 32, WATER_RESOLUTION / 32, 1);
-		});
-
-	renderer_->ComputeRecord(waveheightInstance_, [&]() {
-		vkCmdBindPipeline(waveheightInstance_->commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, waveheightInstance_->pipeline);
-		vkCmdBindDescriptorSets(waveheightInstance_->commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, waveheightInstance_->pipelineLayout, 0, 1, &waveheightInstance_->descriptorSet, 0, 0);
-		vkCmdDispatch(waveheightInstance_->commandBuffer, WATER_RESOLUTION / 32, WATER_RESOLUTION / 32, 1);
-		vkCmdPipelineBarrier(waveheightInstance_->commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 1, &memoryBarrier, 0, nullptr, 0, nullptr);
-		});
-
-	renderer_->ComputeRecord(horizontalIFFTInstance_, [&]() {
-		vkCmdBindPipeline(horizontalIFFTInstance_->commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, horizontalIFFTInstance_->pipeline);
-		vkCmdBindDescriptorSets(horizontalIFFTInstance_->commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, horizontalIFFTInstance_->pipelineLayout, 0, 1, &horizontalIFFTInstance_->descriptorSet, 0, 0);
-		for (auto i = 0; i < 5; i++) {
-			horizontalIFFTResources_.pushConstants.iteration = i;
-			vkCmdPushConstants(horizontalIFFTInstance_->commandBuffer, horizontalIFFTInstance_->pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(IFFTPushConstants), &horizontalIFFTResources_.pushConstants);
-			vkCmdDispatch(horizontalIFFTInstance_->commandBuffer, 1, WATER_RESOLUTION, 1);
-		}
-		vkCmdPipelineBarrier(horizontalIFFTInstance_->commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 1, &memoryBarrier, 0, nullptr, 0, nullptr);
-		});
-
-	renderer_->ComputeRecord(verticalIFFTInstance_, [&]() {
-		vkCmdBindPipeline(verticalIFFTInstance_->commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, verticalIFFTInstance_->pipeline);
-		vkCmdBindDescriptorSets(verticalIFFTInstance_->commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, verticalIFFTInstance_->pipelineLayout, 0, 1, &verticalIFFTInstance_->descriptorSet, 0, 0);
-		for (auto i = 0; i < 5; i++) {
-			verticalIFFTResources_.pushConstants.iteration = i;
-			vkCmdPushConstants(verticalIFFTInstance_->commandBuffer, verticalIFFTInstance_->pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(IFFTPushConstants), &verticalIFFTResources_.pushConstants);
-			vkCmdDispatch(verticalIFFTInstance_->commandBuffer, 1, WATER_RESOLUTION, 1);
-		}
-		vkCmdPipelineBarrier(verticalIFFTInstance_->commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 1, &memoryBarrier, 0, nullptr, 0, nullptr);
-		});
-
-	renderer_->ComputeRecord(displacementInstance_, [&]() {
-		vkCmdBindPipeline(displacementInstance_->commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, displacementInstance_->pipeline);
-		vkCmdBindDescriptorSets(displacementInstance_->commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, displacementInstance_->pipelineLayout, 0, 1, &displacementInstance_->descriptorSet, 0, 0);
-		vkCmdDispatch(displacementInstance_->commandBuffer, WATER_RESOLUTION / 32, WATER_RESOLUTION / 32, 1);
-		vkCmdPipelineBarrier(displacementInstance_->commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 1, &memoryBarrier, 0, nullptr, 0, nullptr);
-	});
+	compute_->Dispatch(precalcPipeline_, WATER_RESOLUTION / 32, WATER_RESOLUTION / 32, 1);
 }
 
 void Water::Simulate(float deltaTime) {
@@ -146,34 +74,47 @@ void Water::Simulate(float deltaTime) {
 	// Increment the time in the wave functions 
 	UpdateWaveheightUBO(deltaTime);
 
-	// Compute waveheights
-	renderer_->ComputeDispatch(waveheightInstance_);
+	compute_->Dispatch(waveheightPipeline_, WATER_RESOLUTION / 32, WATER_RESOLUTION / 32, 1);
+
+	// Here we pass the addresses of 5 instances of IFFTPushConstants
+	// to the compute pipeline to be used as pushconstants for X = 5 
+	// iterations of both the horizontal and vertical pipeline
+	eastl::array<IFFTPushConstants, 5> iterations = { {
+		{ 0 }, { 1 }, { 2 }, { 3 }, { 4 }
+	} };
+	eastl::vector<const void*> pushConstants{
+		&iterations[0],
+		&iterations[1],
+		&iterations[2],
+		&iterations[3],
+		&iterations[4]
+	};
 
 	// IFFT, first a horizontal pass then a vertical pass
-	renderer_->ComputeDispatch(horizontalIFFTInstance_);
-	renderer_->ComputeDispatch(verticalIFFTInstance_);
+	compute_->DispatchX(5, horizontalIFFTPipeline_, 1, WATER_RESOLUTION, 1, pushConstants, sizeof(IFFTPushConstants));
+	compute_->DispatchX(5, verticalIFFTPipeline_, 1, WATER_RESOLUTION, 1, pushConstants, sizeof(IFFTPushConstants));
 
 	// Finally assemble the displacement map to be used in the vertex shader each frame
-	renderer_->ComputeDispatch(displacementInstance_);
-}
+	compute_->Dispatch(displacementPipeline_, WATER_RESOLUTION / 32, WATER_RESOLUTION / 32, 1);
 
-void Water::DrawFrame() {
-	renderer_->DrawFrame();
+	DrawImGui();
 }
 
 void Water::InitPrecalcComputeInstance() {
 	// Create UBO
-	renderer_->CreateGPUBuffer(precalcResources_.ubo, sizeof(PrecalcUBO), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, Quadbit::QBVK_MEMORY_USAGE_CPU_TO_GPU);
+	precalcResources_.ubo = graphics_->CreateUniformBuffer<PrecalcUBO>();
 	// Set initial values for water
-	PrecalcUBO* ubo = reinterpret_cast<PrecalcUBO*>(precalcResources_.ubo.alloc.data);
-	ubo->N = WATER_RESOLUTION;
-	ubo->A = 12000;
-	ubo->L = 1000;
-	ubo->W = glm::float2(18.0f, 24.0f);
+	PrecalcUBO initialData;
+	initialData.N = WATER_RESOLUTION;
+	initialData.A = 12000;
+	initialData.L = 1000;
+	initialData.W = glm::float2(18.0f, 24.0f);
+	graphics_->InitializeUBO(precalcResources_.ubo, &initialData);
 
 	// Create unif randoms storage buffer 
 	VkDeviceSize uniformRandomsSize = WATER_RESOLUTION * WATER_RESOLUTION * sizeof(glm::float4);
-	renderer_->CreateGPUBuffer(precalcResources_.uniformRandomsStorageBuffer, uniformRandomsSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
+	precalcResources_.uniformRandomsStorageBuffer = graphics_->CreateGPUBuffer(uniformRandomsSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+		Quadbit::QbVkMemoryUsage::QBVK_MEMORY_USAGE_GPU_ONLY);
 	// Precalculate uniform randoms used for the generation of the initial frequency heightmaps
 	precalcResources_.precalcUniformRandoms.resize(WATER_RESOLUTION * WATER_RESOLUTION);
 	std::minstd_rand engine(std::random_device{}());
@@ -187,186 +128,144 @@ void Water::InitPrecalcComputeInstance() {
 		};
 	}
 	// Transfer to the GPU buffer
-	renderer_->TransferDataToGPUBuffer(precalcResources_.uniformRandomsStorageBuffer, uniformRandomsSize, precalcResources_.precalcUniformRandoms.data());
+	graphics_->TransferDataToGPUBuffer(precalcResources_.precalcUniformRandoms.data(), uniformRandomsSize, precalcResources_.uniformRandomsStorageBuffer);
 
 	// Create textures
-	renderer_->CreateTexture(precalcResources_.h0Tilde, WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT,
-		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
-	renderer_->CreateTexture(precalcResources_.h0TildeConj, WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT,
-		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
+	precalcResources_.h0Tilde = graphics_->CreateStorageTexture(WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT);
+	precalcResources_.h0TildeConj = graphics_->CreateStorageTexture(WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT);
 
-	// Setup precalc compute shader
-	std::vector<Quadbit::QbVkComputeDescriptor> computeDescriptors = {
-			renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, precalcResources_.ubo.descriptor),
-			renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, precalcResources_.h0Tilde.descriptor),
-			renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, precalcResources_.h0TildeConj.descriptor),
-			renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, precalcResources_.uniformRandomsStorageBuffer.descriptor)
-	};
-	precalcInstance_ = renderer_->CreateComputeInstance(computeDescriptors, "Resources/Shaders/Compiled/precalc_comp.spv", "main");
+
+	precalcPipeline_ = compute_->CreatePipeline("Assets/Water/Shaders/precalc_comp.glsl", "main");
+	compute_->BindResource(precalcPipeline_, "UBO", precalcResources_.ubo.handle);
+	compute_->BindResource(precalcPipeline_, "h0tilde", precalcResources_.h0Tilde);
+	compute_->BindResource(precalcPipeline_, "h0tilde_conj", precalcResources_.h0TildeConj);
+	compute_->BindResource(precalcPipeline_, "UNIF_RAND_STORAGE_BUF", precalcResources_.uniformRandomsStorageBuffer);
 }
 
 void Water::InitWaveheightComputeInstance() {
 	// Create UBO
-	renderer_->CreateGPUBuffer(waveheightResources_.ubo, sizeof(WaveheightUBO), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, Quadbit::QBVK_MEMORY_USAGE_CPU_TO_GPU);
+	waveheightResources_.ubo = graphics_->CreateUniformBuffer<WaveheightUBO>();
+	auto* waveheightUBO = graphics_->GetUniformBufferPtr(waveheightResources_.ubo);
 	// Fill with initial data
-	WaveheightUBO* ubo = reinterpret_cast<WaveheightUBO*>(waveheightResources_.ubo.alloc.data);
-	ubo->N = WATER_RESOLUTION;
-	ubo->L = 1000;
-	ubo->RT = repeat_;
-	ubo->T = 0.0f;
+	WaveheightUBO initialData;
+	initialData.N = WATER_RESOLUTION;
+	initialData.L = 1000;
+	initialData.RT = repeat_;
+	initialData.T = 0.0f;
+	graphics_->InitializeUBO(waveheightResources_.ubo, &initialData);
 
-	renderer_->CreateTexture(waveheightResources_.h0TildeTx, WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT,
-		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
-	renderer_->CreateTexture(waveheightResources_.h0TildeTy, WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT,
-		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
-	renderer_->CreateTexture(waveheightResources_.h0TildeTz, WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT,
-		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
-	renderer_->CreateTexture(waveheightResources_.h0TildeSlopeX, WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT,
-		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
-	renderer_->CreateTexture(waveheightResources_.h0TildeSlopeZ, WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT,
-		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
+	waveheightResources_.h0TildeTx = graphics_->CreateStorageTexture(WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT);
+	waveheightResources_.h0TildeTy = graphics_->CreateStorageTexture(WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT);
+	waveheightResources_.h0TildeTz = graphics_->CreateStorageTexture(WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT);
+	waveheightResources_.h0TildeSlopeX = graphics_->CreateStorageTexture(WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT);
+	waveheightResources_.h0TildeSlopeZ = graphics_->CreateStorageTexture(WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT);
 
-	std::vector<Quadbit::QbVkComputeDescriptor> computeDescriptors = {
-		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, waveheightResources_.ubo.descriptor),
-		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, precalcResources_.h0Tilde.descriptor),
-		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, precalcResources_.h0TildeConj.descriptor),
-		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, waveheightResources_.h0TildeTx.descriptor),
-		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, waveheightResources_.h0TildeTy.descriptor),
-		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, waveheightResources_.h0TildeTz.descriptor),
-		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, waveheightResources_.h0TildeSlopeX.descriptor),
-		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, waveheightResources_.h0TildeSlopeZ.descriptor)
-	};
-
-	waveheightInstance_ = renderer_->CreateComputeInstance(computeDescriptors, "Resources/Shaders/Compiled/waveheight_comp.spv", "main");
+	waveheightPipeline_ = compute_->CreatePipeline("Assets/Water/Shaders/waveheight_comp.glsl", "main");
+	compute_->BindResource(waveheightPipeline_, "UBO", waveheightResources_.ubo.handle);
+	compute_->BindResource(waveheightPipeline_, "h0tilde", precalcResources_.h0Tilde);
+	compute_->BindResource(waveheightPipeline_, "h0tilde_conj", precalcResources_.h0TildeConj);
+	compute_->BindResource(waveheightPipeline_, "h0tilde_tx", waveheightResources_.h0TildeTx);
+	compute_->BindResource(waveheightPipeline_, "h0tilde_ty", waveheightResources_.h0TildeTy);
+	compute_->BindResource(waveheightPipeline_, "h0tilde_tz", waveheightResources_.h0TildeTz);
+	compute_->BindResource(waveheightPipeline_, "h0tilde_slopex", waveheightResources_.h0TildeSlopeX);
+	compute_->BindResource(waveheightPipeline_, "h0tilde_slopez", waveheightResources_.h0TildeSlopeZ);
 }
 
 void Water::InitInverseFFTComputeInstances() {
-	// Here we will utilize Vulkan specialization maps to dynamically change the size of the IFFT incase resolution changes.
-	// The vertical pass property is also set here. This way we avoid having to use a Uniform Buffer.
-	VkSpecializationMapEntry xLocalSize		{ 0, 0, sizeof(int) };
-	VkSpecializationMapEntry yLocalSize		{ 1, sizeof(int) * 1, sizeof(int) };
-	VkSpecializationMapEntry zLocalSize		{ 2, sizeof(int) * 2, sizeof(int) };
-	VkSpecializationMapEntry resolution		{ 3, sizeof(int) * 3, sizeof(int) };
-	VkSpecializationMapEntry passCount		{ 4, sizeof(int) * 4, sizeof(int) };
-	VkSpecializationMapEntry verticalPass	{ 5, sizeof(int) * 5, sizeof(int) };
+	const int WATER_RESOLUTION_LOG2 = eastl::Internal::Log2(WATER_RESOLUTION);
+	horizontalIFFTResources_.specData = { WATER_RESOLUTION, 1, 1, WATER_RESOLUTION, WATER_RESOLUTION_LOG2, 0 };
+	verticalIFFTResources_.specData = { WATER_RESOLUTION, 1, 1, WATER_RESOLUTION, WATER_RESOLUTION_LOG2, 1 };
 
-	std::array<VkSpecializationMapEntry, 6> specMaps { xLocalSize, yLocalSize, zLocalSize, resolution, passCount, verticalPass };
+	horizontalIFFTResources_.dX = graphics_->CreateStorageTexture(WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT);
+	horizontalIFFTResources_.dY = graphics_->CreateStorageTexture(WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT);
+	horizontalIFFTResources_.dZ = graphics_->CreateStorageTexture(WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT);
+	horizontalIFFTResources_.dSlopeX = graphics_->CreateStorageTexture(WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT);
+	horizontalIFFTResources_.dSlopeZ = graphics_->CreateStorageTexture(WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT);
 
-	horizontalIFFTResources_.specData = { WATER_RESOLUTION, 1, 1, WATER_RESOLUTION, static_cast<int>(std::log2(WATER_RESOLUTION)), 0 };
-	verticalIFFTResources_.specData = { WATER_RESOLUTION, 1, 1, WATER_RESOLUTION, static_cast<int>(std::log2(WATER_RESOLUTION)), 1 };
-
-	VkSpecializationInfo horizontalSpecInfo{};
-	horizontalSpecInfo.mapEntryCount = 6;
-	horizontalSpecInfo.pMapEntries = specMaps.data();
-	horizontalSpecInfo.dataSize = 6 * sizeof(int);
-	horizontalSpecInfo.pData = horizontalIFFTResources_.specData.data();
-
-	VkSpecializationInfo verticalSpecInfo{};
-	verticalSpecInfo.mapEntryCount = 6;
-	verticalSpecInfo.pMapEntries = specMaps.data();
-	verticalSpecInfo.dataSize = 6 * sizeof(int);
-	verticalSpecInfo.pData = verticalIFFTResources_.specData.data();
-
-	renderer_->CreateTexture(horizontalIFFTResources_.dX, WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT,
-		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
-	renderer_->CreateTexture(horizontalIFFTResources_.dY, WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT,
-		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
-	renderer_->CreateTexture(horizontalIFFTResources_.dZ, WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT,
-		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
-	renderer_->CreateTexture(horizontalIFFTResources_.dSlopeX, WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT,
-		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
-	renderer_->CreateTexture(horizontalIFFTResources_.dSlopeZ, WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT,
-		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
-
-	renderer_->CreateTexture(verticalIFFTResources_.dX, WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT,
-		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
-	renderer_->CreateTexture(verticalIFFTResources_.dY, WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT,
-		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
-	renderer_->CreateTexture(verticalIFFTResources_.dZ, WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT,
-		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
-	renderer_->CreateTexture(verticalIFFTResources_.dSlopeX, WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT,
-		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
-	renderer_->CreateTexture(verticalIFFTResources_.dSlopeZ, WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT,
-		VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
+	verticalIFFTResources_.dX = graphics_->CreateStorageTexture(WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT);
+	verticalIFFTResources_.dY = graphics_->CreateStorageTexture(WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT);
+	verticalIFFTResources_.dZ = graphics_->CreateStorageTexture(WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT);
+	verticalIFFTResources_.dSlopeX = graphics_->CreateStorageTexture(WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT);
+	verticalIFFTResources_.dSlopeZ = graphics_->CreateStorageTexture(WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT);
 
 	// Setup the vertical/horizontal IFFT compute shaders
-	std::vector waveheightImageArray = {
-		waveheightResources_.h0TildeTx.descriptor,
-		waveheightResources_.h0TildeTy.descriptor,
-		waveheightResources_.h0TildeTz.descriptor,
-		waveheightResources_.h0TildeSlopeX.descriptor,
-		waveheightResources_.h0TildeSlopeZ.descriptor,
+	eastl::vector waveheightImageArray = {
+		waveheightResources_.h0TildeTx,
+		waveheightResources_.h0TildeTy,
+		waveheightResources_.h0TildeTz,
+		waveheightResources_.h0TildeSlopeX,
+		waveheightResources_.h0TildeSlopeZ
 	};
-	std::vector horizontalImageArray = {
-		horizontalIFFTResources_.dX.descriptor,
-		horizontalIFFTResources_.dY.descriptor,
-		horizontalIFFTResources_.dZ.descriptor,
-		horizontalIFFTResources_.dSlopeX.descriptor,
-		horizontalIFFTResources_.dSlopeZ.descriptor
+	eastl::vector horizontalImageArray = {
+		horizontalIFFTResources_.dX,
+		horizontalIFFTResources_.dY,
+		horizontalIFFTResources_.dZ,
+		horizontalIFFTResources_.dSlopeX,
+		horizontalIFFTResources_.dSlopeZ
 	};
-	std::vector verticalImageArray = {
-		verticalIFFTResources_.dX.descriptor,
-		verticalIFFTResources_.dY.descriptor,
-		verticalIFFTResources_.dZ.descriptor,
-		verticalIFFTResources_.dSlopeX.descriptor,
-		verticalIFFTResources_.dSlopeZ.descriptor
+	eastl::vector verticalImageArray = {
+		verticalIFFTResources_.dX,
+		verticalIFFTResources_.dY,
+		verticalIFFTResources_.dZ,
+		verticalIFFTResources_.dSlopeX,
+		verticalIFFTResources_.dSlopeZ
 	};
 
-	std::vector<Quadbit::QbVkComputeDescriptor> horizontalComputeDesc = {
-		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, waveheightImageArray),
-		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, horizontalImageArray)
-	};
-	std::vector<Quadbit::QbVkComputeDescriptor> verticalComputeDesc = {
-		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, horizontalImageArray),
-		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, verticalImageArray)
-	};
-	
-	horizontalIFFTInstance_ = renderer_->CreateComputeInstance(horizontalComputeDesc, "Resources/Shaders/Compiled/ifft_comp.spv", "main", &horizontalSpecInfo, sizeof(IFFTPushConstants));
-	verticalIFFTInstance_ = renderer_->CreateComputeInstance(verticalComputeDesc, "Resources/Shaders/Compiled/ifft_comp.spv", "main", &verticalSpecInfo, sizeof(IFFTPushConstants));
+	horizontalIFFTPipeline_ = compute_->CreatePipeline("Assets/Water/Shaders/ifft_comp.glsl", "main", horizontalIFFTResources_.specData.data());
+	verticalIFFTPipeline_ = compute_->CreatePipeline("Assets/Water/Shaders/ifft_comp.glsl", "main", verticalIFFTResources_.specData.data());
+
+	compute_->BindResourceArray(horizontalIFFTPipeline_, "input_images", waveheightImageArray);
+	compute_->BindResourceArray(horizontalIFFTPipeline_, "output_images", horizontalImageArray);
+
+	compute_->BindResourceArray(verticalIFFTPipeline_, "input_images", horizontalImageArray);
+	compute_->BindResourceArray(verticalIFFTPipeline_, "output_images", verticalImageArray);
 }
 
 void Water::InitDisplacementInstance() {
-	renderer_->CreateTexture(displacementResources_.displacementMap, WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT, VK_IMAGE_TILING_OPTIMAL, 
-		VK_IMAGE_USAGE_STORAGE_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 
-		VK_PIPELINE_STAGE_TRANSFER_BIT, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY);
+	displacementResources_.displacementMap = graphics_->CreateStorageTexture(WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT);
+	auto samplerInfo = graphics_->CreateImageSamplerInfo(VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_TRUE, 16.0f, VK_COMPARE_OP_ALWAYS, VK_SAMPLER_MIPMAP_MODE_LINEAR);
+	displacementResources_.normalMap = graphics_->CreateStorageTexture(WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT, &samplerInfo);
 
-	renderer_->CreateTexture(displacementResources_.normalMap, WATER_RESOLUTION, WATER_RESOLUTION, IMAGE_FORMAT, VK_IMAGE_TILING_OPTIMAL, 
-		VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 
-		VK_PIPELINE_STAGE_TRANSFER_BIT, Quadbit::QBVK_MEMORY_USAGE_GPU_ONLY, renderer_->CreateImageSampler(VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT,
-			VK_TRUE, 16.0f, VK_COMPARE_OP_ALWAYS, VK_SAMPLER_MIPMAP_MODE_LINEAR));
-
-	// Setup the displacement compute shader
-	std::vector<Quadbit::QbVkComputeDescriptor> computeDescriptors = {
-		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, verticalIFFTResources_.dX.descriptor),
-		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, verticalIFFTResources_.dY.descriptor),
-		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, verticalIFFTResources_.dZ.descriptor),
-		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, verticalIFFTResources_.dSlopeX.descriptor),
-		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, verticalIFFTResources_.dSlopeZ.descriptor),
-		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, displacementResources_.displacementMap.descriptor),
-		renderer_->CreateComputeDescriptor(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, displacementResources_.normalMap.descriptor)
-	};
-
-	displacementInstance_ = renderer_->CreateComputeInstance(computeDescriptors, "Resources/Shaders/Compiled/displacement_comp.spv", "main");
+	displacementPipeline_ = compute_->CreatePipeline("Assets/Water/Shaders/displacement_comp.glsl", "main");
+	compute_->BindResource(displacementPipeline_, "Dx", verticalIFFTResources_.dX);
+	compute_->BindResource(displacementPipeline_, "Dy", verticalIFFTResources_.dY);
+	compute_->BindResource(displacementPipeline_, "Dz", verticalIFFTResources_.dZ);
+	compute_->BindResource(displacementPipeline_, "D_slopex", verticalIFFTResources_.dSlopeX);
+	compute_->BindResource(displacementPipeline_, "D_slopez", verticalIFFTResources_.dSlopeZ);
+	compute_->BindResource(displacementPipeline_, "displacement_map", displacementResources_.displacementMap);
+	compute_->BindResource(displacementPipeline_, "normal_map", displacementResources_.normalMap);
 }
 
 void Water::UpdateWaveheightUBO(float deltaTime) {
 	static float t = 0.0f;
 
-	WaveheightUBO* ubo = reinterpret_cast<WaveheightUBO*>(waveheightResources_.ubo.alloc.data);
-	ubo->RT = repeat_;
-	ubo->T = t;
+	auto* waveheightUBO = graphics_->GetUniformBufferPtr(waveheightResources_.ubo);
+	waveheightUBO->RT = repeat_;
+	waveheightUBO->T = t;
 
 	t += deltaTime * step_;
 }
 
 void Water::UpdateTogglesUBO(float deltaTime) {
-	TogglesUBO* togglesUBO = reinterpret_cast<TogglesUBO*>(togglesUBO_.alloc.data);
+	Quadbit::Entity cameraEntity = graphics_->GetActiveCamera();
+	Quadbit::RenderCamera* camera = entityManager_->GetComponentPtr<Quadbit::RenderCamera>(cameraEntity);
 
-	Quadbit::Entity cameraEntity = renderer_->GetActiveCamera();
-	Quadbit::RenderCamera* camera = cameraEntity.GetComponentPtr<Quadbit::RenderCamera>();
-	togglesUBO->colourIntensity = colourIntensity_;
-	togglesUBO->cameraPos = camera->position;
-	togglesUBO->useNormalMap = useNormalMap_ ? 1 : 0;
-	togglesUBO->topColour = topColour_;
-	togglesUBO->botColour = botColour_;
+	auto* toggles = graphics_->GetUniformBufferPtr(togglesUBO_);
+	toggles->colourIntensity = colourIntensity_;
+	toggles->cameraPos = camera->position;
+	toggles->useNormalMap = useNormalMap_ ? 1 : 0;
+	toggles->topColour = topColour_;
+	toggles->botColour = botColour_;
+}
+
+void Water::DrawImGui() {
+	ImGui::SetNextWindowSize(ImVec2(300, 100), ImGuiCond_FirstUseEver);
+	ImGui::Begin("Water Debug", nullptr);
+	ImGui::Checkbox("Use Normal Map?", &useNormalMap_);
+	ImGui::SliderFloat("Step size", &step_, 0.1f, 10.0f, "%.3f");
+	ImGui::SliderFloat("Cycle length", &repeat_, 10.0f, 500.0f, "%.3f");
+	ImGui::SliderFloat("Colour Intensity", &colourIntensity_, 0.01f, 1.0f, "%.3f");
+	ImGui::ColorPicker4("Top colour", reinterpret_cast<float*>(&topColour_));
+	ImGui::ColorPicker4("Bot colour", reinterpret_cast<float*>(&botColour_));
+	ImGui::End();
 }

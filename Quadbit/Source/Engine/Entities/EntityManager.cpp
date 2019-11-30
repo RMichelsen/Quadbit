@@ -1,31 +1,26 @@
-#include <PCH.h>
-
 #include "Engine/Entities/EntityManager.h"
 #include "Engine/Entities/SystemDispatch.h"
 
 namespace Quadbit {
 	Entity::Entity() : id_(0, 1) {}
 
-	void Entity::Destroy() {
-		EntityManager::Instance().Destroy(*this);
-	}
+	EntityManager::EntityManager() : systemDispatch_(eastl::make_unique<SystemDispatch>(this)) {}
 
-	bool Entity::IsValid() {
-		return id_.version == EntityManager::Instance().GetEntityVersion(id_);
-	}
-
-	EntityManager::EntityManager() {
-		systemDispatch_ = std::make_unique<SystemDispatch>();
-	}
-
-	EntityManager& EntityManager::Instance() {
-		static EntityManager instance;
-		return instance;
+	EntityManager::~EntityManager() {
+		systemDispatch_->Shutdown();
+		systemDispatch_.reset();
+		for (auto&& pool : componentPools_) {
+			// We can break at the first null-pointer since component pools
+			// cannot be unregistered (destroyed) at runtime and thus when we
+			// encounter a nullptr, no pools are left in the array.
+			if (pool.get() == nullptr) break;
+			pool.reset();
+		}
 	}
 
 	Entity EntityManager::Create() {
 		// If the freelist is empty, just add a new entity with version 1
-		if(entityFreeList_.empty()) {
+		if (entityFreeList_.empty()) {
 			auto entity = Entity(EntityID(nextEntityId_, entityVersions_[nextEntityId_]));
 			sparse_[entity.id_.index] = static_cast<uint32_t>(entities_.size());
 			entities_.push_back(entity);
@@ -46,15 +41,19 @@ namespace Quadbit {
 	}
 
 	void EntityManager::Destroy(const Entity& entity) {
-		for(auto&& pool : componentPools_) {
-			if(pool == nullptr) break;
+		// Destroy component pools one by one
+		for (auto&& pool : componentPools_) {
+			// We can break at the first null-pointer since component pools
+			// cannot be unregistered (destroyed) at runtime and thus when we
+			// encounter a nullptr, no pools are left in the array.
+			if (pool.get() == nullptr) break;
 			pool->RemoveIfExists(entity.id_);
 		}
 
 		// Remove by swap and pop
 		auto lastEntity = entities_.back();
-		sparse_[entities_.back().id_.index] = sparse_[entity.id_.index];
-		std::swap(entities_[sparse_[entity.id_.index]], entities_.back());
+		sparse_[lastEntity.id_.index] = sparse_[entity.id_.index];
+		eastl::swap(entities_[sparse_[entity.id_.index]], lastEntity);
 		entities_.pop_back();
 		sparse_[entity.id_.index] = 0xFFFFFFFF;
 
