@@ -14,6 +14,7 @@
 #include <vulkan/vulkan.h>
 
 #include "Engine/Core/Logging.h"
+#include "Engine/Entities/EntityTypes.h"
 
 #define VK_ERROR_STRING(x) case (int)x: return #x;
 
@@ -278,6 +279,7 @@ namespace Quadbit {
 
 	struct ShadowmapResources {
 		QbVkTextureHandle texture = QBVK_TEXTURE_NULL_HANDLE;
+		QbVkPipelineHandle pipeline = QBVK_PIPELINE_NULL_HANDLE;
 		VkRenderPass renderPass = VK_NULL_HANDLE;
 		eastl::array<VkFramebuffer, 2> framebuffers;
 	};
@@ -323,6 +325,21 @@ namespace Quadbit {
 		VkRenderPass mainRenderPass = VK_NULL_HANDLE;
 
 		eastl::hash_map<eastl::string, double> computeAvgTimes;
+
+		Entity fallbackCamera = NULL_ENTITY;
+		Entity userCamera = NULL_ENTITY;
+
+		float sunAzimuth;
+		float sunAltitude;
+
+		Entity GetActiveCamera() {
+			return (userCamera == NULL_ENTITY) ? fallbackCamera : userCamera;
+		}
+
+		void SetCamera(Entity entity) {
+			QB_ASSERT(entity != NULL_ENTITY && "Invalid camera entity!");
+			userCamera = entity;
+		}
 	};
 
 	struct QbVkTransfer {

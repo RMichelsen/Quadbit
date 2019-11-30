@@ -12,20 +12,22 @@
 #include "Engine/Rendering/VulkanTypes.h"
 
 namespace Quadbit {
+	struct SunUBO {
+		float sunAzimuth;
+		float sunAltitude;
+	};
+
 	class PBRPipeline {
 	public:
 		PBRPipeline(QbVkContext& context);
 
-		void RebuildPipeline();
+		void DrawShadows(uint32_t resourceIndex, VkCommandBuffer commandBuffer);
 		void DrawFrame(uint32_t resourceIndex, VkCommandBuffer commandBuffer);
 
 		PBRSceneComponent LoadModel(const char* path);
 
-		Entity GetActiveCamera();
-		void SetCamera(Entity entity);
-		void LoadSkyGradient(glm::vec3 botColour, glm::vec3 topColour);
-
 		QbVkPipelineHandle pipeline_;
+		QbVkPipelineHandle skyPipeline_;
 
 	private:
 		void SetViewportAndScissor(VkCommandBuffer& commandBuffer);
@@ -38,16 +40,13 @@ namespace Quadbit {
 		QbVkPBRMesh ParseMesh(const tinygltf::Model& model, const tinygltf::Mesh& mesh,
 			eastl::vector<QbVkVertex>& vertices, eastl::vector<uint32_t>& indices, const eastl::vector<QbVkPBRMaterial>& materials);
 		QbVkDescriptorSetsHandle WriteMaterialDescriptors(const QbVkPBRMaterial& material);
-		QbVkTextureHandle CreateTextureFromResource(const tinygltf::Model& model, const tinygltf::Material& material, const char* textureName);
+		QbVkTextureHandle CreateTextureFromResource(const tinygltf::Model& model, const tinygltf::Texture& texture);
 		VkSamplerCreateInfo GetSamplerInfo(const tinygltf::Model& model, int samplerIndex);
 
 		friend class QbVkRenderer;
 
 		QbVkContext& context_;
 
-		Entity fallbackCamera_ = NULL_ENTITY;
-		Entity userCamera_ = NULL_ENTITY;
-
-		Entity environmentMap_ = NULL_ENTITY;
+		QbVkUniformBuffer<SunUBO> sunUBO_;
 	};
 }

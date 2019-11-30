@@ -11,6 +11,7 @@
 #include "Engine/Rendering/VulkanUtils.h"
 #include "Engine/Rendering/Memory/ResourceManager.h"
 #include "Engine/Rendering/Pipelines/PBRPipeline.h"
+#include "Engine/Rendering/Pipelines/SkyPipeline.h"
 #include "Engine/Rendering/Pipelines/ImGuiPipeline.h"
 #include "Engine/Rendering/Pipelines/Pipeline.h"
 #include "Engine/Rendering/Shaders/ShaderCompiler.h"
@@ -64,25 +65,30 @@ namespace Quadbit {
 		CreateSurface();
 		CreatePhysicalDevice();
 		CreateLogicalDeviceAndQueues();
-
-		context_->allocator = eastl::make_unique<QbVkAllocator>(context_->device, context_->gpu->deviceProps.limits.bufferImageGranularity, context_->gpu->memoryProps);
-
 		CreateCommandPool();
 		CreateSyncObjects();
 		AllocateCommandBuffers();
+
+		context_->allocator = eastl::make_unique<QbVkAllocator>(context_->device, context_->gpu->deviceProps.limits.bufferImageGranularity, context_->gpu->memoryProps);
+		context_->shaderCompiler = eastl::make_unique<QbVkShaderCompiler>(*context_);
+		context_->resourceManager = eastl::make_unique<QbVkResourceManager>(*context_);
 
 		// Swapchain and dependent resources
 		CreateSwapChain();
 		CreateMultisamplingResources();
 		CreateDepthResources();
+		CreateShadowmapResources();
 		CreateMainRenderPass();
-
-		context_->shaderCompiler = eastl::make_unique<QbVkShaderCompiler>(*context_);
-		context_->resourceManager = eastl::make_unique<QbVkResourceManager>(*context_);
 
 		// Pipelines
 		pbrPipeline_ = eastl::make_unique<PBRPipeline>(*context_);
 		imGuiPipeline_ = eastl::make_unique<ImGuiPipeline>(*context_);
+		skyPipeline_ = eastl::make_unique<SkyPipeline>(*context_);
+
+		// Set up camera
+		context_->fallbackCamera = context_->entityManager->Create();
+		context_->entityManager->AddComponent<RenderCamera>(context_->fallbackCamera, 
+			Quadbit::RenderCamera(145.0f, -42.0f, glm::vec3(130.0f, 190.0f, 25.0f), 16.0f / 9.0f, 10000.0f));
 	}
 
 	QbVkRenderer::~QbVkRenderer() {
@@ -108,6 +114,11 @@ namespace Quadbit {
 			vkDestroyFence(context_->device, renderingResource.fence, nullptr);
 		}
 
+		for (const auto& shadowmapFramebuffer : context_->shadowmapResources.framebuffers) {
+			vkDestroyFramebuffer(context_->device, shadowmapFramebuffer, nullptr);
+		}
+		vkDestroyRenderPass(context_->device, context_->shadowmapResources.renderPass, nullptr);
+		
 		// Cleanup mesh and depth resources
 		context_->allocator->DestroyImage(context_->multisamplingResources.msaaImage);
 		vkDestroyImageView(context_->device, context_->multisamplingResources.msaaImageView, nullptr);
@@ -166,7 +177,7 @@ namespace Quadbit {
 		VkResult result = vkAcquireNextImageKHR(context_->device, context_->swapchain.swapchain, UINT64_MAX,
 			currentRenderingResources.imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
 		if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-			RecreateSwapchain();
+			Rebuild();
 			return;
 		}
 		VK_CHECK(result);
@@ -213,7 +224,7 @@ namespace Quadbit {
 		result = vkQueuePresentKHR(context_->presentQueue, &presentInfo);
 		if (!((result == VK_SUCCESS) || (result == VK_SUBOPTIMAL_KHR))) {
 			if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-				RecreateSwapchain();
+				Rebuild();
 				return;
 			}
 		}
@@ -344,6 +355,7 @@ namespace Quadbit {
 		deviceFeatures.imageCubeArray = VK_TRUE;
 		deviceFeatures.fillModeNonSolid = VK_TRUE;
 		deviceFeatures.samplerAnisotropy = VK_TRUE;
+		deviceFeatures.depthClamp = VK_TRUE;
 		//deviceFeatures.sampleRateShading = VK_TRUE;
 
 		// Now we will fill out the actual information for device creation
@@ -435,14 +447,15 @@ namespace Quadbit {
 
 	void QbVkRenderer::CreateShadowmapResources() {
 		// Prepare the shadowmap texture
-		VkImageCreateInfo imageInfo = VkUtils::Init::ImageCreateInfo(2048, 2048, VK_FORMAT_R8G8B8A8_UNORM,
+		VkImageCreateInfo imageInfo = VkUtils::Init::ImageCreateInfo(2048, 2048, VkUtils::FindDepthFormat(*context_),
 			VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
 
 		VkSamplerCreateInfo samplerInfo = VkUtils::Init::SamplerCreateInfo(VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, 
 			VK_FALSE, 1.0f, VK_COMPARE_OP_NEVER, VK_SAMPLER_MIPMAP_MODE_LINEAR);
 		samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
 
-		context_->shadowmapResources.texture = context_->resourceManager->CreateTexture(&imageInfo, &samplerInfo);
+		context_->shadowmapResources.texture = context_->resourceManager->CreateTexture(&imageInfo, VK_IMAGE_ASPECT_DEPTH_BIT, 
+			VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL, &samplerInfo);
 
 		// Prepare the offscreen renderpass
 		VkAttachmentDescription attachmentDescription{};
@@ -490,6 +503,16 @@ namespace Quadbit {
 		renderPassInfo.pDependencies = dependencies.data();
 
 		VK_CHECK(vkCreateRenderPass(context_->device, &renderPassInfo, nullptr, &context_->shadowmapResources.renderPass));
+
+		QbVkPipelineDescription pipelineDescription{};
+		pipelineDescription.colourBlending = QbVkPipelineColourBlending::QBVK_COLOURBLENDING_NOATTACHMENT;
+		pipelineDescription.depth = QbVkPipelineDepth::QBVK_PIPELINE_DEPTH_ENABLE;
+		pipelineDescription.dynamicState = QbVkPipelineDynamicState::QBVK_DYNAMICSTATE_DEPTHBIAS;
+		pipelineDescription.enableMSAA = false;
+		pipelineDescription.rasterization = QbVkPipelineRasterization::QBVK_PIPELINE_RASTERIZATION_SHADOWMAP;
+
+		context_->shadowmapResources.pipeline = context_->resourceManager->CreateGraphicsPipeline("Assets/Quadbit/Shaders/shadowmap.vert", "main", 
+			"Assets/Quadbit/Shaders/shadowmap.frag", "main", pipelineDescription, context_->shadowmapResources.renderPass);
 	}
 
 	void QbVkRenderer::CreateSwapChain() {
@@ -605,9 +628,6 @@ namespace Quadbit {
 		CreateSwapChain();
 		CreateMultisamplingResources();
 		CreateDepthResources();
-
-		// Mesh Pipeline
-		pbrPipeline_->RebuildPipeline();
 
 		// Requery the surface capabilities
 		VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(context_->gpu->physicalDevice, context_->surface, &context_->gpu->surfaceCapabilities));
@@ -725,39 +745,84 @@ namespace Quadbit {
 		ImGui::Render();
 	}
 
-	void QbVkRenderer::PrepareFrame(uint32_t resourceIndex, VkCommandBuffer commandbuffer, VkFramebuffer& framebuffer, VkImageView imageView) {
+	void QbVkRenderer::PrepareFrame(uint32_t resourceIndex, VkCommandBuffer commandBuffer, VkFramebuffer& framebuffer, VkImageView imageView) {
 		// Let the allocator cleanup stuff before preparing the frame
 		context_->allocator->EmptyGarbage();
 
 		eastl::array<VkClearValue, 2> clearValues;
+		clearValues[0].color = { {0.2f, 0.2f, 0.2f, 1.0f} };
+		clearValues[1].depthStencil = { 1.0f, 0 };
 
 		VkCommandBufferBeginInfo commandBufferInfo = VkUtils::Init::CommandBufferBeginInfo();
 		commandBufferInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-		VK_CHECK(vkBeginCommandBuffer(commandbuffer, &commandBufferInfo));
+		VK_CHECK(vkBeginCommandBuffer(commandBuffer, &commandBufferInfo));
+
+
+		//auto& shadowmapResources = context_->shadowmapResources;
+
+		//VkUtils::CreateFrameBuffer(*context_, 2048, 2048, shadowmapResources.framebuffers[resourceIndex], shadowmapResources.renderPass,
+		//	{ context_->resourceManager->textures_[shadowmapResources.texture].descriptor.imageView });
+
+		//VkRenderPassBeginInfo renderPassInfo = VkUtils::Init::RenderPassBeginInfo();
+		//renderPassInfo.renderPass = context_->shadowmapResources.renderPass;
+		//renderPassInfo.renderArea.offset = { 0, 0 };
+		//renderPassInfo.renderArea.extent = { 2048, 2048 };
+
+		//// This specifies the clear values to use for the VK_ATTACHMENT_LOAD_OP_CLEAR operation (in the color and depth attachments)
+		//renderPassInfo.clearValueCount = 1;
+		//renderPassInfo.pClearValues = &clearValues[1];
+		//renderPassInfo.framebuffer = shadowmapResources.framebuffers[resourceIndex];
+
+		//vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+		//constexpr float depthBiasConstant = 1.25f;
+		//constexpr float depthBiasSlope = 1.75f;
+		//vkCmdSetDepthBias(commandBuffer, depthBiasConstant, 0.0f, depthBiasSlope);
+
+		//auto& pipeline = context_->resourceManager->pipelines_[shadowmapResources.pipeline];
+		//pipeline->Bind(commandBuffer);
+
+		//pbrPipeline_->DrawShadows(resourceIndex, commandBuffer);
+
+		//vkCmdEndRenderPass(commandBuffer);
 
 		// Create the frame buffer
-		VkUtils::CreateFrameBuffer(*context_, framebuffer, imageView);
+		VkUtils::CreateFrameBuffer(*context_, context_->swapchain.extent.width, context_->swapchain.extent.height, 
+			framebuffer, context_->mainRenderPass, { context_->multisamplingResources.msaaImageView, context_->depthResources.imageView, imageView });
 
-		VkRenderPassBeginInfo renderPassInfo = VkUtils::Init::RenderPassBeginInfo();
+		auto renderPassInfo = VkUtils::Init::RenderPassBeginInfo();
 		renderPassInfo.renderPass = context_->mainRenderPass;
 		renderPassInfo.renderArea.offset = { 0, 0 };
 		renderPassInfo.renderArea.extent = context_->swapchain.extent;
 
 		// This specifies the clear values to use for the VK_ATTACHMENT_LOAD_OP_CLEAR operation (in the color and depth attachments)
-		clearValues[0].color = { {0.2f, 0.2f, 0.2f, 1.0f} };
-		clearValues[1].depthStencil = { 1.0f, 0 };
 		renderPassInfo.clearValueCount = 2;
 		renderPassInfo.pClearValues = clearValues.data();
 		renderPassInfo.framebuffer = framebuffer;
 
-		vkCmdBeginRenderPass(commandbuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+		vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-		pbrPipeline_->DrawFrame(resourceIndex, commandbuffer);
+		//auto& skyPipeline = context_->resourceManager->pipelines_[skyPipeline_];
+		//skyPipeline->Bind(commandBuffer);
+		//vkCmdDraw(commandBuffer, 6, 1, 0, 0);
+
+		skyPipeline_->DrawFrame(commandBuffer);
+		pbrPipeline_->DrawFrame(resourceIndex, commandBuffer);
 
 		ImGuiUpdateContent();
-		imGuiPipeline_->DrawFrame(resourceIndex, commandbuffer);
+		imGuiPipeline_->DrawFrame(resourceIndex, commandBuffer);
 
-		vkCmdEndRenderPass(commandbuffer);
-		VK_CHECK(vkEndCommandBuffer(commandbuffer));
+		vkCmdEndRenderPass(commandBuffer);
+		VK_CHECK(vkEndCommandBuffer(commandBuffer));
+	}
+	
+	void QbVkRenderer::Rebuild() {
+		RecreateSwapchain();
+		context_->resourceManager->RebuildPipelines();
+
+		context_->entityManager->AddComponent<CameraUpdateAspectRatioTag>(context_->fallbackCamera);
+		if (context_->userCamera != NULL_ENTITY && context_->entityManager->IsValid(context_->userCamera)) {
+			context_->entityManager->AddComponent<CameraUpdateAspectRatioTag>(context_->userCamera);
+		}
 	}
 }

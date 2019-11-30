@@ -17,6 +17,14 @@ namespace Quadbit {
 		return static_cast<float>(renderer_->context_->swapchain.extent.width) / static_cast<float>(renderer_->context_->swapchain.extent.height);
 	}
 
+	float Graphics::GetSunAzimuth() {
+		return renderer_->context_->sunAzimuth;
+	}
+
+	float Graphics::GetSunAltitude() {
+		return renderer_->context_->sunAltitude;
+	}
+
 	void Graphics::LoadSkyGradient(glm::vec3 botColour, glm::vec3 topColour) {
 		renderer_->pbrPipeline_->LoadSkyGradient(botColour, topColour);
 	}
@@ -56,7 +64,7 @@ namespace Quadbit {
 
 #pragma region Objects and Meshes
 	Entity Graphics::GetActiveCamera() {
-		return renderer_->pbrPipeline_->GetActiveCamera();
+		return renderer_->context_->GetActiveCamera();
 	}
 
 	void Graphics::RegisterCamera(Entity entity) {
@@ -64,7 +72,7 @@ namespace Quadbit {
 			QB_LOG_ERROR("Cannot register camera: Entity must have the Quadbit::RenderCamera component\n");
 			return;
 		}
-		renderer_->pbrPipeline_->SetCamera(entity);
+		renderer_->context_->SetCamera(entity);
 	}
 
 	QbVkShaderInstance Graphics::CreateShaderInstance() {
@@ -81,10 +89,12 @@ namespace Quadbit {
 
 	// Max instances here refers to the maximum number shader resource instances
 	QbVkPipelineHandle Graphics::CreatePipeline(const char* vertexPath, const char* vertexEntry, const char* fragmentPath, const char* fragmentEntry,
-		const QbVkPipelineDescription pipelineDescription, const uint32_t maxInstances, const eastl::vector<eastl::tuple<VkFormat, uint32_t>>& vertexAttributeOverride) {
+		const QbVkPipelineDescription pipelineDescription, const VkRenderPass renderPass, const uint32_t maxInstances, 
+		const eastl::vector<eastl::tuple<VkFormat, uint32_t>>& vertexAttributeOverride) {
+
 		auto handle = resourceManager_->pipelines_.GetNextHandle();
 		resourceManager_->pipelines_[handle] = eastl::make_unique<QbVkPipeline>(*renderer_->context_, vertexPath, vertexEntry,
-			fragmentPath, fragmentEntry, pipelineDescription, maxInstances, vertexAttributeOverride);
+			fragmentPath, fragmentEntry, pipelineDescription, renderPass == VkRenderPass(-1) ? renderer_->context_->mainRenderPass : renderPass, maxInstances, vertexAttributeOverride);
 		
 		auto& pipeline = resourceManager_->pipelines_[handle];
 		pipeline->Rebuild();
@@ -149,21 +159,6 @@ namespace Quadbit {
 			{ mesh->vertexHandle, mesh->indexHandle }
 		);
 		entityManager->RemoveComponent<CustomMeshComponent>(entity);
-	}
-#pragma endregion
-
-#pragma region Internal
-	void* Graphics::GetMappedGPUData(QbVkBufferHandle handle) {
-		QB_ASSERT(resourceManager_->buffers_[handle].alloc.data != nullptr && "GPUBuffer data not mapped!");
-		return resourceManager_->buffers_[handle].alloc.data;
-	}
-
-	uint32_t Graphics::GetUniformBufferAlignment(uint32_t structSize) {
-		return VkUtils::GetDynamicUBOAlignment(*renderer_->context_, structSize);
-	}
-
-	QbVkBufferHandle Graphics::CreateUniformBuffer(uint32_t alignedSize) {
-		return CreateGPUBuffer(alignedSize * MAX_FRAMES_IN_FLIGHT, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, QbVkMemoryUsage::QBVK_MEMORY_USAGE_CPU_TO_GPU);
 	}
 #pragma endregion
 }

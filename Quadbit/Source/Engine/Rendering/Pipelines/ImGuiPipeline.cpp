@@ -17,7 +17,7 @@ namespace Quadbit {
 		CreateFontTexture();
 
 		QbVkPipelineDescription pipelineDescription;
-		pipelineDescription.colorBlending = QbVkPipelineColorBlending::QBVK_COLORBLENDING_ENABLE;
+		pipelineDescription.colourBlending = QbVkPipelineColourBlending::QBVK_COLOURBLENDING_ENABLE;
 		pipelineDescription.depth = QbVkPipelineDepth::QBVK_PIPELINE_DEPTH_DISABLE;
 		pipelineDescription.dynamicState = QbVkPipelineDynamicState::QBVK_DYNAMICSTATE_VIEWPORTSCISSOR;
 		pipelineDescription.enableMSAA = true;
@@ -32,7 +32,7 @@ namespace Quadbit {
 		//	} });
 
 		pipeline_ = context_.resourceManager->CreateGraphicsPipeline("Assets/Quadbit/Shaders/imgui_vert.glsl", "main",
-			"Assets/Quadbit/Shaders/imgui_frag.glsl", "main", pipelineDescription, 1,
+			"Assets/Quadbit/Shaders/imgui_frag.glsl", "main", pipelineDescription, context_.mainRenderPass, 1,
 			eastl::vector<eastl::tuple<VkFormat, uint32_t>> { {
 				{VK_FORMAT_R32G32_SFLOAT, 8},
 				{ VK_FORMAT_R32G32_SFLOAT, 8 },

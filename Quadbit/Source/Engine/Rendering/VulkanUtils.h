@@ -862,7 +862,8 @@ namespace Quadbit::VkUtils {
 		context.allocator->DestroyBuffer(stagingBuffer);
 	}
 
-	inline void CreateFrameBuffer(const QbVkContext& context, VkFramebuffer& framebuffer, VkImageView imageView) {
+	inline void CreateFrameBuffer(const QbVkContext& context, uint32_t width, uint32_t height,
+		VkFramebuffer& framebuffer, const VkRenderPass renderPass, const eastl::vector<VkImageView> imageViews) {
 		// Might be troublemaker
 		if (framebuffer != VK_NULL_HANDLE) {
 			vkDestroyFramebuffer(context.device, framebuffer, nullptr);
@@ -871,13 +872,13 @@ namespace Quadbit::VkUtils {
 
 		// Here we will fill out the common information for the framebuffer
 		VkFramebufferCreateInfo framebufferInfo = Init::FramebufferCreateInfo();
-		framebufferInfo.renderPass = context.mainRenderPass;
-		framebufferInfo.width = context.swapchain.extent.width;
-		framebufferInfo.height = context.swapchain.extent.height;
+		framebufferInfo.renderPass = renderPass;
+		framebufferInfo.width = width;
+		framebufferInfo.height = height;
 		framebufferInfo.layers = 1;
-		eastl::array<VkImageView, 3> attachments = { context.multisamplingResources.msaaImageView, context.depthResources.imageView, imageView };
-		framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-		framebufferInfo.pAttachments = attachments.data();
+		//eastl::array<VkImageView, 3> attachments = { context.multisamplingResources.msaaImageView, context.depthResources.imageView, imageView };
+		framebufferInfo.attachmentCount = static_cast<uint32_t>(imageViews.size());
+		framebufferInfo.pAttachments = imageViews.data();
 
 		// Finally create it
 		VK_CHECK(vkCreateFramebuffer(context.device, &framebufferInfo, nullptr, &framebuffer))

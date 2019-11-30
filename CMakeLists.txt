@@ -29,6 +29,13 @@ set_target_properties(Water PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_SOU
 set_target_properties(Testing PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 set_target_properties(
+    Voxels
+    Water
+    Testing  
+        PROPERTIES FOLDER Examples
+    )
+
+set_target_properties(
     glslang 
     OGLCompiler 
     OSDependent 

@@ -31,12 +31,12 @@ void Water::Init() {
 	}
 
 	// Create UBO
-	togglesUBO_ = graphics_->CreateUniformBuffer<TogglesUBO>(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+	togglesUBO_ = graphics_->CreateUniformBuffer<TogglesUBO>();
 	auto* toggles = graphics_->GetUniformBufferPtr(togglesUBO_);
 	toggles->useNormalMap = 0;
 
 	Quadbit::QbVkPipelineDescription pipelineDescription;
-	pipelineDescription.colorBlending = Quadbit::QbVkPipelineColorBlending::QBVK_COLORBLENDING_DISABLE;
+	pipelineDescription.colourBlending = Quadbit::QbVkPipelineColourBlending::QBVK_COLOURBLENDING_DISABLE;
 	pipelineDescription.depth = Quadbit::QbVkPipelineDepth::QBVK_PIPELINE_DEPTH_ENABLE;
 	pipelineDescription.dynamicState = Quadbit::QbVkPipelineDynamicState::QBVK_DYNAMICSTATE_VIEWPORTSCISSOR;
 	pipelineDescription.enableMSAA = true;
@@ -102,7 +102,7 @@ void Water::Simulate(float deltaTime) {
 
 void Water::InitPrecalcComputeInstance() {
 	// Create UBO
-	precalcResources_.ubo = graphics_->CreateUniformBuffer<PrecalcUBO>(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+	precalcResources_.ubo = graphics_->CreateUniformBuffer<PrecalcUBO>();
 	// Set initial values for water
 	PrecalcUBO initialData;
 	initialData.N = WATER_RESOLUTION;
@@ -144,7 +144,7 @@ void Water::InitPrecalcComputeInstance() {
 
 void Water::InitWaveheightComputeInstance() {
 	// Create UBO
-	waveheightResources_.ubo = graphics_->CreateUniformBuffer<WaveheightUBO>(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+	waveheightResources_.ubo = graphics_->CreateUniformBuffer<WaveheightUBO>();
 	auto* waveheightUBO = graphics_->GetUniformBufferPtr(waveheightResources_.ubo);
 	// Fill with initial data
 	WaveheightUBO initialData;

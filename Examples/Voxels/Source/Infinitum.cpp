@@ -26,7 +26,7 @@ void Infinitum::Init() {
 	//renderer->RegisterCamera(camera_);
 
 	Quadbit::QbVkPipelineDescription pipelineDescription;
-	pipelineDescription.colorBlending = Quadbit::QbVkPipelineColorBlending::QBVK_COLORBLENDING_DISABLE;
+	pipelineDescription.colourBlending = Quadbit::QbVkPipelineColourBlending::QBVK_COLOURBLENDING_DISABLE;
 	pipelineDescription.depth = Quadbit::QbVkPipelineDepth::QBVK_PIPELINE_DEPTH_ENABLE;
 	pipelineDescription.dynamicState = Quadbit::QbVkPipelineDynamicState::QBVK_DYNAMICSTATE_VIEWPORTSCISSOR;
 	pipelineDescription.enableMSAA = true;

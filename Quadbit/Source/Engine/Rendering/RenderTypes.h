@@ -75,6 +75,20 @@ namespace Quadbit {
 		}
 	};
 
+	struct MaterialUBO {
+		glm::vec4 baseColorFactor;
+		glm::vec4 emissiveFactor;
+		float metallicFactor;
+		float roughnessFactor;
+		float alphaMask;
+		float alphaMaskCutoff;
+		int baseColorTextureIndex;
+		int metallicRoughnessTextureIndex;
+		int normalTextureIndex;
+		int occlusionTextureIndex;
+		int emissiveTextureIndex;
+	};
+
 	struct QbVkPBRMaterial {
 		struct TextureIndices {
 			int baseColorTextureIndex = -1;
@@ -96,9 +110,11 @@ namespace Quadbit {
 		glm::vec4 emissiveFactor{};
 		float metallicFactor = 0.0f;
 		float roughnessFactor = 0.0f;
+		float alphaMask = 0.0f;
+		float alphaCutoff = 0.0f;
 
-		//QbVkDescriptorAllocatorHandle descriptorAllocator = QBVK_DESCRIPTOR_ALLOCATOR_NULL_HANDLE;
 		QbVkDescriptorSetsHandle descriptorSets = QBVK_DESCRIPTOR_SETS_NULL_HANDLE;
+		QbVkUniformBuffer<MaterialUBO> ubo;
 	};
 
 	struct QbVkPBRPrimitive {

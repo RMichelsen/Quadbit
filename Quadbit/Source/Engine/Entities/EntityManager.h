@@ -13,37 +13,6 @@
 
 namespace Quadbit {
 	class SystemDispatch;
-	struct Entity {
-		EntityID id_;
-
-		Entity();
-		Entity(EntityID id) : id_(id) {}
-
-		bool operator == (const Entity& other) const { return (id_ == other.id_); }
-		bool operator != (const Entity& other) const { return (id_ != other.id_); }
-
-		template<typename T>
-		void AddComponent();
-
-		// Aggregate initialization
-		template<typename T>
-		void AddComponent(T&& t);
-
-		template<typename... T>
-		void AddComponents();
-
-		template<typename T>
-		T* const GetComponentPtr();
-
-		template<typename T>
-		bool HasComponent();
-
-		template<typename T>
-		void RemoveComponent();
-	};
-
-	inline const Entity NULL_ENTITY{ {0xFFFF'FFFF, 0xFFFF'FFFF} };
-
 	/*
 	Note on entity manager behaviour:
 	On release builds registering a component twice, adding a component twice
@@ -61,7 +30,6 @@ namespace Quadbit {
 		Entity Create();
 		void Destroy(const Entity& entity);
 		bool IsValid(const Entity& entity);
-		void Shutdown();
 
 		template<typename C>
 		SparseSet<C>* GetComponentStoragePtr() const {

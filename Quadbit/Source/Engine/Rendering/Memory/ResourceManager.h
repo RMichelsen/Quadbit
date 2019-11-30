@@ -43,7 +43,8 @@ namespace Quadbit {
 
 		QbVkPipelineHandle CreateGraphicsPipeline(const char* vertexPath, const char* vertexEntry,
 			const char* fragmentPath, const char* fragmentEntry, const QbVkPipelineDescription pipelineDescription,
-			const uint32_t maxInstances = 1, const eastl::vector<eastl::tuple<VkFormat, uint32_t>>& vertexAttributeOverride = {});
+			const VkRenderPass renderPass, const uint32_t maxInstances = 1, 
+			const eastl::vector<eastl::tuple<VkFormat, uint32_t>>& vertexAttributeOverride = {});
 		QbVkPipelineHandle CreateComputePipeline(const char* computePath, const char* computeEntry,
 			const void* specConstants = nullptr, const uint32_t maxInstances = 1);
 		void RebuildPipelines();
@@ -54,9 +55,33 @@ namespace Quadbit {
 		QbVkBufferHandle CreateGPUBuffer(VkDeviceSize size, VkBufferUsageFlags bufferUsage, QbVkMemoryUsage memoryUsage);
 		QbVkBufferHandle CreateVertexBuffer(const void* vertices, uint32_t vertexStride, uint32_t vertexCount);
 		QbVkBufferHandle CreateIndexBuffer(const eastl::vector<uint32_t>& indices);
+		
+		template<typename T>
+		QbVkUniformBuffer<T> CreateUniformBuffer() {
+			auto alignedSize = GetUniformBufferAlignment(sizeof(T));
+			QbVkBufferHandle handle = CreateUniformBuffer(alignedSize);
+			return QbVkUniformBuffer<T>{ handle, alignedSize };
+		}
+		template<typename T>
+		T* const GetUniformBufferPtr(QbVkUniformBuffer<T>& ubo) {
+			auto* data = static_cast<char*>(GetMappedGPUData(ubo.handle)) + (ubo.alignedSize * context_.resourceIndex);
+			return reinterpret_cast<T*>(data);
+		}
+		// This function initializes all the mapped buffer instances
+		// of the UBO to values given by the struct T
+		template<typename T>
+		void InitializeUBO(QbVkUniformBuffer<T>& ubo, const T* t) {
+			QB_ASSERT(t != nullptr);
+			void* data = GetMappedGPUData(ubo.handle);
+			for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+				char* dataInstance = reinterpret_cast<char*>(data) + (ubo.alignedSize * i);
+				memcpy(dataInstance, t, sizeof(T));
+			}
+		}
 
 		QbVkTextureHandle CreateTexture(uint32_t width, uint32_t height, VkSamplerCreateInfo* samplerInfo = nullptr);
-		QbVkTextureHandle CreateTexture(VkImageCreateInfo* imageInfo, VkSamplerCreateInfo* samplerInfo = nullptr);
+		QbVkTextureHandle CreateTexture(VkImageCreateInfo* imageInfo, VkImageAspectFlags aspectFlags,
+			VkImageLayout finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VkSamplerCreateInfo* samplerInfo = nullptr);
 		QbVkTextureHandle CreateStorageTexture(uint32_t width, uint32_t height, VkFormat format, VkSamplerCreateInfo* samplerInfo = nullptr);
 		QbVkTextureHandle LoadTexture(uint32_t width, uint32_t height, const void* data, VkSamplerCreateInfo* samplerInfo = nullptr);
 		QbVkTextureHandle LoadTexture(const char* imagePath, VkSamplerCreateInfo* samplerInfo = nullptr);
@@ -92,14 +117,21 @@ namespace Quadbit {
 		}
 
 		template<typename T, typename U>
-		U* GetDescriptorPtr(QbVkResourceHandle<T> handle) {
+		const U* Get(QbVkResourceHandle<T> handle) {
 			if constexpr (eastl::is_same<T, QbVkBuffer>::value) {
-				return &buffers_[handle].descriptor;
+				return &buffers_[handle];
 			}
 			else if constexpr (eastl::is_same<T, QbVkTexture>::value) {
-				return &textures_[handle].descriptor;
+				return &textures_[handle];
+			}
+			else if constexpr (eastl::is_same<T, QbVkDescriptorAllocator>::value) {
+				return &descriptorAllocators_[handle];
+			}
+			else if constexpr (eastl::is_same<T, eastl::unique_ptr<QbVkPipeline>>::value) {
+				return pipelines_[handle].get();
 			}
 		}
+
 
 		QbVkResource<QbVkBuffer, MAX_BUFFER_COUNT> buffers_;
 		QbVkResource<QbVkTexture, MAX_TEXTURE_COUNT> textures_;
@@ -110,5 +142,9 @@ namespace Quadbit {
 		QbVkContext& context_;
 		PerFrameTransfers transferQueue_;
 		QbVkTextureHandle emptyTexture_ = QBVK_TEXTURE_NULL_HANDLE;
+
+		uint32_t GetUniformBufferAlignment(uint32_t structSize);
+		QbVkBufferHandle CreateUniformBuffer(uint32_t alignedSize);
+		void* GetMappedGPUData(QbVkBufferHandle handle);
 	};
 }

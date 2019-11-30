@@ -29,6 +29,7 @@ namespace Quadbit {
 		eastl::string vertexEntry;
 		eastl::string fragmentPath;
 		eastl::string fragmentEntry;
+		VkRenderPass renderPass;
 	};
 	
 	struct ComputeResources {
@@ -46,10 +47,12 @@ namespace Quadbit {
 		VkVertexInputBindingDescription inputBindingDescription;
 		VkPipelineVertexInputStateCreateInfo vertexInputInfo;
 		VkPipelineInputAssemblyStateCreateInfo inputAssemblyInfo;
+		VkViewport viewport;
+		VkRect2D scissor;
 		VkPipelineViewportStateCreateInfo viewportInfo;
 		VkPipelineMultisampleStateCreateInfo multisampleInfo;
-		VkPipelineColorBlendAttachmentState colorBlendingAttachment;
-		VkPipelineColorBlendStateCreateInfo colorBlendInfo;
+		VkPipelineColorBlendAttachmentState colourBlendingAttachment;
+		VkPipelineColorBlendStateCreateInfo colourBlendInfo;
 		VkPipelineRasterizationStateCreateInfo rasterizationInfo;
 		VkPipelineDepthStencilStateCreateInfo depthStencilInfo;
 		VkPipelineDynamicStateCreateInfo dynamicStateInfo;
@@ -68,8 +71,8 @@ namespace Quadbit {
 		QbVkDescriptorSetsHandle mainDescriptors_ = QBVK_DESCRIPTOR_SETS_NULL_HANDLE;
 
 		QbVkPipeline(QbVkContext& context, const char* vertexPath, const char* vertexEntry,
-			const char* fragmentPath, const char* fragmentEntry, const QbVkPipelineDescription pipelineDescription, 
-			const uint32_t maxInstances = 1, const eastl::vector<eastl::tuple<VkFormat, uint32_t>>& vertexAttributeOverride = {});
+			const char* fragmentPath, const char* fragmentEntry, const QbVkPipelineDescription pipelineDescription,
+			const VkRenderPass renderPass, const uint32_t maxInstances = 1, const eastl::vector<eastl::tuple<VkFormat, uint32_t>>& vertexAttributeOverride = {});
 		QbVkPipeline(QbVkContext& context, const char* computePath, const char* computeEntry, 
 			const void* specConstants = nullptr, const uint32_t maxInstances = 1);
 		~QbVkPipeline();

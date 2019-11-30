@@ -23,8 +23,9 @@
 #include "Engine/Entities/SystemDispatch.h"
 #include "Engine/Entities/EntityManager.h"
 #include "Engine/Rendering/VulkanUtils.h"
-#include "Engine/Rendering/Systems/NoClipCameraSystem.h"
+#include "Engine/Rendering/Geometry/Icosphere.h"
 #include "Engine/Rendering/Memory/ResourceManager.h"
+#include "Engine/Rendering/Systems/NoClipCameraSystem.h"
 
 
 namespace Quadbit {
@@ -35,23 +36,79 @@ namespace Quadbit {
 		context.entityManager->RegisterComponents<CustomMeshComponent, CustomMeshDeleteComponent, PBRSceneComponent, RenderTransformComponent,
 			RenderCamera, CameraUpdateAspectRatioTag>();
 
-		fallbackCamera_ = context.entityManager->Create();
-		context.entityManager->AddComponent<RenderCamera>(fallbackCamera_, Quadbit::RenderCamera(145.0f, -42.0f, glm::vec3(130.0f, 190.0f, 25.0f), 16.0f / 9.0f, 10000.0f));
-
 		QbVkPipelineDescription pipelineDescription;
-		pipelineDescription.colorBlending = QbVkPipelineColorBlending::QBVK_COLORBLENDING_DISABLE;
+		pipelineDescription.colourBlending = QbVkPipelineColourBlending::QBVK_COLOURBLENDING_DISABLE;
 		pipelineDescription.depth = QbVkPipelineDepth::QBVK_PIPELINE_DEPTH_ENABLE;
 		pipelineDescription.dynamicState = QbVkPipelineDynamicState::QBVK_DYNAMICSTATE_VIEWPORTSCISSOR;
 		pipelineDescription.enableMSAA = true;
 		pipelineDescription.rasterization = QbVkPipelineRasterization::QBVK_PIPELINE_RASTERIZATION_DEFAULT;
 
 		pipeline_ = context_.resourceManager->CreateGraphicsPipeline("Assets/Quadbit/Shaders/default_vert.glsl", "main",
-			"Assets/Quadbit/Shaders/default_frag.glsl", "main", pipelineDescription, 1024);
+			"Assets/Quadbit/Shaders/default_frag.glsl", "main", pipelineDescription, context_.mainRenderPass, 1024);
+
+		sunUBO_ = context.resourceManager->CreateUniformBuffer<SunUBO>();
 	}
 
-	void PBRPipeline::RebuildPipeline() {
-		context_.entityManager->AddComponent<CameraUpdateAspectRatioTag>(fallbackCamera_);
-		if (userCamera_ != NULL_ENTITY && context_.entityManager->IsValid(userCamera_)) context_.entityManager->AddComponent<CameraUpdateAspectRatioTag>(userCamera_);
+	void PBRPipeline::DrawShadows(uint32_t resourceIndex, VkCommandBuffer commandBuffer) {
+		//auto& pipeline = context_.resourceManager->pipelines_[context_.shadowmapResources.pipeline];
+
+		//static float timer = 0.0f;
+
+		//// Animate the light source
+		//auto* ubo = context_.resourceManager->GetUniformBufferPtr<PBRUBO>(ubo_);
+		//ubo->lightPos.x = sin(glm::radians(timer * 360.0f)) * 40.0f;
+		//ubo->lightPos.y = 500.0f;
+		//ubo->lightPos.z = cos(glm::radians(timer * 360.0f)) * 40.0f;
+
+		//// Matrix from light's point of view
+		//static float zNear = 1.0f;
+		//static float zFar = 96.0f;
+		//static float lightFOV = 45.0f;
+
+		//ImGui::Begin("Camera Position", nullptr);
+		//ImGui::DragFloat("zNear", &zNear);
+		//ImGui::DragFloat("zFar", &zFar);
+		//ImGui::DragFloat("FOV", &lightFOV);
+		//ImGui::End();
+
+		//glm::mat4 depthProjectionMatrix = glm::perspective(glm::radians(lightFOV), 1.0f, zNear, zFar);
+		//glm::mat4 depthViewMatrix = glm::lookAt(ubo->lightPos, glm::vec3(0.0f), glm::vec3(0, 1, 0));
+		//glm::mat4 depthModelMatrix = glm::mat4(1.0f);
+		//glm::mat4 lightSpace = depthProjectionMatrix * depthViewMatrix * depthModelMatrix;
+		//ubo->lightSpace = lightSpace;
+
+
+		//ImGui::Begin("LightSpace");
+		//ImGui::Text("%f %f %f %f\n", lightSpace[0][0], lightSpace[0][1], lightSpace[0][2], lightSpace[0][3]);
+		//ImGui::Text("%f %f %f %f\n", lightSpace[1][0], lightSpace[1][1], lightSpace[1][2], lightSpace[1][3]);
+		//ImGui::Text("%f %f %f %f\n", lightSpace[2][0], lightSpace[2][1], lightSpace[2][2], lightSpace[2][3]);
+		//ImGui::Text("%f %f %f %f\n", lightSpace[3][0], lightSpace[3][1], lightSpace[3][2], lightSpace[3][3]);
+		//ImGui::End();
+
+		//timer += 0.0001f;
+
+		//context_.entityManager->ForEach<PBRSceneComponent, RenderTransformComponent>(
+		//	[&](Entity entity, PBRSceneComponent& scene, RenderTransformComponent& transform) noexcept {
+		//		for (const auto& mesh : scene.meshes) {
+		//			eastl::array<VkDeviceSize, 1> offsets{ 0 };
+
+		//			for (const auto& primitive : mesh.primitives) {
+		//				offsets[0] = primitive.vertexOffset * sizeof(QbVkVertex);
+		//				vkCmdBindVertexBuffers(commandBuffer, 0, 1, &context_.resourceManager->buffers_[scene.vertexHandle].buf, offsets.data());
+		//				vkCmdBindIndexBuffer(commandBuffer, context_.resourceManager->buffers_[scene.indexHandle].buf, primitive.indexOffset * sizeof(uint32_t), VK_INDEX_TYPE_UINT32);
+
+		//				//RenderMeshPushConstants* pushConstants = scene.GetSafePushConstPtr<RenderMeshPushConstants>();
+		//				//auto model = transform.model * mesh.localTransform;
+		//				//pushConstants->model = model;	
+		//				//pushConstants->mvp = camera->perspective * camera->view * model;
+		//				vkCmdPushConstants(commandBuffer, pipeline->pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &lightSpace);
+
+		//				//pipeline->BindDescriptorSets(commandBuffer, primitive.material.descriptorSets);
+
+		//				vkCmdDrawIndexed(commandBuffer, primitive.indexCount, 1, 0, 0, 0);
+		//			}
+		//		}
+		//	});
 	}
 
 	void PBRPipeline::DrawFrame(uint32_t resourceIndex, VkCommandBuffer commandBuffer) {
@@ -75,14 +132,14 @@ namespace Quadbit {
 			camera.perspective[1][1] *= -1;
 			});
 
-		if (userCamera_ == NULL_ENTITY || !context_.entityManager->IsValid(userCamera_)) {
+		if (context_.userCamera == NULL_ENTITY || !context_.entityManager->IsValid(context_.userCamera)) {
 			context_.entityManager->systemDispatch_->RunSystem<NoClipCameraSystem>(Time::deltaTime, context_.inputHandler);
 		}
 
 		Quadbit::RenderCamera* camera;
-		(userCamera_ != NULL_ENTITY && context_.entityManager->IsValid(userCamera_)) ? 
-			camera = context_.entityManager->GetComponentPtr<RenderCamera>(userCamera_) : 
-			camera = context_.entityManager->GetComponentPtr<RenderCamera>(fallbackCamera_);
+		(context_.userCamera != NULL_ENTITY && context_.entityManager->IsValid(context_.userCamera)) ?
+			camera = context_.entityManager->GetComponentPtr<RenderCamera>(context_.userCamera) :
+			camera = context_.entityManager->GetComponentPtr<RenderCamera>(context_.fallbackCamera);
 
 		// Update environment map if applicable, use camera stuff to do this
 		//if (environmentMap_ != NULL_ENTITY) {
@@ -107,11 +164,20 @@ namespace Quadbit {
 		//	camera->view = glm::lookAt(camera->position, camera->position + camera->front, camera->up);
 		//}
 
-		SetViewportAndScissor(commandBuffer);
+
+		ImGui::Begin("Camera Position", nullptr);
+		ImGui::Text("%f, %f, %f", camera->position.x, camera->position.y, camera->position.z);
+		ImGui::End();
 
 		VkDeviceSize offsets[]{ 0 };
 
 		pipeline->Bind(commandBuffer);
+		SetViewportAndScissor(commandBuffer);
+
+		auto* sunUBO = context_.resourceManager->GetUniformBufferPtr<SunUBO>(sunUBO_);
+		sunUBO->sunAltitude = context_.sunAltitude;
+		sunUBO->sunAzimuth = context_.sunAzimuth;
+
 		context_.entityManager->ForEach<PBRSceneComponent, RenderTransformComponent>(
 			[&](Entity entity, PBRSceneComponent& scene, RenderTransformComponent& transform) noexcept {
 			for (const auto& mesh : scene.meshes) {
@@ -126,6 +192,7 @@ namespace Quadbit {
 					auto model = transform.model * mesh.localTransform;
 					pushConstants->model = model;
 					pushConstants->mvp = camera->perspective * camera->view * model;
+
 					vkCmdPushConstants(commandBuffer, pipeline->pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RenderMeshPushConstants), pushConstants);
 
 					pipeline->BindDescriptorSets(commandBuffer, primitive.material.descriptorSets);
@@ -144,7 +211,7 @@ namespace Quadbit {
 			if (mesh.pushConstantStride == -1) {
 				RenderMeshPushConstants* pushConstants = mesh.GetSafePushConstPtr<RenderMeshPushConstants>();
 				pushConstants->model = transform.model;
-				pushConstants->mvp = camera->perspective * camera->view * transform.model;
+				pushConstants->mvp = (camera->perspective * camera->view * transform.model);
 				vkCmdPushConstants(commandBuffer, meshPipeline->pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RenderMeshPushConstants), pushConstants);
 			}
 			else if (mesh.pushConstantStride > 0) {
@@ -202,67 +269,6 @@ namespace Quadbit {
 		return scene;
 	}
 
-	Entity PBRPipeline::GetActiveCamera() {
-		return (userCamera_ == NULL_ENTITY) ? fallbackCamera_ : userCamera_;
-	}
-
-	void PBRPipeline::SetCamera(Entity entity) {
-		if(entity != NULL_ENTITY) userCamera_ = entity;
-	}
-
-	void PBRPipeline::LoadSkyGradient(glm::vec3 botColour, glm::vec3 topColour) {
-		//eastl::vector<Quadbit::QbVkVertexInputAttribute> vertexModel{
-		//	Quadbit::QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_POSITION,
-		//	Quadbit::QbVkVertexInputAttribute::QBVK_VERTEX_ATTRIBUTE_COLOUR
-		//};
-
-		//QbVkShaderInstance shaderInstance(context_);
-		//shaderInstance.AddShader(gradientSkyboxVert.data(), static_cast<uint32_t>(gradientSkyboxVert.size()), "main", VK_SHADER_STAGE_VERTEX_BIT);
-		//shaderInstance.AddShader(gradientSkyboxFrag.data(), static_cast<uint32_t>(gradientSkyboxFrag.size()), "main", VK_SHADER_STAGE_FRAGMENT_BIT);
-
-		//eastl::vector<QbVkRenderDescriptor> empty{};
-		//const QbVkRenderMeshInstance* instance = CreateInstance(empty, vertexModel, shaderInstance, sizeof(EnvironmentMapPushConstants), VK_SHADER_STAGE_VERTEX_BIT, VK_FALSE);
-
-		//const eastl::vector<SkyGradientVertex> cubeVertices = {
-		//	{{-1.0f, -1.0f, 1.0f},	topColour},
-		//	{{1.0f, -1.0f, 1.0f},	topColour},
-		//	{{1.0f, 1.0f, 1.0f},	botColour},
-		//	{{-1.0f, 1.0f, 1.0f},	botColour},
-
-		//	{{-1.0f, -1.0f, -1.0f}, topColour},
-		//	{{1.0f, -1.0f, -1.0f},	topColour},
-		//	{{1.0f, 1.0f, -1.0f},	botColour},
-		//	{{-1.0f, 1.0f, -1.0f},	botColour}
-		//};
-
-		//const eastl::vector<uint32_t> cubeIndices = {
-		//	0, 1, 2,
-		//	2, 3, 0,
-		//	1, 5, 6,
-		//	6, 2, 1,
-		//	7, 6, 5,
-		//	5, 4, 7,
-		//	4, 0, 3,
-		//	3, 7, 4,
-		//	4, 5, 1,
-		//	1, 0, 4,
-		//	3, 2, 6,
-		//	6, 7, 3
-		//};
-
-		//environmentMap_ = context_.entityManager->Create();
-		//context_.entityManager->AddComponent<RenderMeshComponent>(environmentMap_, {
-		//	context_.resourceManager->CreateVertexBuffer(cubeVertices.data(), sizeof(SkyGradientVertex), static_cast<uint32_t>(cubeVertices.size())),
-		//	context_.resourceManager->CreateIndexBuffer(cubeIndices),
-		//	static_cast<uint32_t>(cubeIndices.size()),
-		//	eastl::array<float, 32>(),
-		//	sizeof(EnvironmentMapPushConstants),
-		//	instance
-		//	});
-		//context_.entityManager->AddComponent<Quadbit::RenderTransformComponent>(environmentMap_,
-		//	Quadbit::RenderTransformComponent(1.0f, { 0.0f, 0.0f, 0.0f }, { 0, 0, 0, 1 }));
-	}
-
 	void PBRPipeline::SetViewportAndScissor(VkCommandBuffer& commandBuffer) {
 		// Dynamic update viewport and scissor for user-defined pipelines (also doesn't necessitate rebuilding the pipeline on window resize)
 		VkViewport viewport{};
@@ -284,30 +290,35 @@ namespace Quadbit {
 
 		QbVkPBRMaterial mat{};
 		if (material.values.find("baseColorTexture") != material.values.end()) {
-			mat.baseColorTexture = CreateTextureFromResource(model, material, "baseColorTexture");
+			auto& texture = model.textures[material.values.at("baseColorTexture").TextureIndex()];
+			mat.baseColorTexture = CreateTextureFromResource(model, texture);
 			mat.textureIndices.baseColorTextureIndex = material.values.at("baseColorTexture").TextureTexCoord();
 		}
 		if (material.values.find("metallicRoughnessTexture") != material.values.end()) {
-			mat.metallicRoughnessTexture = CreateTextureFromResource(model, material, "metallicRoughnessTexture");
+			auto& texture = model.textures[material.values.at("metallicRoughnessTexture").TextureIndex()];
+			mat.metallicRoughnessTexture = CreateTextureFromResource(model, texture);
 			mat.textureIndices.metallicRoughnessTextureIndex = material.values.at("metallicRoughnessTexture").TextureTexCoord();
 		}
-		if (material.values.find("normalTexture") != material.values.end()) {
-			mat.normalTexture = CreateTextureFromResource(model, material, "normalTexture");
-			mat.textureIndices.normalTextureIndex = material.values.at("normalTexture").TextureTexCoord();
+		if (material.additionalValues.find("normalTexture") != material.additionalValues.end()) {
+			auto& texture = model.textures[material.additionalValues.at("normalTexture").TextureIndex()];
+			mat.normalTexture = CreateTextureFromResource(model, texture);
+			mat.textureIndices.normalTextureIndex = material.additionalValues.at("normalTexture").TextureTexCoord();
 		}
-		if (material.values.find("occlusionTexture") != material.values.end()) {
-			mat.occlusionTexture = CreateTextureFromResource(model, material, "occlusionTexture");
-			mat.textureIndices.occlusionTextureIndex = material.values.at("occlusionTexture").TextureTexCoord();
+		if (material.additionalValues.find("occlusionTexture") != material.additionalValues.end()) {
+			auto& texture = model.textures[material.additionalValues.at("occlusionTexture").TextureIndex()];
+			mat.occlusionTexture = CreateTextureFromResource(model, texture);
+			mat.textureIndices.occlusionTextureIndex = material.additionalValues.at("occlusionTexture").TextureTexCoord();
 		}
-		if (material.values.find("emissiveTexture") != material.values.end()) {
-			mat.occlusionTexture = CreateTextureFromResource(model, material, "emissiveTexture");
-			mat.textureIndices.occlusionTextureIndex = material.values.at("emissiveTexture").TextureTexCoord();
+		if (material.additionalValues.find("emissiveTexture") != material.additionalValues.end()) {
+			auto& texture = model.textures[material.additionalValues.at("emissiveTexture").TextureIndex()];
+			mat.emissiveTexture = CreateTextureFromResource(model, texture);
+			mat.textureIndices.emissiveTextureIndex = material.additionalValues.at("emissiveTexture").TextureTexCoord();
 		}
 		if (material.values.find("baseColorFactor") != material.values.end()) {
 			mat.baseColorFactor = glm::make_vec4(material.values.at("baseColorFactor").ColorFactor().data());
 		}
-		if (material.values.find("emissiveFactor") != material.values.end()) {
-			mat.emissiveFactor = glm::vec4(glm::make_vec3(material.values.at("emissiveFactor").ColorFactor().data()), 1.0f);
+		if (material.additionalValues.find("emissiveFactor") != material.additionalValues.end()) {
+			mat.emissiveFactor = glm::vec4(glm::make_vec3(material.additionalValues.at("emissiveFactor").ColorFactor().data()), 1.0f);
 		}
 		if (material.values.find("metallicFactor") != material.values.end()) {
 			mat.metallicFactor = static_cast<float>(material.values.at("metallicFactor").Factor());
@@ -315,8 +326,32 @@ namespace Quadbit {
 		if (material.values.find("roughnessFactor") != material.values.end()) {
 			mat.roughnessFactor = static_cast<float>(material.values.at("roughnessFactor").Factor());
 		}
+		if (material.additionalValues.find("alphaMode") != material.additionalValues.end()) {
+			if (material.additionalValues.at("alphaMode").string_value == "MASK") {
+				mat.alphaMask = 1.0f;
+				mat.alphaCutoff = 0.5f;
+				if (material.additionalValues.find("alphaCutoff") != material.additionalValues.end()) {
+					mat.alphaCutoff = static_cast<float>(material.additionalValues.at("alphaCutoff").Factor());
+				}
+			}
+		}
+
+		mat.ubo = context_.resourceManager->CreateUniformBuffer<MaterialUBO>();
+		MaterialUBO ubo{};
+		ubo.alphaMask = mat.alphaMask;
+		ubo.alphaMaskCutoff = mat.alphaCutoff;
+		ubo.baseColorFactor = mat.baseColorFactor;
+		ubo.emissiveFactor = mat.emissiveFactor;
+		ubo.metallicFactor = mat.metallicFactor;
+		ubo.roughnessFactor = mat.roughnessFactor;
+		ubo.baseColorTextureIndex = mat.textureIndices.baseColorTextureIndex;
+		ubo.emissiveTextureIndex = mat.textureIndices.emissiveTextureIndex;
+		ubo.metallicRoughnessTextureIndex = mat.textureIndices.metallicRoughnessTextureIndex;
+		ubo.normalTextureIndex = mat.textureIndices.normalTextureIndex;
+		ubo.occlusionTextureIndex = mat.textureIndices.occlusionTextureIndex;
+		context_.resourceManager->InitializeUBO(mat.ubo, &ubo);
+
 		mat.descriptorSets = WriteMaterialDescriptors(mat);
-		//mat.descriptorAllocator = pipeline->descriptorAllocator_;
 		return mat;
 	}
 
@@ -486,16 +521,22 @@ namespace Quadbit {
 		auto& emissiveHandle = (material.textureIndices.emissiveTextureIndex > -1) ?
 			material.emissiveTexture : emptyTextureHandle;
 
+		// Bind UBO for vertex shader
+		pipeline->BindResource(descriptorSetsHandle, "SunUBO", sunUBO_.handle);
+
+		// Bind texture for fragment shader
+		pipeline->BindResource(descriptorSetsHandle, "shadowMap", context_.shadowmapResources.texture);
 		pipeline->BindResource(descriptorSetsHandle, "baseColorMap", baseColorHandle);
 		pipeline->BindResource(descriptorSetsHandle, "metallicRoughnessMap", metallicRoughnessHandle);
 		pipeline->BindResource(descriptorSetsHandle, "normalMap", normalHandle);
 		pipeline->BindResource(descriptorSetsHandle, "occlusionMap", occlusionHandle);
 		pipeline->BindResource(descriptorSetsHandle, "emissiveMap", emissiveHandle);
 
+		pipeline->BindResource(descriptorSetsHandle, "MaterialUBO", material.ubo.handle);
+
 		return descriptorSetsHandle;
 	}
-	QbVkTextureHandle PBRPipeline::CreateTextureFromResource(const tinygltf::Model& model, const tinygltf::Material& material, const char* textureName) {
-		auto& texture = model.textures[material.values.at(textureName).TextureIndex()];
+	QbVkTextureHandle PBRPipeline::CreateTextureFromResource(const tinygltf::Model& model, const tinygltf::Texture& texture) {
 		auto& image = model.images[texture.source];
 
 		auto samplerInfo = GetSamplerInfo(model, texture.sampler);

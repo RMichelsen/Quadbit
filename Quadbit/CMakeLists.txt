@@ -27,7 +27,7 @@ add_subdirectory(Dependencies/glslang EXCLUDE_FROM_ALL)
 
 add_custom_target(glmNatVis SOURCES Dependencies/glm/util/glm.natvis)
 add_custom_target(EASTLNatVis SOURCES Dependencies/EASTL/doc/EASTL.natvis)
-
+    
 set(QUADBIT_SOURCES
    Source/Engine/API/Compute.h
    Source/Engine/API/Compute.cpp
@@ -59,6 +59,8 @@ set(QUADBIT_SOURCES
    Source/Engine/Rendering/VulkanTypes.h
    Source/Engine/Rendering/VulkanUtils.h
 
+   Source/Engine/Rendering/Geometry/Icosphere.h
+
    Source/Engine/Rendering/Memory/Allocator.h
    Source/Engine/Rendering/Memory/Allocator.cpp
    Source/Engine/Rendering/Memory/Pool.h
@@ -72,6 +74,8 @@ set(QUADBIT_SOURCES
    Source/Engine/Rendering/Pipelines/ImGuiPipeline.cpp
    Source/Engine/Rendering/Pipelines/PBRPipeline.h
    Source/Engine/Rendering/Pipelines/PBRPipeline.cpp
+   Source/Engine/Rendering/Pipelines/SkyPipeline.h
+   Source/Engine/Rendering/Pipelines/SkyPipeline.cpp
 
    Source/Engine/Rendering/Shaders/ShaderCompiler.h
    Source/Engine/Rendering/Shaders/ShaderCompiler.cpp

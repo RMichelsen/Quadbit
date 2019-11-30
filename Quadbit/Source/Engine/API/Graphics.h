@@ -7,6 +7,7 @@
 
 #include "Engine/Rendering/RenderTypes.h"
 #include "Engine/Rendering/VulkanTypes.h"
+#include "Engine/Rendering/Memory/ResourceManager.h"
 #include "Engine/Rendering/Pipelines/PipelinePresets.h"
 
 namespace Quadbit {
@@ -22,6 +23,8 @@ namespace Quadbit {
 		/*   General   */
 		/***************/
 		float GetAspectRatio();
+		float GetSunAzimuth();
+		float GetSunAltitude();
 		void LoadSkyGradient(glm::vec3 botColour, glm::vec3 topColour);
 
 		/**************/
@@ -31,27 +34,20 @@ namespace Quadbit {
 		void TransferDataToGPUBuffer(const void* data, VkDeviceSize size, QbVkBufferHandle destination);
 
 		template<typename T>
-		QbVkUniformBuffer<T> CreateUniformBuffer(VkBufferUsageFlags bufferUsage) {
-			auto alignedSize = GetUniformBufferAlignment(sizeof(T));
-			QbVkBufferHandle handle = CreateUniformBuffer(alignedSize);
-			return QbVkUniformBuffer<T>{ handle, alignedSize };
+		QbVkUniformBuffer<T> CreateUniformBuffer() {
+			return renderer_->context_->resourceManager->CreateUniformBuffer<T>();
 		}
+
 		template<typename T>
 		T* const GetUniformBufferPtr(QbVkUniformBuffer<T>& ubo) {
-			auto* data = reinterpret_cast<char*>(GetMappedGPUData(ubo.handle)) + (ubo.alignedSize * renderer_->context_->resourceIndex);
-			return reinterpret_cast<T*>(data);
+			return renderer_->context_->resourceManager->GetUniformBufferPtr<T>(ubo);
 		}
 
 		// This function initializes all the mapped buffer instances
 		// of the UBO to values given by the struct T
 		template<typename T>
 		void InitializeUBO(QbVkUniformBuffer<T>& ubo, const T* t) {
-			QB_ASSERT(t != nullptr);
-			void* data = GetMappedGPUData(ubo.handle);
-			for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-				char* dataInstance = reinterpret_cast<char*>(data) + (ubo.alignedSize * i);
-				memcpy(dataInstance, t, sizeof(T));
-			}
+			renderer_->context_->resourceManager->InitializeUBO(ubo, t);
 		}
 
 		/******************************/
@@ -73,7 +69,8 @@ namespace Quadbit {
 		QbVkBufferHandle CreateVertexBuffer(const void* vertices, uint32_t vertexStride, uint32_t vertexCount);
 		QbVkBufferHandle CreateIndexBuffer(const eastl::vector<uint32_t>& indices);
 		QbVkPipelineHandle CreatePipeline(const char* vertexPath, const char* vertexEntry, const char* fragmentPath, const char* fragmentEntry,
-			const QbVkPipelineDescription pipelineDescription, const uint32_t maxInstances = 1, const eastl::vector<eastl::tuple<VkFormat, uint32_t>>& vertexAttributeOverride = {});
+			const QbVkPipelineDescription pipelineDescription, const VkRenderPass renderPass = VkRenderPass(-1), const uint32_t maxInstances = 1, 
+			const eastl::vector<eastl::tuple<VkFormat, uint32_t>>& vertexAttributeOverride = {});
 
 		void BindResource(const QbVkPipelineHandle pipelineHandle, const eastl::string name,
 			const QbVkBufferHandle bufferHandle, const QbVkDescriptorSetsHandle descriptorsHandle = QBVK_DESCRIPTOR_SETS_NULL_HANDLE);
@@ -106,10 +103,5 @@ namespace Quadbit {
 	private:
 		QbVkRenderer* const renderer_;
 		QbVkResourceManager* const resourceManager_;
-
-		void* GetMappedGPUData(QbVkBufferHandle handle);
-		uint32_t GetUniformBufferAlignment(uint32_t structSize);
-		QbVkBufferHandle CreateUniformBuffer(uint32_t alignedSize);
-
 	};
 }

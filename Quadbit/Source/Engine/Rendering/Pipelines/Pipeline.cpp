@@ -12,13 +12,15 @@ namespace Quadbit {
     // Max instances here refers to the maximum number shader resource instances
 	QbVkPipeline::QbVkPipeline(QbVkContext& context, const char* vertexPath, const char* vertexEntry,
         const char* fragmentPath, const char* fragmentEntry, const QbVkPipelineDescription pipelineDescription,
-        const uint32_t maxInstances, const eastl::vector<eastl::tuple<VkFormat, uint32_t>>& vertexAttributeOverride) : context_(context) {
+        const VkRenderPass renderPass, const uint32_t maxInstances, 
+        const eastl::vector<eastl::tuple<VkFormat, uint32_t>>& vertexAttributeOverride) : context_(context) {
 
         graphicsResources_ = eastl::make_unique<GraphicsResources>();
         graphicsResources_->vertexPath = vertexPath;
         graphicsResources_->vertexEntry = vertexEntry;
         graphicsResources_->fragmentPath = fragmentPath;
         graphicsResources_->fragmentEntry = fragmentEntry;
+        graphicsResources_->renderPass = renderPass;
 
         auto vertexBytecode = context_.shaderCompiler->CompileShader(vertexPath, QbVkShaderType::QBVK_SHADER_TYPE_VERTEX);
         auto fragmentBytecode = context_.shaderCompiler->CompileShader(fragmentPath, QbVkShaderType::QBVK_SHADER_TYPE_FRAGMENT);
@@ -58,68 +60,80 @@ namespace Quadbit {
             }
         }
 
-        // Now we will parse the vertex attributes. Here we make the assumption that
-        // all vectors are in 32-bit floating point format. That means a vec2 is an R32G32_SFLOAT,
-        // a vec3 is an R32G32B32_SFLOAT etc. The user can override the vertex attribute formats
-        // by placing the VkFormats in order, in the vertexAttributeOverride vector
-        eastl::vector<VertexInput> vertexInput;
-        for (const auto& input : vertexResources.stage_inputs) {
-            auto location = vertexCompiler.get_decoration(input.id, spv::DecorationLocation);
-            auto type = vertexCompiler.get_type(input.type_id);
-            vertexInput.push_back({ location, type.vecsize * static_cast<uint32_t>(sizeof(float)) });
-        }
-        // We will sort the inputs so the first location is the first entry, 
-        // this makes it easier to build the attribute descriptions
-        const auto compare = [](const VertexInput & a, const VertexInput & b) {
-            return a.location < b.location;
-        };
-        eastl::sort(vertexInput.begin(), vertexInput.end(), compare);
-
-        auto offset = 0;
-        for (int i = 0; i < vertexInput.size(); i++) {
-            // Override the VkFormat in case necessary
-            if (!vertexAttributeOverride.empty()) {
-                auto format = eastl::get<VkFormat>(vertexAttributeOverride[i]);
-                auto size = eastl::get<uint32_t>(vertexAttributeOverride[i]);
-                auto attribute = VkUtils::Init::VertexInputAttributeDescription(0, vertexInput[i].location, format, offset);
-                persistentPipelineInfo_.attributeDescriptions.push_back(attribute);
-                offset += size;
-                continue;
+        if (!vertexResources.stage_inputs.empty()) {
+            // Now we will parse the vertex attributes. Here we make the assumption that
+            // all vectors are in 32-bit floating point format. That means a vec2 is an R32G32_SFLOAT,
+            // a vec3 is an R32G32B32_SFLOAT etc. The user can override the vertex attribute formats
+            // by placing the VkFormats in order, in the vertexAttributeOverride vector
+            eastl::vector<VertexInput> vertexInput;
+            for (const auto& input : vertexResources.stage_inputs) {
+                auto location = vertexCompiler.get_decoration(input.id, spv::DecorationLocation);
+                auto type = vertexCompiler.get_type(input.type_id);
+                vertexInput.push_back({ location, type.vecsize * static_cast<uint32_t>(sizeof(float)) });
             }
-            auto attribute = 
-                VkUtils::Init::VertexInputAttributeDescription(0, vertexInput[i].location, VkUtils::GetVertexFormatFromSize(vertexInput[i].size), offset);
-            persistentPipelineInfo_.attributeDescriptions.push_back(attribute);
-            offset += vertexInput[i].size;
-        }
-        persistentPipelineInfo_.inputBindingDescription = VkUtils::Init::VertexInputBindingDescription(0, offset, VK_VERTEX_INPUT_RATE_VERTEX);
+            // We will sort the inputs so the first location is the first entry, 
+            // this makes it easier to build the attribute descriptions
+            const auto compare = [](const VertexInput& a, const VertexInput& b) {
+                return a.location < b.location;
+            };
+            eastl::sort(vertexInput.begin(), vertexInput.end(), compare);
 
-        persistentPipelineInfo_.vertexInputInfo =
-            VkUtils::Init::PipelineVertexInputStateCreateInfo(persistentPipelineInfo_.attributeDescriptions, persistentPipelineInfo_.inputBindingDescription);
+            auto offset = 0;
+            for (int i = 0; i < vertexInput.size(); i++) {
+                // Override the VkFormat in case necessary
+                if (!vertexAttributeOverride.empty()) {
+                    auto format = eastl::get<VkFormat>(vertexAttributeOverride[i]);
+                    auto size = eastl::get<uint32_t>(vertexAttributeOverride[i]);
+                    auto attribute = VkUtils::Init::VertexInputAttributeDescription(0, vertexInput[i].location, format, offset);
+                    persistentPipelineInfo_.attributeDescriptions.push_back(attribute);
+                    offset += size;
+                    continue;
+                }
+                auto attribute =
+                    VkUtils::Init::VertexInputAttributeDescription(0, vertexInput[i].location, VkUtils::GetVertexFormatFromSize(vertexInput[i].size), offset);
+                persistentPipelineInfo_.attributeDescriptions.push_back(attribute);
+                offset += vertexInput[i].size;
+            }
+            persistentPipelineInfo_.inputBindingDescription = VkUtils::Init::VertexInputBindingDescription(0, offset, VK_VERTEX_INPUT_RATE_VERTEX);
+
+            persistentPipelineInfo_.vertexInputInfo =
+                VkUtils::Init::PipelineVertexInputStateCreateInfo(persistentPipelineInfo_.attributeDescriptions, persistentPipelineInfo_.inputBindingDescription);
+        }
+        else {
+            persistentPipelineInfo_.vertexInputInfo = VkPipelineVertexInputStateCreateInfo{};
+            persistentPipelineInfo_.vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+        }
 
         persistentPipelineInfo_.inputAssemblyInfo =
             VkUtils::Init::PipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 
-        VkViewport viewport{};
-        VkRect2D scissor{};
-        viewport.width = static_cast<float>(context_.swapchain.extent.width);
-        viewport.height = static_cast<float>(context_.swapchain.extent.height);
-        viewport.minDepth = 0.0f;
-        viewport.maxDepth = 1.0f;
-        scissor.extent = context_.swapchain.extent;
+        persistentPipelineInfo_.viewport = VkViewport{};
+        persistentPipelineInfo_.viewport.width = static_cast<float>(context_.swapchain.extent.width);
+        persistentPipelineInfo_.viewport.height = static_cast<float>(context_.swapchain.extent.height);
+        persistentPipelineInfo_.viewport.minDepth = 0.0f;
+        persistentPipelineInfo_.viewport.maxDepth = 1.0f;
+        persistentPipelineInfo_.scissor = VkRect2D{};
+        persistentPipelineInfo_.scissor.extent = context_.swapchain.extent;
 
         persistentPipelineInfo_.viewportInfo = VkUtils::Init::PipelineViewportStateCreateInfo();
         persistentPipelineInfo_.viewportInfo.viewportCount = 1;
-        persistentPipelineInfo_.viewportInfo.pViewports = &viewport;
+        persistentPipelineInfo_.viewportInfo.pViewports = &persistentPipelineInfo_.viewport;
         persistentPipelineInfo_.viewportInfo.scissorCount = 1;
-        persistentPipelineInfo_.viewportInfo.pScissors = &scissor;
+        persistentPipelineInfo_.viewportInfo.pScissors = &persistentPipelineInfo_.scissor;
 
         persistentPipelineInfo_.multisampleInfo = VkUtils::Init::PipelineMultisampleStateCreateInfo();
         persistentPipelineInfo_.multisampleInfo.minSampleShading = 1.0f;
         persistentPipelineInfo_.multisampleInfo.rasterizationSamples = pipelineDescription.enableMSAA ? context_.multisamplingResources.msaaSamples : VK_SAMPLE_COUNT_1_BIT;
 
-        persistentPipelineInfo_.colorBlendingAttachment = Presets::GetColorBlending(pipelineDescription.colorBlending);
-        persistentPipelineInfo_.colorBlendInfo =
-            VkUtils::Init::PipelineColorBlendStateCreateInfo(1, &persistentPipelineInfo_.colorBlendingAttachment);
+        if (pipelineDescription.colourBlending != QbVkPipelineColourBlending::QBVK_COLOURBLENDING_NOATTACHMENT) {
+            persistentPipelineInfo_.colourBlendingAttachment = Presets::GetColorBlending(pipelineDescription.colourBlending);
+            persistentPipelineInfo_.colourBlendInfo =
+                VkUtils::Init::PipelineColorBlendStateCreateInfo(1, &persistentPipelineInfo_.colourBlendingAttachment);
+        }
+        else {
+            persistentPipelineInfo_.colourBlendInfo = VkUtils::Init::PipelineColorBlendStateCreateInfo(0, nullptr);
+        }
+
 
         VkPipelineLayoutCreateInfo pipelineLayoutInfo = VkUtils::Init::PipelineLayoutCreateInfo();
         pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(descriptorSetLayouts_.size());
@@ -158,10 +172,10 @@ namespace Quadbit {
         pipelineInfo.pRasterizationState = &persistentPipelineInfo_.rasterizationInfo;
         pipelineInfo.pMultisampleState = &persistentPipelineInfo_.multisampleInfo;
         pipelineInfo.pDepthStencilState = &persistentPipelineInfo_.depthStencilInfo;
-        pipelineInfo.pColorBlendState = &persistentPipelineInfo_.colorBlendInfo;
+        pipelineInfo.pColorBlendState = &persistentPipelineInfo_.colourBlendInfo;
         pipelineInfo.pDynamicState = &persistentPipelineInfo_.dynamicStateInfo;
         pipelineInfo.layout = pipelineLayout_;
-        pipelineInfo.renderPass = context_.mainRenderPass;
+        pipelineInfo.renderPass = renderPass;
 
         VK_CHECK(vkCreateGraphicsPipelines(context_.device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline_));
 	}
@@ -323,10 +337,10 @@ namespace Quadbit {
             pipelineInfo.pRasterizationState = &persistentPipelineInfo_.rasterizationInfo;
             pipelineInfo.pMultisampleState = &persistentPipelineInfo_.multisampleInfo;
             pipelineInfo.pDepthStencilState = &persistentPipelineInfo_.depthStencilInfo;
-            pipelineInfo.pColorBlendState = &persistentPipelineInfo_.colorBlendInfo;
+            pipelineInfo.pColorBlendState = &persistentPipelineInfo_.colourBlendInfo;
             pipelineInfo.pDynamicState = &persistentPipelineInfo_.dynamicStateInfo;
             pipelineInfo.layout = pipelineLayout_;
-            pipelineInfo.renderPass = context_.mainRenderPass;
+            pipelineInfo.renderPass = graphicsResources_->renderPass;
 
             vkDestroyPipeline(context_.device, pipeline_, nullptr);
             VK_CHECK(vkCreateGraphicsPipelines(context_.device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline_));

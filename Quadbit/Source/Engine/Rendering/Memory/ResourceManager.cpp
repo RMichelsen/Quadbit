@@ -51,11 +51,11 @@ namespace Quadbit {
 
 	QbVkPipelineHandle QbVkResourceManager::CreateGraphicsPipeline(const char* vertexPath, const char* vertexEntry, 
 		const char* fragmentPath, const char* fragmentEntry, const QbVkPipelineDescription pipelineDescription, 
-		const uint32_t maxInstances, const eastl::vector<eastl::tuple<VkFormat, uint32_t>>& vertexAttributeOverride) {
+		const VkRenderPass renderPass, const uint32_t maxInstances, const eastl::vector<eastl::tuple<VkFormat, uint32_t>>& vertexAttributeOverride) {
 		
 		auto handle = pipelines_.GetNextHandle();
 		pipelines_[handle] = eastl::make_unique<QbVkPipeline>(context_, vertexPath, vertexEntry, fragmentPath, fragmentEntry,
-			pipelineDescription, maxInstances, vertexAttributeOverride);
+			pipelineDescription, renderPass, maxInstances, vertexAttributeOverride);
 		return handle;
 	}
 
@@ -169,18 +169,20 @@ namespace Quadbit {
 		return handle;
 	}
 
-	QbVkTextureHandle QbVkResourceManager::CreateTexture(VkImageCreateInfo* imageInfo, VkSamplerCreateInfo* samplerInfo) {
+	QbVkTextureHandle QbVkResourceManager::CreateTexture(VkImageCreateInfo* imageInfo, VkImageAspectFlags aspectFlags, 
+		VkImageLayout finalLayout, VkSamplerCreateInfo* samplerInfo) {
+
 		auto handle = textures_.GetNextHandle();
 		auto& texture = textures_[handle];
 
 		context_.allocator->CreateImage(texture.image, *imageInfo, QbVkMemoryUsage::QBVK_MEMORY_USAGE_GPU_ONLY);
-		texture.descriptor.imageView = VkUtils::CreateImageView(context_, texture.image.imgHandle, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
-		texture.descriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		texture.descriptor.imageView = VkUtils::CreateImageView(context_, texture.image.imgHandle, imageInfo->format, aspectFlags);
+		texture.descriptor.imageLayout = finalLayout;
 		if (samplerInfo != nullptr) VK_CHECK(vkCreateSampler(context_.device, samplerInfo, nullptr, &texture.descriptor.sampler));
 
 		// Transition the image layout to the desired layout
-		VkUtils::TransitionImageLayout(context_, texture.image.imgHandle, VK_IMAGE_ASPECT_COLOR_BIT,
-			VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_HOST_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+		VkUtils::TransitionImageLayout(context_, texture.image.imgHandle, aspectFlags,
+			VK_IMAGE_LAYOUT_UNDEFINED, finalLayout, VK_PIPELINE_STAGE_HOST_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 
 		return handle;
 	}
@@ -334,5 +336,16 @@ namespace Quadbit {
 			&textures_[textureHandle].descriptor, descriptorCount)
 		};
 		vkUpdateDescriptorSets(context_.device, static_cast<uint32_t>(writeDescSets.size()), writeDescSets.data(), 0, nullptr);
+	}
+	uint32_t QbVkResourceManager::GetUniformBufferAlignment(uint32_t structSize) {
+		return VkUtils::GetDynamicUBOAlignment(context_, structSize);
+	}
+
+	QbVkBufferHandle QbVkResourceManager::CreateUniformBuffer(uint32_t alignedSize) {
+		return CreateGPUBuffer(alignedSize * MAX_FRAMES_IN_FLIGHT, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, QbVkMemoryUsage::QBVK_MEMORY_USAGE_CPU_TO_GPU);
+	}
+	void* QbVkResourceManager::GetMappedGPUData(QbVkBufferHandle handle) {
+		QB_ASSERT(buffers_[handle].alloc.data != nullptr && "GPUBuffer data not mapped!");
+		return buffers_[handle].alloc.data;
 	}
 }

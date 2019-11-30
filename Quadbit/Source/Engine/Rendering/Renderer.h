@@ -12,6 +12,7 @@ namespace Quadbit {
 	// Forward declarations
 	class PBRPipeline;
 	class ImGuiPipeline;
+	class SkyPipeline;
 	class EntityManager;
 	struct Entity;
 
@@ -38,6 +39,8 @@ namespace Quadbit {
 		eastl::unique_ptr<QbVkContext> context_;
 		eastl::unique_ptr<PBRPipeline> pbrPipeline_;
 		eastl::unique_ptr<ImGuiPipeline> imGuiPipeline_;
+		eastl::unique_ptr<SkyPipeline> skyPipeline_;
+
 
 		// DEBUG BUILD ONLY
 #ifndef NDEBUG
@@ -63,6 +66,8 @@ namespace Quadbit {
 		void CreateMainRenderPass();
 
 		void ImGuiUpdateContent();
-		void PrepareFrame(uint32_t resourceIndex, VkCommandBuffer commandbuffer, VkFramebuffer& framebuffer, VkImageView imageView);
+		void PrepareFrame(uint32_t resourceIndex, VkCommandBuffer commandBuffer, VkFramebuffer& framebuffer, VkImageView imageView);
+
+		void Rebuild();
 	};
 }
