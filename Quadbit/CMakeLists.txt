@@ -60,6 +60,7 @@ set(QUADBIT_SOURCES
    Source/Engine/Rendering/VulkanUtils.h
 
    Source/Engine/Rendering/Geometry/Icosphere.h
+   Source/Engine/Rendering/Geometry/Plane.h
 
    Source/Engine/Rendering/Memory/Allocator.h
    Source/Engine/Rendering/Memory/Allocator.cpp
@@ -70,6 +71,7 @@ set(QUADBIT_SOURCES
 
    Source/Engine/Rendering/Pipelines/Pipeline.h
    Source/Engine/Rendering/Pipelines/Pipeline.cpp
+   Source/Engine/Rendering/Pipelines/PipelinePresets.h
    Source/Engine/Rendering/Pipelines/ImGuiPipeline.h
    Source/Engine/Rendering/Pipelines/ImGuiPipeline.cpp
    Source/Engine/Rendering/Pipelines/PBRPipeline.h

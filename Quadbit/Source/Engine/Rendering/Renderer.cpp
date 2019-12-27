@@ -83,7 +83,7 @@ namespace Quadbit {
 		// Pipelines
 		pbrPipeline_ = eastl::make_unique<PBRPipeline>(*context_);
 		imGuiPipeline_ = eastl::make_unique<ImGuiPipeline>(*context_);
-		skyPipeline_ = eastl::make_unique<SkyPipeline>(*context_);
+		//skyPipeline_ = eastl::make_unique<SkyPipeline>(*context_);
 
 		// Set up camera
 		context_->fallbackCamera = context_->entityManager->Create();
@@ -163,6 +163,9 @@ namespace Quadbit {
 		// Return early if we cannot render (if swapchain is being recreated)
 		if (!canRender_) return;
 
+		// Clean up resources that are due for removal
+		context_->resourceManager->DestroyUnusedResources();
+
 		// Before we render, we transfer all queued data to buffers on the GPU
 		// we make sure we only wait on the transfer if there was any data transferred
 		const bool transferActive = context_->resourceManager->TransferQueuedDataToGPU(context_->resourceIndex);
@@ -239,16 +242,6 @@ namespace Quadbit {
 			vkDeviceWaitIdle(context_->device);
 			context_->resourceManager->RebuildPipelines();
 		}
-	}
-
-	void QbVkRenderer::DestroyResource(QbVkBuffer buffer) {
-		context_->allocator->DestroyBuffer(buffer);
-	}
-
-	void QbVkRenderer::DestroyResource(QbVkTexture texture) {
-		if (texture.descriptor.imageView != VK_NULL_HANDLE) vkDestroyImageView(context_->device, texture.descriptor.imageView, nullptr);
-		if (texture.descriptor.sampler != VK_NULL_HANDLE) vkDestroySampler(context_->device, texture.descriptor.sampler, nullptr);
-		context_->allocator->DestroyImage(texture.image);
 	}
 
 #ifndef NDEBUG
@@ -802,11 +795,7 @@ namespace Quadbit {
 
 		vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-		//auto& skyPipeline = context_->resourceManager->pipelines_[skyPipeline_];
-		//skyPipeline->Bind(commandBuffer);
-		//vkCmdDraw(commandBuffer, 6, 1, 0, 0);
-
-		skyPipeline_->DrawFrame(commandBuffer);
+		//skyPipeline_->DrawFrame(commandBuffer);
 		pbrPipeline_->DrawFrame(resourceIndex, commandBuffer);
 
 		ImGuiUpdateContent();

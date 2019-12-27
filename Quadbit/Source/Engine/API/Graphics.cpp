@@ -24,11 +24,6 @@ namespace Quadbit {
 	float Graphics::GetSunAltitude() {
 		return renderer_->context_->sunAltitude;
 	}
-
-	void Graphics::LoadSkyGradient(glm::vec3 botColour, glm::vec3 topColour) {
-		renderer_->pbrPipeline_->LoadSkyGradient(botColour, topColour);
-	}
-
 #pragma endregion
 
 #pragma region GPU
@@ -146,17 +141,30 @@ namespace Quadbit {
 		}
 	}
 
-	PBRSceneComponent Graphics::LoadPBRModel(const char* path) {
-		return renderer_->pbrPipeline_->LoadModel(path);
+	QbVkPBRMaterial Graphics::CreatePBRMaterial(QbVkTextureHandle baseColourTexture, QbVkTextureHandle metallicRoughnessTexture,
+		QbVkTextureHandle normalTexture, QbVkTextureHandle occlusionTexture, QbVkTextureHandle emissiveTexture) {
+		return renderer_->pbrPipeline_->CreateMaterial(baseColourTexture, metallicRoughnessTexture, normalTexture, occlusionTexture, emissiveTexture);
+	}
+
+	PBRSceneComponent Graphics::LoadPBRScene(const char* path) {
+		return renderer_->pbrPipeline_->LoadScene(path);
+	}
+
+	PBRSceneComponent Graphics::CreatePBRPlane(uint32_t xSize, uint32_t zSize, const QbVkPBRMaterial& material) {
+		return renderer_->pbrPipeline_->CreatePlane(xSize, zSize, material);
+	}
+
+	void Graphics::DestroyPBRScene(const Entity& entity) {
+		renderer_->pbrPipeline_->DestroyScene(entity);
 	}
 
 	void Graphics::DestroyMesh(const Entity& entity) {
 		const auto& entityManager = renderer_->context_->entityManager;
 		QB_ASSERT(entityManager->HasComponent<CustomMeshComponent>(entity));
 		const auto& mesh = entityManager->GetComponentPtr<CustomMeshComponent>(entity);
-		entityManager->AddComponent<CustomMeshDeleteComponent>(
+		entityManager->AddComponent<ResourceDeleteComponent>(
 			entityManager->Create(),
-			{ mesh->vertexHandle, mesh->indexHandle }
+			{ {mesh->vertexHandle, mesh->indexHandle}, {} }
 		);
 		entityManager->RemoveComponent<CustomMeshComponent>(entity);
 	}

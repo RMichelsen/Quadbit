@@ -3,6 +3,7 @@
 #include <vulkan/vulkan.h>
 
 #include <EASTL/array.h>
+#include <EASTL/hash_set.h>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -76,13 +77,13 @@ namespace Quadbit {
 	};
 
 	struct MaterialUBO {
-		glm::vec4 baseColorFactor;
+		glm::vec4 baseColourFactor;
 		glm::vec4 emissiveFactor;
 		float metallicFactor;
 		float roughnessFactor;
 		float alphaMask;
 		float alphaMaskCutoff;
-		int baseColorTextureIndex;
+		int baseColourTextureIndex;
 		int metallicRoughnessTextureIndex;
 		int normalTextureIndex;
 		int occlusionTextureIndex;
@@ -91,14 +92,14 @@ namespace Quadbit {
 
 	struct QbVkPBRMaterial {
 		struct TextureIndices {
-			int baseColorTextureIndex = -1;
+			int baseColourTextureIndex = -1;
 			int metallicRoughnessTextureIndex = -1;
 			int normalTextureIndex = -1;
 			int occlusionTextureIndex = -1;
 			int emissiveTextureIndex = -1;
 		};
 
-		QbVkTextureHandle baseColorTexture = QBVK_TEXTURE_NULL_HANDLE;
+		QbVkTextureHandle baseColourTexture = QBVK_TEXTURE_NULL_HANDLE;
 		QbVkTextureHandle metallicRoughnessTexture = QBVK_TEXTURE_NULL_HANDLE;
 		QbVkTextureHandle normalTexture = QBVK_TEXTURE_NULL_HANDLE;
 		QbVkTextureHandle occlusionTexture = QBVK_TEXTURE_NULL_HANDLE;
@@ -106,7 +107,7 @@ namespace Quadbit {
 
 		TextureIndices textureIndices;
 
-		glm::vec4 baseColorFactor{};
+		glm::vec4 baseColourFactor{};
 		glm::vec4 emissiveFactor{};
 		float metallicFactor = 0.0f;
 		float roughnessFactor = 0.0f;
@@ -115,11 +116,47 @@ namespace Quadbit {
 
 		QbVkDescriptorSetsHandle descriptorSets = QBVK_DESCRIPTOR_SETS_NULL_HANDLE;
 		QbVkUniformBuffer<MaterialUBO> ubo;
+
+		// These functions set textures, the corresponding texture indices have to 
+		// be set to a number larger than -1 to be processed in the fragment shader
+		// texture index 0 corresponds to the first set of UVs and are used as a default here
+		void SetBaseColourTexture(QbVkTextureHandle texture) {
+			if (texture != QBVK_TEXTURE_NULL_HANDLE) {
+				baseColourTexture = texture;
+				textureIndices.baseColourTextureIndex = 0;
+			}
+		}
+		void SetMetallicRoughnessTexture(QbVkTextureHandle texture) {
+			if (texture != QBVK_TEXTURE_NULL_HANDLE) {
+				metallicRoughnessTexture = texture;
+				textureIndices.metallicRoughnessTextureIndex = 0;
+			}
+		}
+		void SetNormalTexture(QbVkTextureHandle texture) {
+			if (texture != QBVK_TEXTURE_NULL_HANDLE) {
+				normalTexture = texture;
+				textureIndices.normalTextureIndex = 0;
+			}
+		}
+		void SetOcclusionTexture(QbVkTextureHandle texture) {
+			if (texture != QBVK_TEXTURE_NULL_HANDLE) {
+				occlusionTexture = texture;
+				textureIndices.occlusionTextureIndex = 0;
+			}
+		}
+		void SetEmissiveTexture(QbVkTextureHandle texture) {
+			if (texture != QBVK_TEXTURE_NULL_HANDLE) {
+				emissiveTexture = texture;
+				textureIndices.emissiveTextureIndex = 0;
+			}
+		}
+		void UpdateUBO() {
+
+		}
 	};
 
 	struct QbVkPBRPrimitive {
-		QbVkPBRMaterial material;
-
+		uint32_t material;
 		uint32_t vertexOffset;
 		uint32_t indexOffset;
 		uint32_t indexCount;
@@ -135,9 +172,9 @@ namespace Quadbit {
 		QbVkResourceHandle<QbVkBuffer> indexHandle;
 
 		eastl::vector<QbVkPBRMesh> meshes;
+		eastl::vector<QbVkPBRMaterial> materials;
 
 		eastl::array<float, 32> pushConstants;
-		int pushConstantStride;
 
 		template<typename T>
 		T* GetSafePushConstPtr() {
@@ -166,9 +203,9 @@ namespace Quadbit {
 
 	// The deletion delay should be the number of potential frames 
 	// in a row that the mesh could be used by the rendering system
-	struct CustomMeshDeleteComponent {
-		QbVkBufferHandle vertexHandle;
-		QbVkBufferHandle indexHandle;
+	struct ResourceDeleteComponent {
+		eastl::vector<QbVkBufferHandle> bufferHandles;
+		eastl::vector<QbVkTextureHandle> textureHandles;
 		uint32_t deletionDelay = MAX_FRAMES_IN_FLIGHT;
 	};
 

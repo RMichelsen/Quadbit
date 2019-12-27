@@ -9,6 +9,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/quaternion.hpp>
 
+#include "Engine/Entities/EntityManager.h"
+#include "Engine/Rendering/RenderTypes.h"
 #include "Engine/Rendering/VulkanUtils.h"
 #include "Engine/Rendering/Memory/Allocator.h"
 #include "Engine/Core/Logging.h"
@@ -76,6 +78,26 @@ namespace Quadbit {
 		}
 	}
 
+	void QbVkResourceManager::DestroyUnusedResources() {
+		// Here we clean up resources that are due for removal
+		// The deletion delay ensures that no resources are destroyed while still in use
+		// by the rendering systems
+		context_.entityManager->ForEachWithCommandBuffer<ResourceDeleteComponent>([&](Entity entity, EntityCommandBuffer* cmdBuf, ResourceDeleteComponent& resource) noexcept {
+			if (resource.deletionDelay == 0) {
+				for (const auto& buffer : resource.bufferHandles) {
+					context_.resourceManager->DestroyResource(buffer);
+				}
+				for (const auto& texture : resource.textureHandles) {
+					context_.resourceManager->DestroyResource(texture);
+				}
+				cmdBuf->DestroyEntity(entity);
+			}
+			else {
+				resource.deletionDelay--;
+			}
+			});
+	}
+
 	void QbVkResourceManager::TransferDataToGPU(const void* data, VkDeviceSize size, QbVkBufferHandle destination) {
 		// If its the first transfer of the frame, we destroy the staging buffers from the previous transfer frame
 		if (transferQueue_.count == 0) {
@@ -87,7 +109,7 @@ namespace Quadbit {
 		}
 
 		context_.allocator->CreateStagingBuffer(transferQueue_.stagingBuffers[transferQueue_.count], size, data);
-		transferQueue_.transfers[transferQueue_.count] = { size, destination };
+		transferQueue_.transfers[transferQueue_.count] = { destination, size };
 		transferQueue_.count++;
 	}
 

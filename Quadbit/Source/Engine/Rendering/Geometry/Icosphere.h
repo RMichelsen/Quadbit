@@ -47,11 +47,6 @@ namespace Quadbit {
 
 				auto size = indices_.size();
 				for (auto i = 0; i < size; i += 3) {
-					//eastl::array<uint32_t, 3> mid;
-					//for (auto j = 0; j < 3; j++) {
-					//	mid[j] = divideVertex(triangles_[i][j], triangles_[i][(j + 1) % 3]);
-					//}
-
 					uint32_t mid1 = divideVertex(indices_[i + 0], indices_[i + 1]);
 					uint32_t mid2 = divideVertex(indices_[i + 1], indices_[i + 2]);
 					uint32_t mid3 = divideVertex(indices_[i + 2], indices_[i + 0]);

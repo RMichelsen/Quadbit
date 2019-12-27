@@ -15,14 +15,16 @@ layout(location = 1) in vec3 inNormal;
 layout(location = 2) in vec2 inUV0;
 layout(location = 3) in vec2 inUV1;
 
-layout(location = 0) out vec3 outNormal;
-layout(location = 1) out vec2 outUV0;
-layout(location = 2) out vec2 outUV1;
-layout(location = 3) out vec3 outViewVec;
-layout(location = 4) out vec3 outSunViewVec;
+layout(location = 0) out vec3 outPos;
+layout(location = 1) out vec3 outNormal;
+layout(location = 2) out vec2 outUV0;
+layout(location = 3) out vec2 outUV1;
+layout(location = 4) out vec3 outViewVec;
+layout(location = 5) out vec3 outSunViewVec;
 
 void main() {
     gl_Position = pc.MVP * vec4(inPosition, 1.0);
+	outPos = inPosition;
 	outNormal = inNormal;
 	outUV0 = inUV0;
 	outUV1 = inUV1;

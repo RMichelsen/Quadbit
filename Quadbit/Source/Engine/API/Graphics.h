@@ -4,14 +4,15 @@
 #include <EASTL/array.h>
 #include <EASTL/vector.h>
 #include <EASTL/string.h>
+#include <EASTL/hash_set.h>
 
+#include "Engine/Rendering/Renderer.h"
 #include "Engine/Rendering/RenderTypes.h"
 #include "Engine/Rendering/VulkanTypes.h"
 #include "Engine/Rendering/Memory/ResourceManager.h"
 #include "Engine/Rendering/Pipelines/PipelinePresets.h"
 
 namespace Quadbit {
-	class QbVkRenderer;
 	class QbVkShaderInstance;
 	struct Entity;
 
@@ -25,7 +26,6 @@ namespace Quadbit {
 		float GetAspectRatio();
 		float GetSunAzimuth();
 		float GetSunAltitude();
-		void LoadSkyGradient(glm::vec3 botColour, glm::vec3 topColour);
 
 		/**************/
 		/*    GPU     */
@@ -81,7 +81,12 @@ namespace Quadbit {
 		void BindResourceArray(const QbVkPipelineHandle pipelineHandle, const eastl::string name,
 			const eastl::vector<QbVkTextureHandle> textureHandles, const QbVkDescriptorSetsHandle descriptorsHandle = QBVK_DESCRIPTOR_SETS_NULL_HANDLE);
 
-		PBRSceneComponent LoadPBRModel(const char* path);
+		QbVkPBRMaterial CreatePBRMaterial(QbVkTextureHandle baseColourTexture, QbVkTextureHandle metallicRoughnessTexture = QBVK_TEXTURE_NULL_HANDLE,
+			QbVkTextureHandle normalTexture = QBVK_TEXTURE_NULL_HANDLE, QbVkTextureHandle occlusionTexture = QBVK_TEXTURE_NULL_HANDLE, 
+			QbVkTextureHandle emissiveTexture = QBVK_TEXTURE_NULL_HANDLE);
+		PBRSceneComponent LoadPBRScene(const char* path);
+		PBRSceneComponent CreatePBRPlane(uint32_t xSize, uint32_t zSize, const QbVkPBRMaterial& material);
+		void DestroyPBRScene(const Entity& entity);
 
 		template<typename T>
 		CustomMeshComponent CreateMesh(const eastl::vector<T>& vertices, uint32_t vertexStride, 

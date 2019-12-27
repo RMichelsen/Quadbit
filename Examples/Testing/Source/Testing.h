@@ -9,8 +9,8 @@ class Testing : public Quadbit::Game {
 public:
 	void Init() override;
 	void Simulate(float deltaTime) override;
+
 private:
-	Quadbit::Entity sun;
 };
 
 eastl::unique_ptr<Quadbit::Game> Quadbit::CreateGame() {

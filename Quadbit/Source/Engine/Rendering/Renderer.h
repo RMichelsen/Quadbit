@@ -22,8 +22,6 @@ namespace Quadbit {
 		~QbVkRenderer();
 
 		void DrawFrame();
-		void DestroyResource(QbVkBuffer buffer);
-		void DestroyResource(QbVkTexture texture);
 
 	private:
 		// API Classes can access internals to provide functionality to the user
@@ -40,7 +38,6 @@ namespace Quadbit {
 		eastl::unique_ptr<PBRPipeline> pbrPipeline_;
 		eastl::unique_ptr<ImGuiPipeline> imGuiPipeline_;
 		eastl::unique_ptr<SkyPipeline> skyPipeline_;
-
 
 		// DEBUG BUILD ONLY
 #ifndef NDEBUG

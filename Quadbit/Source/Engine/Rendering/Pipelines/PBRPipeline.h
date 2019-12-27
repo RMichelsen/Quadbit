@@ -24,7 +24,12 @@ namespace Quadbit {
 		void DrawShadows(uint32_t resourceIndex, VkCommandBuffer commandBuffer);
 		void DrawFrame(uint32_t resourceIndex, VkCommandBuffer commandBuffer);
 
-		PBRSceneComponent LoadModel(const char* path);
+		QbVkPBRMaterial CreateMaterial(QbVkTextureHandle baseColourTexture, QbVkTextureHandle metallicRoughnessTexture = QBVK_TEXTURE_NULL_HANDLE,
+			QbVkTextureHandle normalTexture = QBVK_TEXTURE_NULL_HANDLE, QbVkTextureHandle occlusionTexture = QBVK_TEXTURE_NULL_HANDLE, 
+			QbVkTextureHandle emissiveTexture = QBVK_TEXTURE_NULL_HANDLE);
+		PBRSceneComponent LoadScene(const char* path);
+		PBRSceneComponent CreatePlane(uint32_t xSize, uint32_t zSize, const QbVkPBRMaterial& material);
+		void DestroyScene(const Entity& entity);
 
 		QbVkPipelineHandle pipeline_;
 		QbVkPipelineHandle skyPipeline_;
@@ -32,14 +37,13 @@ namespace Quadbit {
 	private:
 		void SetViewportAndScissor(VkCommandBuffer& commandBuffer);
 
-
 		// PBR Loader Helpers
 		QbVkPBRMaterial ParseMaterial(const tinygltf::Model& model, const tinygltf::Material& material);
 		void ParseNode(const tinygltf::Model& model, const tinygltf::Node& node, PBRSceneComponent& scene,
-			eastl::vector<QbVkVertex>& vertices, eastl::vector<uint32_t>& indices, const eastl::vector<QbVkPBRMaterial> materials, glm::mat4 parentTransform);
+			eastl::vector<QbVkVertex>& vertices, eastl::vector<uint32_t>& indices, glm::mat4 parentTransform);
 		QbVkPBRMesh ParseMesh(const tinygltf::Model& model, const tinygltf::Mesh& mesh,
 			eastl::vector<QbVkVertex>& vertices, eastl::vector<uint32_t>& indices, const eastl::vector<QbVkPBRMaterial>& materials);
-		QbVkDescriptorSetsHandle WriteMaterialDescriptors(const QbVkPBRMaterial& material);
+		QbVkDescriptorSetsHandle WriteMaterialDescriptors(QbVkPBRMaterial& material);
 		QbVkTextureHandle CreateTextureFromResource(const tinygltf::Model& model, const tinygltf::Texture& texture);
 		VkSamplerCreateInfo GetSamplerInfo(const tinygltf::Model& model, int samplerIndex);
 

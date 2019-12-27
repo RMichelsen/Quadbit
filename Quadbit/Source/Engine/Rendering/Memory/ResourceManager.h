@@ -49,6 +49,7 @@ namespace Quadbit {
 			const void* specConstants = nullptr, const uint32_t maxInstances = 1);
 		void RebuildPipelines();
 
+		void DestroyUnusedResources();
 		void TransferDataToGPU(const void* data, VkDeviceSize size, QbVkBufferHandle destination);
 		bool TransferQueuedDataToGPU(uint32_t resourceIndex);
 

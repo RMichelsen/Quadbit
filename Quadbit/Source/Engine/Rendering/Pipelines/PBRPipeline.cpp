@@ -24,6 +24,7 @@
 #include "Engine/Entities/EntityManager.h"
 #include "Engine/Rendering/VulkanUtils.h"
 #include "Engine/Rendering/Geometry/Icosphere.h"
+#include "Engine/Rendering/Geometry/Plane.h"
 #include "Engine/Rendering/Memory/ResourceManager.h"
 #include "Engine/Rendering/Systems/NoClipCameraSystem.h"
 
@@ -33,7 +34,7 @@ namespace Quadbit {
 		context_(context) {
 
 		// Register the mesh component to be used by the ECS
-		context.entityManager->RegisterComponents<CustomMeshComponent, CustomMeshDeleteComponent, PBRSceneComponent, RenderTransformComponent,
+		context.entityManager->RegisterComponents<CustomMeshComponent, ResourceDeleteComponent, PBRSceneComponent, RenderTransformComponent,
 			RenderCamera, CameraUpdateAspectRatioTag>();
 
 		QbVkPipelineDescription pipelineDescription;
@@ -114,18 +115,6 @@ namespace Quadbit {
 	void PBRPipeline::DrawFrame(uint32_t resourceIndex, VkCommandBuffer commandBuffer) {
 		auto& pipeline = context_.resourceManager->pipelines_[pipeline_];
 
-		// Here we clean up meshes that are due for removal
-		context_.entityManager->ForEachWithCommandBuffer<CustomMeshDeleteComponent>([&](Entity entity, EntityCommandBuffer* cmdBuf, CustomMeshDeleteComponent& mesh) noexcept {
-			if (mesh.deletionDelay == 0) {
-				context_.resourceManager->DestroyResource(mesh.vertexHandle);
-				context_.resourceManager->DestroyResource(mesh.indexHandle);
-				cmdBuf->DestroyEntity(entity);
-			}
-			else {
-				mesh.deletionDelay--;
-			}
-			});
-
 		context_.entityManager->ForEach<RenderCamera, CameraUpdateAspectRatioTag>([&](Entity entity, auto& camera, auto& tag) noexcept {
 			camera.perspective =
 				glm::perspective(glm::radians(45.0f), static_cast<float>(context_.swapchain.extent.width) / static_cast<float>(context_.swapchain.extent.height), 0.1f, camera.viewDistance);
@@ -195,7 +184,7 @@ namespace Quadbit {
 
 					vkCmdPushConstants(commandBuffer, pipeline->pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(RenderMeshPushConstants), pushConstants);
 
-					pipeline->BindDescriptorSets(commandBuffer, primitive.material.descriptorSets);
+					pipeline->BindDescriptorSets(commandBuffer, scene.materials[primitive.material].descriptorSets);
 
 					vkCmdDrawIndexed(commandBuffer, primitive.indexCount, 1, 0, 0, 0);
 				}
@@ -227,7 +216,36 @@ namespace Quadbit {
 			});
 	}
 
-	PBRSceneComponent PBRPipeline::LoadModel(const char* path)
+	QbVkPBRMaterial PBRPipeline::CreateMaterial(QbVkTextureHandle baseColourTexture, QbVkTextureHandle metallicRoughnessTexture, 
+		QbVkTextureHandle normalTexture, QbVkTextureHandle occlusionTexture, QbVkTextureHandle emissiveTexture) {
+		QbVkPBRMaterial material;
+		material.ubo = context_.resourceManager->CreateUniformBuffer<MaterialUBO>();
+
+		material.SetBaseColourTexture(baseColourTexture);
+		material.SetMetallicRoughnessTexture(metallicRoughnessTexture);
+		material.SetNormalTexture(normalTexture);
+		material.SetOcclusionTexture(occlusionTexture);
+		material.SetEmissiveTexture(emissiveTexture);
+
+		MaterialUBO ubo{};
+		ubo.alphaMask = material.alphaMask;
+		ubo.alphaMaskCutoff = material.alphaCutoff;
+		ubo.baseColourFactor = material.baseColourFactor;
+		ubo.emissiveFactor = material.emissiveFactor;
+		ubo.metallicFactor = material.metallicFactor;
+		ubo.roughnessFactor = material.roughnessFactor;
+		ubo.baseColourTextureIndex = material.textureIndices.baseColourTextureIndex;
+		ubo.emissiveTextureIndex = material.textureIndices.emissiveTextureIndex;
+		ubo.metallicRoughnessTextureIndex = material.textureIndices.metallicRoughnessTextureIndex;
+		ubo.normalTextureIndex = material.textureIndices.normalTextureIndex;
+		ubo.occlusionTextureIndex = material.textureIndices.occlusionTextureIndex;
+		context_.resourceManager->InitializeUBO(material.ubo, &ubo);
+
+		material.descriptorSets = WriteMaterialDescriptors(material);
+		return material;
+	}
+
+	PBRSceneComponent PBRPipeline::LoadScene(const char* path)
 	{
 		eastl::string extension = VkUtils::GetFileExtension(path);
 		PBRSceneComponent scene;
@@ -251,22 +269,65 @@ namespace Quadbit {
 		QB_ASSERT(model.scenes.size() == 1 && "Failed to parse model, only one scene allowed!");
 
 		// Parse materials
-		eastl::vector<QbVkPBRMaterial> materials;
 		for (const auto& material : model.materials) {
-			materials.push_back(ParseMaterial(model, material));
+			scene.materials.push_back(ParseMaterial(model, material));
 		}
 
 		eastl::vector<QbVkVertex> vertices;
 		eastl::vector<uint32_t> indices;
 		// Parse nodes recursively
 		for (const auto& node : model.scenes[model.defaultScene].nodes) {
-			ParseNode(model, model.nodes[node], scene, vertices, indices, materials, glm::mat4(1.0f));
+			ParseNode(model, model.nodes[node], scene, vertices, indices, glm::mat4(1.0f));
 		}
 
 		scene.vertexHandle = context_.resourceManager->CreateVertexBuffer(vertices.data(), sizeof(QbVkVertex), static_cast<uint32_t>(vertices.size()));
 		scene.indexHandle = context_.resourceManager->CreateIndexBuffer(indices);
 
 		return scene;
+	}
+
+	PBRSceneComponent PBRPipeline::CreatePlane(uint32_t xSize, uint32_t zSize, const QbVkPBRMaterial& material) {
+		PBRSceneComponent scene{};
+		Plane plane(xSize, zSize);
+		scene.vertexHandle = context_.resourceManager->CreateVertexBuffer(plane.vertices.data(), sizeof(QbVkVertex), static_cast<uint32_t>(plane.vertices.size()));
+		scene.indexHandle = context_.resourceManager->CreateIndexBuffer(plane.indices);
+
+		scene.materials.push_back(material);
+		QbVkPBRPrimitive primitive;
+		primitive.material = 0;
+		primitive.indexCount = static_cast<uint32_t>(plane.indices.size());
+		primitive.indexOffset = 0;
+		primitive.vertexOffset = 0;
+		QbVkPBRMesh mesh;
+		mesh.localTransform = glm::mat4(1.0f);
+		mesh.primitives.push_back(primitive);
+
+		scene.meshes.push_back(mesh);
+
+		return scene;
+	}
+
+	void PBRPipeline::DestroyScene(const Entity& entity) {
+		const auto& entityManager = context_.entityManager;
+		QB_ASSERT(entityManager->HasComponent<PBRSceneComponent>(entity));
+		const auto& model = entityManager->GetComponentPtr<PBRSceneComponent>(entity);
+		eastl::vector<QbVkBufferHandle> bufferHandles;
+		eastl::vector<QbVkTextureHandle> textureHandles;
+		for (const auto& material : model->materials) {
+			if (material.textureIndices.baseColourTextureIndex > -1) textureHandles.push_back(material.baseColourTexture);
+			if (material.textureIndices.emissiveTextureIndex > -1) textureHandles.push_back(material.emissiveTexture);
+			if (material.textureIndices.metallicRoughnessTextureIndex > -1) textureHandles.push_back(material.metallicRoughnessTexture);
+			if (material.textureIndices.normalTextureIndex > -1) textureHandles.push_back(material.normalTexture);
+			if (material.textureIndices.occlusionTextureIndex > -1) textureHandles.push_back(material.occlusionTexture);
+			bufferHandles.push_back(material.ubo.handle);
+		}
+		bufferHandles.push_back(model->vertexHandle);
+		bufferHandles.push_back(model->indexHandle);
+		entityManager->AddComponent<ResourceDeleteComponent>(
+			entityManager->Create(),
+			{ bufferHandles, textureHandles }
+		);
+		entityManager->RemoveComponent<PBRSceneComponent>(entity);
 	}
 
 	void PBRPipeline::SetViewportAndScissor(VkCommandBuffer& commandBuffer) {
@@ -291,8 +352,8 @@ namespace Quadbit {
 		QbVkPBRMaterial mat{};
 		if (material.values.find("baseColorTexture") != material.values.end()) {
 			auto& texture = model.textures[material.values.at("baseColorTexture").TextureIndex()];
-			mat.baseColorTexture = CreateTextureFromResource(model, texture);
-			mat.textureIndices.baseColorTextureIndex = material.values.at("baseColorTexture").TextureTexCoord();
+			mat.baseColourTexture = CreateTextureFromResource(model, texture);
+			mat.textureIndices.baseColourTextureIndex = material.values.at("baseColorTexture").TextureTexCoord();
 		}
 		if (material.values.find("metallicRoughnessTexture") != material.values.end()) {
 			auto& texture = model.textures[material.values.at("metallicRoughnessTexture").TextureIndex()];
@@ -315,7 +376,7 @@ namespace Quadbit {
 			mat.textureIndices.emissiveTextureIndex = material.additionalValues.at("emissiveTexture").TextureTexCoord();
 		}
 		if (material.values.find("baseColorFactor") != material.values.end()) {
-			mat.baseColorFactor = glm::make_vec4(material.values.at("baseColorFactor").ColorFactor().data());
+			mat.baseColourFactor = glm::make_vec4(material.values.at("baseColorFactor").ColorFactor().data());
 		}
 		if (material.additionalValues.find("emissiveFactor") != material.additionalValues.end()) {
 			mat.emissiveFactor = glm::vec4(glm::make_vec3(material.additionalValues.at("emissiveFactor").ColorFactor().data()), 1.0f);
@@ -340,11 +401,11 @@ namespace Quadbit {
 		MaterialUBO ubo{};
 		ubo.alphaMask = mat.alphaMask;
 		ubo.alphaMaskCutoff = mat.alphaCutoff;
-		ubo.baseColorFactor = mat.baseColorFactor;
+		ubo.baseColourFactor = mat.baseColourFactor;
 		ubo.emissiveFactor = mat.emissiveFactor;
 		ubo.metallicFactor = mat.metallicFactor;
 		ubo.roughnessFactor = mat.roughnessFactor;
-		ubo.baseColorTextureIndex = mat.textureIndices.baseColorTextureIndex;
+		ubo.baseColourTextureIndex = mat.textureIndices.baseColourTextureIndex;
 		ubo.emissiveTextureIndex = mat.textureIndices.emissiveTextureIndex;
 		ubo.metallicRoughnessTextureIndex = mat.textureIndices.metallicRoughnessTextureIndex;
 		ubo.normalTextureIndex = mat.textureIndices.normalTextureIndex;
@@ -356,7 +417,7 @@ namespace Quadbit {
 	}
 
 	void PBRPipeline::ParseNode(const tinygltf::Model& model, const tinygltf::Node& node, PBRSceneComponent& scene,
-		eastl::vector<QbVkVertex>& vertices, eastl::vector<uint32_t>& indices, const eastl::vector<QbVkPBRMaterial> materials, glm::mat4 parentTransform) {
+		eastl::vector<QbVkVertex>& vertices, eastl::vector<uint32_t>& indices, glm::mat4 parentTransform) {
 		// Construct transform matrix from node data and parent data
 		// Even though the data read is in double precision, we will 
 		// take the precision hit and store them as floats since it should
@@ -384,13 +445,13 @@ namespace Quadbit {
 		// Let parent transform data propagate down through children on recurse
 		if (node.children.size() > 0) {
 			for (const auto& node : node.children) {
-				ParseNode(model, model.nodes[node], scene, vertices, indices, materials, transform);
+				ParseNode(model, model.nodes[node], scene, vertices, indices, transform);
 			}
 		}
 
 		// Parse mesh if node contains a mesh
 		if (node.mesh > -1) {
-			QbVkPBRMesh mesh = ParseMesh(model, model.meshes[node.mesh], vertices, indices, materials);
+			QbVkPBRMesh mesh = ParseMesh(model, model.meshes[node.mesh], vertices, indices, scene.materials);
 			mesh.localTransform = transform;
 			scene.meshes.push_back(mesh);
 		}
@@ -491,14 +552,14 @@ namespace Quadbit {
 			qbPrimitive.vertexOffset = vertexOffset;
 			qbPrimitive.indexOffset = indexOffset;
 			qbPrimitive.indexCount = static_cast<uint32_t>(indices.size()) - indexOffset;
-			qbPrimitive.material = materials[primitive.material];
+			qbPrimitive.material = primitive.material;
 			qbMesh.primitives.push_back(qbPrimitive);
 		}
 
 		return qbMesh;
 	}
 
-	QbVkDescriptorSetsHandle PBRPipeline::WriteMaterialDescriptors(const QbVkPBRMaterial& material) {
+	QbVkDescriptorSetsHandle PBRPipeline::WriteMaterialDescriptors(QbVkPBRMaterial& material) {
 		auto& pipeline = context_.resourceManager->pipelines_[pipeline_];
 
 		auto descriptorSetsHandle = pipeline->GetNextDescriptorSetsHandle();
@@ -506,8 +567,8 @@ namespace Quadbit {
 
 		std::vector<VkWriteDescriptorSet> writeDescSets;
 
-		auto& baseColorHandle = (material.textureIndices.baseColorTextureIndex > -1) ?
-			material.baseColorTexture : emptyTextureHandle;
+		auto& baseColourHandle = (material.textureIndices.baseColourTextureIndex > -1) ?
+			material.baseColourTexture : emptyTextureHandle;
 
 		auto& metallicRoughnessHandle = (material.textureIndices.metallicRoughnessTextureIndex > -1) ?
 			material.metallicRoughnessTexture : emptyTextureHandle;
@@ -526,7 +587,7 @@ namespace Quadbit {
 
 		// Bind texture for fragment shader
 		pipeline->BindResource(descriptorSetsHandle, "shadowMap", context_.shadowmapResources.texture);
-		pipeline->BindResource(descriptorSetsHandle, "baseColorMap", baseColorHandle);
+		pipeline->BindResource(descriptorSetsHandle, "baseColourMap", baseColourHandle);
 		pipeline->BindResource(descriptorSetsHandle, "metallicRoughnessMap", metallicRoughnessHandle);
 		pipeline->BindResource(descriptorSetsHandle, "normalMap", normalHandle);
 		pipeline->BindResource(descriptorSetsHandle, "occlusionMap", occlusionHandle);
@@ -544,21 +605,7 @@ namespace Quadbit {
 	}
 
 	VkSamplerCreateInfo PBRPipeline::GetSamplerInfo(const tinygltf::Model& model, int samplerIndex) {
-		VkSamplerCreateInfo samplerCreateInfo{};
-		samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-		samplerCreateInfo.magFilter = VK_FILTER_LINEAR;
-		samplerCreateInfo.minFilter = VK_FILTER_LINEAR;
-		samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-		samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-		samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-		samplerCreateInfo.anisotropyEnable = VK_TRUE;
-		samplerCreateInfo.maxAnisotropy = 16.0f;
-		samplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
-		samplerCreateInfo.compareEnable = VK_FALSE;
-		samplerCreateInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-		samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-		samplerCreateInfo.maxLod = 0.0f;
-
+		VkSamplerCreateInfo samplerCreateInfo = DEFAULT_TEXTURE_SAMPLER;
 		if (samplerIndex > -1) {
 			auto& sampler = model.samplers[samplerIndex];
 			// Hardcoded conversiosn from OpenGL constants...
