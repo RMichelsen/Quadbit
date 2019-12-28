@@ -84,8 +84,8 @@ namespace Quadbit {
 		QbVkTextureHandle CreateTexture(VkImageCreateInfo* imageInfo, VkImageAspectFlags aspectFlags,
 			VkImageLayout finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VkSamplerCreateInfo* samplerInfo = nullptr);
 		QbVkTextureHandle CreateStorageTexture(uint32_t width, uint32_t height, VkFormat format, VkSamplerCreateInfo* samplerInfo = nullptr);
-		QbVkTextureHandle LoadTexture(uint32_t width, uint32_t height, const void* data, VkSamplerCreateInfo* samplerInfo = nullptr);
-		QbVkTextureHandle LoadTexture(const char* imagePath, VkSamplerCreateInfo* samplerInfo = nullptr);
+		QbVkTextureHandle LoadTexture(uint32_t width, uint32_t height, const void* data, bool generateMips = false, VkSamplerCreateInfo* samplerInfo = nullptr);
+		QbVkTextureHandle LoadTexture(const char* imagePath, bool generateMips = false, VkSamplerCreateInfo* samplerInfo = nullptr);
 		QbVkTextureHandle GetEmptyTexture();
 
 		QbVkDescriptorAllocatorHandle CreateDescriptorAllocator(const eastl::vector<VkDescriptorSetLayout>& setLayouts,
@@ -132,7 +132,6 @@ namespace Quadbit {
 				return pipelines_[handle].get();
 			}
 		}
-
 
 		QbVkResource<QbVkBuffer, MAX_BUFFER_COUNT> buffers_;
 		QbVkResource<QbVkTexture, MAX_TEXTURE_COUNT> textures_;

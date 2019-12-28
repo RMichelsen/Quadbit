@@ -838,8 +838,7 @@ namespace Quadbit::VkUtils {
 		FlushCommandBuffer(context, commandBuffer);
 	}
 
-	inline void CopyBufferToImage(const QbVkContext& context, VkBuffer src, VkImage dst, uint32_t width, uint32_t height) {
-		VkCommandBuffer commandBuffer = CreateSingleTimeCommandBuffer(context);
+	inline void CopyBufferToImage(VkCommandBuffer commandBuffer, VkBuffer src, VkImage dst, uint32_t width, uint32_t height) {
 		// Issue copy command
 		VkBufferImageCopy copyRegion{};
 		copyRegion.bufferOffset = 0;
@@ -849,9 +848,6 @@ namespace Quadbit::VkUtils {
 		copyRegion.imageOffset = { 0, 0, 0 };
 		copyRegion.imageExtent = { width, height, 1 };
 		vkCmdCopyBufferToImage(commandBuffer, src, dst, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
-
-		// Flush command buffer
-		FlushCommandBuffer(context, commandBuffer);
 	}
 
 	inline void TransferDataToGPUBuffer(const QbVkContext& context, const void* data, VkDeviceSize size, QbVkBuffer& destination) {
@@ -884,21 +880,17 @@ namespace Quadbit::VkUtils {
 		VK_CHECK(vkCreateFramebuffer(context.device, &framebufferInfo, nullptr, &framebuffer))
 	}
 
-	inline void TransitionImageLayout(const QbVkContext& context, VkImage image, VkImageAspectFlags aspectFlags,
-		VkImageLayout oldLayout, VkImageLayout newLayout, VkPipelineStageFlags srcStage, VkPipelineStageFlags dstStage, uint32_t levelCount = 1, uint32_t layerCount = 1) {
+	inline void TransitionImageLayout(VkCommandBuffer commandBuffer, VkImage image, VkImageAspectFlags aspectFlags,
+		VkImageLayout oldLayout, VkImageLayout newLayout, VkPipelineStageFlags srcStage, VkPipelineStageFlags dstStage,
+		VkImageSubresourceRange subResourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }) {
 
-		VkCommandBuffer commandBuffer = CreateSingleTimeCommandBuffer(context);
+		subResourceRange.aspectMask = aspectFlags;
 
 		VkImageMemoryBarrier memoryBarrier = Init::ImageMemoryBarrier();
 		memoryBarrier.oldLayout = oldLayout;
 		memoryBarrier.newLayout = newLayout;
 		memoryBarrier.image = image;
-
-		memoryBarrier.subresourceRange.baseMipLevel = 0;
-		memoryBarrier.subresourceRange.levelCount = levelCount;
-		memoryBarrier.subresourceRange.baseArrayLayer = 0;
-		memoryBarrier.subresourceRange.layerCount = layerCount;
-		memoryBarrier.subresourceRange.aspectMask = aspectFlags;
+		memoryBarrier.subresourceRange = subResourceRange;
 
 		switch (oldLayout) {
 		case VK_IMAGE_LAYOUT_UNDEFINED:
@@ -965,8 +957,6 @@ namespace Quadbit::VkUtils {
 		}
 
 		vkCmdPipelineBarrier(commandBuffer, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1, &memoryBarrier);
-
-		FlushCommandBuffer(context, commandBuffer);
 	}
 
 	inline VkFormat GetVertexFormatFromSize(const uint32_t size) {

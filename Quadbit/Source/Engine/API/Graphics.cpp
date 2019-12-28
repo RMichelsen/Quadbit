@@ -46,8 +46,8 @@ namespace Quadbit {
 		return resourceManager_->CreateStorageTexture(width, height, format, samplerInfo);
 	}
 
-	QbVkTextureHandle Graphics::LoadTexture(const char* imagePath, VkSamplerCreateInfo* samplerInfo) {
-		return resourceManager_->LoadTexture(imagePath, samplerInfo);
+	QbVkTextureHandle Graphics::LoadTexture(const char* imagePath, bool generateMips, VkSamplerCreateInfo* samplerInfo) {
+		return resourceManager_->LoadTexture(imagePath, generateMips, samplerInfo);
 	}
 
 	VkSamplerCreateInfo Graphics::CreateImageSamplerInfo(VkFilter samplerFilter, VkSamplerAddressMode addressMode, VkBool32 enableAnisotropy,

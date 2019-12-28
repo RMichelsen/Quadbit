@@ -509,7 +509,12 @@ namespace Quadbit {
 			for (int i = 0; i < vertexCount; i++) {
 				QbVkVertex vertex{};
 				vertex.position = glm::make_vec3(&positions[i * positionStride]);
-				if (normals != nullptr) vertex.normal = glm::normalize(glm::make_vec3(&normals[i * normalStride]));
+				if (normals != nullptr) {
+					vertex.normal = glm::normalize(glm::make_vec3(&normals[i * normalStride]));
+					// Reorient normals to comply with blender export
+					eastl::swap(vertex.normal.y, vertex.normal.z);
+					vertex.normal.y *= -1.0f;
+				}
 				if (uvs0 != nullptr) vertex.uv0 = glm::make_vec2(&uvs0[i * uv0Stride]);
 				if (uvs1 != nullptr) vertex.uv1 = glm::make_vec2(&uvs1[i * uv1Stride]);
 				vertices.push_back(vertex);
@@ -601,7 +606,7 @@ namespace Quadbit {
 		auto& image = model.images[texture.source];
 
 		auto samplerInfo = GetSamplerInfo(model, texture.sampler);
-		return context_.resourceManager->LoadTexture(image.width, image.height, image.image.data(), &samplerInfo);
+		return context_.resourceManager->LoadTexture(image.width, image.height, image.image.data(), true, &samplerInfo);
 	}
 
 	VkSamplerCreateInfo PBRPipeline::GetSamplerInfo(const tinygltf::Model& model, int samplerIndex) {

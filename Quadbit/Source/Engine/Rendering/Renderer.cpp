@@ -417,10 +417,11 @@ namespace Quadbit {
 		context_->multisamplingResources.msaaImageView = VkUtils::CreateImageView(*context_, context_->multisamplingResources.msaaImage.imgHandle, colourFormat, VK_IMAGE_ASPECT_COLOR_BIT);
 
 		// Transition image layout with a temporary command buffer
-		VkUtils::TransitionImageLayout(*context_, context_->multisamplingResources.msaaImage.imgHandle,
+		auto commandBuffer = VkUtils::CreateSingleTimeCommandBuffer(*context_);
+		VkUtils::TransitionImageLayout(commandBuffer, context_->multisamplingResources.msaaImage.imgHandle,
 			VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
-
+		VkUtils::FlushCommandBuffer(*context_, commandBuffer);
 	}
 
 	void QbVkRenderer::CreateDepthResources() {
@@ -434,8 +435,10 @@ namespace Quadbit {
 
 		// Transition depth image
 		VkImageAspectFlags aspectFlags = VkUtils::HasStencilComponent(depthFormat) ? VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT : VK_IMAGE_ASPECT_DEPTH_BIT;
-		VkUtils::TransitionImageLayout(*context_, context_->depthResources.depthImage.imgHandle, aspectFlags, VK_IMAGE_LAYOUT_UNDEFINED,
+		auto commandBuffer = VkUtils::CreateSingleTimeCommandBuffer(*context_);
+		VkUtils::TransitionImageLayout(commandBuffer, context_->depthResources.depthImage.imgHandle, aspectFlags, VK_IMAGE_LAYOUT_UNDEFINED,
 			VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT);
+		VkUtils::FlushCommandBuffer(*context_, commandBuffer);
 	}
 
 	void QbVkRenderer::CreateShadowmapResources() {

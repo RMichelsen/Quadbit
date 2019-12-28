@@ -4,7 +4,7 @@
 #include <ctime>
 
 void Testing::Init() {
-	Quadbit::PBRSceneComponent scene = graphics_->LoadPBRScene("Assets/Testing/Models/corner1.glb");
+	Quadbit::PBRSceneComponent scene = graphics_->LoadPBRScene("Assets/Testing/Models/corner.glb");
 	auto entity = entityManager_->Create();
 	entityManager_->AddComponent<Quadbit::PBRSceneComponent>(entity, scene);
 	entityManager_->AddComponent<Quadbit::RenderTransformComponent>(entity,

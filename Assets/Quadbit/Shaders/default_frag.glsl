@@ -83,4 +83,5 @@ void main() {
 	float diffuse = max(dot(N, L), 0.0);
 
 	outColour = vec4((ambient + diffuse) * baseColour.xyz, 1.0);
+	// outColour = vec4(normal, 1.0);
 }

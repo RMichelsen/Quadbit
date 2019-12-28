@@ -185,8 +185,12 @@ namespace Quadbit {
 		if (samplerInfo != nullptr) VK_CHECK(vkCreateSampler(context_.device, samplerInfo, nullptr, &texture.descriptor.sampler));
 
 		// Transition the image layout to the desired layout
-		VkUtils::TransitionImageLayout(context_, texture.image.imgHandle, VK_IMAGE_ASPECT_COLOR_BIT, 
-			VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_HOST_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+		auto commandBuffer = VkUtils::CreateSingleTimeCommandBuffer(context_);
+		VkUtils::TransitionImageLayout(commandBuffer, texture.image.imgHandle, VK_IMAGE_ASPECT_COLOR_BIT,
+			VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
+			VK_PIPELINE_STAGE_HOST_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+		VkUtils::FlushCommandBuffer(context_, commandBuffer);
+
 
 		return handle;
 	}
@@ -203,8 +207,12 @@ namespace Quadbit {
 		if (samplerInfo != nullptr) VK_CHECK(vkCreateSampler(context_.device, samplerInfo, nullptr, &texture.descriptor.sampler));
 
 		// Transition the image layout to the desired layout
-		VkUtils::TransitionImageLayout(context_, texture.image.imgHandle, aspectFlags,
-			VK_IMAGE_LAYOUT_UNDEFINED, finalLayout, VK_PIPELINE_STAGE_HOST_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+		auto commandBuffer = VkUtils::CreateSingleTimeCommandBuffer(context_);
+		VkUtils::TransitionImageLayout(commandBuffer, texture.image.imgHandle, aspectFlags,
+			VK_IMAGE_LAYOUT_UNDEFINED, finalLayout, VK_PIPELINE_STAGE_HOST_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT, 
+			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+		VkUtils::FlushCommandBuffer(context_, commandBuffer);
+
 
 		return handle;
 	}
@@ -221,53 +229,109 @@ namespace Quadbit {
 		if (samplerInfo != nullptr) VK_CHECK(vkCreateSampler(context_.device, samplerInfo, nullptr, &texture.descriptor.sampler));
 
 		// Transition the image layout to the desired layout
-		VkUtils::TransitionImageLayout(context_, texture.image.imgHandle, VK_IMAGE_ASPECT_COLOR_BIT,
+		auto commandBuffer = VkUtils::CreateSingleTimeCommandBuffer(context_);
+		VkUtils::TransitionImageLayout(commandBuffer, texture.image.imgHandle, VK_IMAGE_ASPECT_COLOR_BIT,
 			VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+		VkUtils::FlushCommandBuffer(context_, commandBuffer);
+
 
 		return handle;
 	}
 
-	QbVkTextureHandle QbVkResourceManager::LoadTexture(uint32_t width, uint32_t height, const void* data, VkSamplerCreateInfo* samplerInfo) {
+	QbVkTextureHandle QbVkResourceManager::LoadTexture(uint32_t width, uint32_t height, const void* data, bool generateMips, VkSamplerCreateInfo* samplerInfo) {
 		auto handle = textures_.GetNextHandle();
 		auto& texture = textures_[handle];
 
-		VkDeviceSize size = static_cast<uint64_t>(width)* static_cast<uint64_t>(height) * 4;
+		VkDeviceSize size = static_cast<uint64_t>(width) * static_cast<uint64_t>(height) * 4;
+
+		uint32_t mipLevels = generateMips ? static_cast<uint32_t>(floor(log2(eastl::max(width, height)))) + 1 : 1;
 
 		auto imageCreateInfo = VkUtils::Init::ImageCreateInfo(width, height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
-			VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_SAMPLE_COUNT_1_BIT);
+			VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_SAMPLE_COUNT_1_BIT, mipLevels);
+		if (generateMips) imageCreateInfo.usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 		context_.allocator->CreateImage(texture.image, imageCreateInfo, QbVkMemoryUsage::QBVK_MEMORY_USAGE_GPU_ONLY);
 
 		// Create buffer and copy data
 		QbVkBuffer buffer;
 		context_.allocator->CreateStagingBuffer(buffer, size, data);
 
+		VkCommandBuffer commandBuffer = VkUtils::CreateSingleTimeCommandBuffer(context_);
+
 		// Transition the image layout to the desired layout
-		VkUtils::TransitionImageLayout(context_, texture.image.imgHandle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
+		VkUtils::TransitionImageLayout(commandBuffer, texture.image.imgHandle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
 			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 
 		// Copy the pixel data to the image
-		VkUtils::CopyBufferToImage(context_, buffer.buf, texture.image.imgHandle, width, height);
+		VkUtils::CopyBufferToImage(commandBuffer, buffer.buf, texture.image.imgHandle, width, height);
 
 		// Transition the image to be read in shader
-		VkUtils::TransitionImageLayout(context_, texture.image.imgHandle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+		VkUtils::TransitionImageLayout(commandBuffer, texture.image.imgHandle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			generateMips ? VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT, 
+			generateMips ? VK_PIPELINE_STAGE_TRANSFER_BIT : VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 
-		texture.descriptor.imageView = VkUtils::CreateImageView(context_, texture.image.imgHandle, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+		if (generateMips) {
+			VkImageSubresourceRange mipSubRange{};
+			VkImageBlit imageBlit{};
+
+			for (uint32_t i = 1; i < mipLevels; i++) {
+				imageBlit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				imageBlit.srcSubresource.layerCount = 1;
+				imageBlit.srcSubresource.mipLevel = i - 1;
+				imageBlit.srcOffsets[1].x = static_cast<int>(width >> (i - 1));
+				imageBlit.srcOffsets[1].y = static_cast<int>(height >> (i - 1));
+				imageBlit.srcOffsets[1].z = 1;
+
+				imageBlit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				imageBlit.dstSubresource.layerCount = 1;
+				imageBlit.dstSubresource.mipLevel = i;
+				imageBlit.dstOffsets[1].x = static_cast<int>(width >> i);
+				imageBlit.dstOffsets[1].y = static_cast<int>(height >> i);
+				imageBlit.dstOffsets[1].z = 1;
+
+				mipSubRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				mipSubRange.baseMipLevel = i;
+				mipSubRange.levelCount = 1;
+				mipSubRange.layerCount = 1;
+
+				VkUtils::TransitionImageLayout(commandBuffer, texture.image.imgHandle, VK_IMAGE_ASPECT_COLOR_BIT,
+					VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
+					VK_PIPELINE_STAGE_TRANSFER_BIT, mipSubRange);
+
+				vkCmdBlitImage(commandBuffer, texture.image.imgHandle, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, texture.image.imgHandle,
+					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageBlit, VK_FILTER_LINEAR);
+
+				VkUtils::TransitionImageLayout(commandBuffer, texture.image.imgHandle, VK_IMAGE_ASPECT_COLOR_BIT,
+					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
+					VK_PIPELINE_STAGE_TRANSFER_BIT, mipSubRange);
+			}
+
+			mipSubRange.baseMipLevel = 0;
+			mipSubRange.levelCount = mipLevels;
+			VkUtils::TransitionImageLayout(commandBuffer, texture.image.imgHandle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, mipSubRange);
+
+			samplerInfo->maxLod = static_cast<float>(mipLevels);
+		}
+
+		VkUtils::FlushCommandBuffer(context_, commandBuffer);
+
+		texture.descriptor.imageView = VkUtils::CreateImageView(context_, texture.image.imgHandle, VK_FORMAT_R8G8B8A8_UNORM, 
+			VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_VIEW_TYPE_2D, mipLevels);
 		texture.descriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		if (samplerInfo != nullptr) VK_CHECK(vkCreateSampler(context_.device, samplerInfo, nullptr, &texture.descriptor.sampler));
 
-		// Destroy the buffer and free the image
+		// Destroy the buffer
 		context_.allocator->DestroyBuffer(buffer);
 
 		return handle;
 	}
 
-	QbVkTextureHandle QbVkResourceManager::LoadTexture(const char* imagePath, VkSamplerCreateInfo* samplerInfo) {
+	QbVkTextureHandle QbVkResourceManager::LoadTexture(const char* imagePath, bool generateMips, VkSamplerCreateInfo* samplerInfo) {
 		int width, height, channels;
 		stbi_uc* pixels = stbi_load(imagePath, &width, &height, &channels, STBI_rgb_alpha);
 		QB_ASSERT(pixels != nullptr);
 
-		auto handle = LoadTexture(width, height, pixels, samplerInfo);
+		auto handle = LoadTexture(width, height, pixels, generateMips, samplerInfo);
 
 		stbi_image_free(pixels);
 		return handle;
@@ -310,15 +374,6 @@ namespace Quadbit {
 			descSetallocInfo.descriptorSetCount = setCount;
 			descSetallocInfo.pSetLayouts = layouts.data();
 			VK_CHECK(vkAllocateDescriptorSets(context_.device, &descSetallocInfo, sets.data()));
-
-			//for (int j = 0; j < MAX_FRAMES_IN_FLIGHT; j++) {
-			//	sets[j].resize(setCount);
-			//	VkDescriptorSetAllocateInfo descSetallocInfo = VkUtils::Init::DescriptorSetAllocateInfo();
-			//	descSetallocInfo.descriptorPool = allocator.pool;
-			//	descSetallocInfo.descriptorSetCount = setCount;
-			//	descSetallocInfo.pSetLayouts = layouts.data();
-			//	VK_CHECK(vkAllocateDescriptorSets(context_.device, &descSetallocInfo, sets[j].data()));
-			//}
 		}
 
 		return allocatorHandle;
