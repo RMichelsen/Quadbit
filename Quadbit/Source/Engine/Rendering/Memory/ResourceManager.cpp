@@ -213,7 +213,6 @@ namespace Quadbit {
 			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 		VkUtils::FlushCommandBuffer(context_, commandBuffer);
 
-
 		return handle;
 	}
 
@@ -277,15 +276,15 @@ namespace Quadbit {
 				imageBlit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 				imageBlit.srcSubresource.layerCount = 1;
 				imageBlit.srcSubresource.mipLevel = i - 1;
-				imageBlit.srcOffsets[1].x = static_cast<int>(width >> (i - 1));
-				imageBlit.srcOffsets[1].y = static_cast<int>(height >> (i - 1));
+				imageBlit.srcOffsets[1].x = eastl::max(static_cast<int>(width >> (i - 1)), 1);
+				imageBlit.srcOffsets[1].y = eastl::max(static_cast<int>(height >> (i - 1)), 1);
 				imageBlit.srcOffsets[1].z = 1;
 
 				imageBlit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 				imageBlit.dstSubresource.layerCount = 1;
 				imageBlit.dstSubresource.mipLevel = i;
-				imageBlit.dstOffsets[1].x = static_cast<int>(width >> i);
-				imageBlit.dstOffsets[1].y = static_cast<int>(height >> i);
+				imageBlit.dstOffsets[1].x = eastl::max(static_cast<int>(width >> i), 1);
+				imageBlit.dstOffsets[1].y = eastl::max(static_cast<int>(height >> i), 1);
 				imageBlit.dstOffsets[1].z = 1;
 
 				mipSubRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;

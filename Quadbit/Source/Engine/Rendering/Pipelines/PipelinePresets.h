@@ -34,6 +34,7 @@ namespace Quadbit {
 		QbVkPipelineColourBlending colourBlending;
 		QbVkPipelineDynamicState dynamicState;
 		bool enableMSAA;
+		VkExtent2D viewportExtents;
 	};
 
 	namespace Presets {
@@ -99,7 +100,7 @@ namespace Quadbit {
 			.rasterizerDiscardEnable = VK_FALSE, // We will allow geometry to pass through the rasterizer
 			.polygonMode = VK_POLYGON_MODE_FILL,
 			.cullMode = VK_CULL_MODE_BACK_BIT,
-			.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+			.frontFace = VK_FRONT_FACE_CLOCKWISE,
 			.depthBiasEnable = VK_FALSE, // We won't be doing any altering of depth values in the rasterizer
 			.depthBiasConstantFactor = 0.0f,
 			.depthBiasClamp = 0.0f,
@@ -115,7 +116,7 @@ namespace Quadbit {
 			.rasterizerDiscardEnable = VK_FALSE, // We will allow geometry to pass through the rasterizer
 			.polygonMode = VK_POLYGON_MODE_FILL,
 			.cullMode = VK_CULL_MODE_NONE,
-			.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+			.frontFace = VK_FRONT_FACE_CLOCKWISE,
 			.depthBiasEnable = VK_FALSE, // We won't be doing any altering of depth values in the rasterizer
 			.depthBiasConstantFactor = 0.0f,
 			.depthBiasClamp = 0.0f,
@@ -127,11 +128,11 @@ namespace Quadbit {
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
 			.pNext = nullptr,
 			.flags = 0,
-			.depthClampEnable = VK_FALSE, // Requires a GPU feature to be enabled, useful for special cases like shadow maps
+			.depthClampEnable = VK_TRUE, // Requires a GPU feature to be enabled, useful for special cases like shadow maps
 			.rasterizerDiscardEnable = VK_FALSE, // We will allow geometry to pass through the rasterizer
 			.polygonMode = VK_POLYGON_MODE_FILL,
 			.cullMode = VK_CULL_MODE_BACK_BIT,
-			.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+			.frontFace = VK_FRONT_FACE_CLOCKWISE,
 			.depthBiasEnable = VK_TRUE,
 			.depthBiasConstantFactor = 0.0f,
 			.depthBiasClamp = 0.0f,

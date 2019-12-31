@@ -18,6 +18,7 @@
 
 #include "Engine/Core/Logging.h"
 #include "Engine/Core/Time.h"
+#include "Engine/Core/MathHelpers.h"
 #include "Engine/Rendering/VulkanTypes.h"
 #include "Engine/Rendering/RenderTypes.h"
 #include "Engine/Entities/SystemDispatch.h"
@@ -51,74 +52,49 @@ namespace Quadbit {
 	}
 
 	void PBRPipeline::DrawShadows(uint32_t resourceIndex, VkCommandBuffer commandBuffer) {
-		//auto& pipeline = context_.resourceManager->pipelines_[context_.shadowmapResources.pipeline];
-
-		//static float timer = 0.0f;
-
-		//// Animate the light source
-		//auto* ubo = context_.resourceManager->GetUniformBufferPtr<PBRUBO>(ubo_);
-		//ubo->lightPos.x = sin(glm::radians(timer * 360.0f)) * 40.0f;
-		//ubo->lightPos.y = 500.0f;
-		//ubo->lightPos.z = cos(glm::radians(timer * 360.0f)) * 40.0f;
-
-		//// Matrix from light's point of view
-		//static float zNear = 1.0f;
-		//static float zFar = 96.0f;
-		//static float lightFOV = 45.0f;
-
-		//ImGui::Begin("Camera Position", nullptr);
-		//ImGui::DragFloat("zNear", &zNear);
-		//ImGui::DragFloat("zFar", &zFar);
-		//ImGui::DragFloat("FOV", &lightFOV);
-		//ImGui::End();
-
-		//glm::mat4 depthProjectionMatrix = glm::perspective(glm::radians(lightFOV), 1.0f, zNear, zFar);
-		//glm::mat4 depthViewMatrix = glm::lookAt(ubo->lightPos, glm::vec3(0.0f), glm::vec3(0, 1, 0));
-		//glm::mat4 depthModelMatrix = glm::mat4(1.0f);
-		//glm::mat4 lightSpace = depthProjectionMatrix * depthViewMatrix * depthModelMatrix;
-		//ubo->lightSpace = lightSpace;
+		auto& pipeline = context_.resourceManager->pipelines_[context_.shadowmapResources.pipeline];
 
 
-		//ImGui::Begin("LightSpace");
-		//ImGui::Text("%f %f %f %f\n", lightSpace[0][0], lightSpace[0][1], lightSpace[0][2], lightSpace[0][3]);
-		//ImGui::Text("%f %f %f %f\n", lightSpace[1][0], lightSpace[1][1], lightSpace[1][2], lightSpace[1][3]);
-		//ImGui::Text("%f %f %f %f\n", lightSpace[2][0], lightSpace[2][1], lightSpace[2][2], lightSpace[2][3]);
-		//ImGui::Text("%f %f %f %f\n", lightSpace[3][0], lightSpace[3][1], lightSpace[3][2], lightSpace[3][3]);
-		//ImGui::End();
+		// Matrix from light's point of view
+		static float zNear = 1.0f;
+		static float zFar = 300.0f;
 
-		//timer += 0.0001f;
+		glm::mat4 lightProj = glm::ortho(-200.0f, 200.0f, -200.0f, 200.0f, zNear, zFar);
+		glm::mat4 lightView = glm::lookAt(glm::vec3(100.0f, 150.0f, 100.0f), glm::vec3(0.0f), glm::vec3(0, 1.0f, 0));
 
-		//context_.entityManager->ForEach<PBRSceneComponent, RenderTransformComponent>(
-		//	[&](Entity entity, PBRSceneComponent& scene, RenderTransformComponent& transform) noexcept {
-		//		for (const auto& mesh : scene.meshes) {
-		//			eastl::array<VkDeviceSize, 1> offsets{ 0 };
+		struct ShadowPushConstants {
+			glm::mat4 lightViewProj;
+			glm::mat4 model;
+		};
 
-		//			for (const auto& primitive : mesh.primitives) {
-		//				offsets[0] = primitive.vertexOffset * sizeof(QbVkVertex);
-		//				vkCmdBindVertexBuffers(commandBuffer, 0, 1, &context_.resourceManager->buffers_[scene.vertexHandle].buf, offsets.data());
-		//				vkCmdBindIndexBuffer(commandBuffer, context_.resourceManager->buffers_[scene.indexHandle].buf, primitive.indexOffset * sizeof(uint32_t), VK_INDEX_TYPE_UINT32);
+		context_.entityManager->ForEach<PBRSceneComponent, RenderTransformComponent>(
+			[&](Entity entity, PBRSceneComponent& scene, RenderTransformComponent& transform) noexcept {
+				for (const auto& mesh : scene.meshes) {
+					eastl::array<VkDeviceSize, 1> offsets{ 0 };
 
-		//				//RenderMeshPushConstants* pushConstants = scene.GetSafePushConstPtr<RenderMeshPushConstants>();
-		//				//auto model = transform.model * mesh.localTransform;
-		//				//pushConstants->model = model;	
-		//				//pushConstants->mvp = camera->perspective * camera->view * model;
-		//				vkCmdPushConstants(commandBuffer, pipeline->pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &lightSpace);
+					for (const auto& primitive : mesh.primitives) {
+						offsets[0] = primitive.vertexOffset * sizeof(QbVkVertex);
+						vkCmdBindVertexBuffers(commandBuffer, 0, 1, &context_.resourceManager->buffers_[scene.vertexHandle].buf, offsets.data());
+						vkCmdBindIndexBuffer(commandBuffer, context_.resourceManager->buffers_[scene.indexHandle].buf, primitive.indexOffset * sizeof(uint32_t), VK_INDEX_TYPE_UINT32);
 
-		//				//pipeline->BindDescriptorSets(commandBuffer, primitive.material.descriptorSets);
+						ShadowPushConstants pc{};
+						pc.lightViewProj = (lightProj * lightView);
+						pc.model = glm::translate(transform.model, -mesh.axisAlignedBB.min) * mesh.localTransform;
+						vkCmdPushConstants(commandBuffer, pipeline->pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ShadowPushConstants), &pc);
 
-		//				vkCmdDrawIndexed(commandBuffer, primitive.indexCount, 1, 0, 0, 0);
-		//			}
-		//		}
-		//	});
+						vkCmdDrawIndexed(commandBuffer, primitive.indexCount, 1, 0, 0, 0);
+					}
+				}
+			});
 	}
 
 	void PBRPipeline::DrawFrame(uint32_t resourceIndex, VkCommandBuffer commandBuffer) {
 		auto& pipeline = context_.resourceManager->pipelines_[pipeline_];
 
 		context_.entityManager->ForEach<RenderCamera, CameraUpdateAspectRatioTag>([&](Entity entity, auto& camera, auto& tag) noexcept {
-			camera.perspective =
-				glm::perspective(glm::radians(45.0f), static_cast<float>(context_.swapchain.extent.width) / static_cast<float>(context_.swapchain.extent.height), 0.1f, camera.viewDistance);
-			camera.perspective[1][1] *= -1;
+			camera.perspective = MakeInfiniteProjection(45.0f, 
+				static_cast<float>(context_.swapchain.extent.width) / static_cast<float>(context_.swapchain.extent.height), 
+				0.1f, 0.000001f);
 			});
 
 		if (context_.userCamera == NULL_ENTITY || !context_.entityManager->IsValid(context_.userCamera)) {
@@ -130,32 +106,9 @@ namespace Quadbit {
 			camera = context_.entityManager->GetComponentPtr<RenderCamera>(context_.userCamera) :
 			camera = context_.entityManager->GetComponentPtr<RenderCamera>(context_.fallbackCamera);
 
-		// Update environment map if applicable, use camera stuff to do this
-		//if (environmentMap_ != NULL_ENTITY) {
-		//	auto mesh = context_.entityManager->GetComponentPtr<Quadbit::RenderMeshComponent>(environmentMap_);
-		//	EnvironmentMapPushConstants* pc = mesh->GetSafePushConstPtr<EnvironmentMapPushConstants>();
-		//	pc->proj = camera->perspective;
-		//	pc->proj[1][1] *= -1;
-
-		//	// Invert pitch??
-		//	camera->front.x = cos(glm::radians(camera->yaw)) * cos(glm::radians(-camera->pitch));
-		//	camera->front.y = sin(glm::radians(-camera->pitch));
-		//	camera->front.z = sin(glm::radians(camera->yaw)) * cos(glm::radians(-camera->pitch));
-		//	camera->front = glm::normalize(camera->front);
-		//	camera->view = glm::lookAt(camera->position, camera->position + camera->front, camera->up);
-		//	pc->view = glm::mat4(glm::mat3(camera->view));
-
-		//	// Reset
-		//	camera->front.x = cos(glm::radians(camera->yaw)) * cos(glm::radians(camera->pitch));
-		//	camera->front.y = sin(glm::radians(camera->pitch));
-		//	camera->front.z = sin(glm::radians(camera->yaw)) * cos(glm::radians(camera->pitch));
-		//	camera->front = glm::normalize(camera->front);
-		//	camera->view = glm::lookAt(camera->position, camera->position + camera->front, camera->up);
-		//}
-
-
 		ImGui::Begin("Camera Position", nullptr);
-		ImGui::Text("%f, %f, %f", camera->position.x, camera->position.y, camera->position.z);
+		ImGui::Text("X: %f, Y: %f, Z: %f", camera->position.x, camera->position.y, camera->position.z);
+		ImGui::Text("Yaw: %f, Pitch: %f", camera->yaw, camera->pitch);
 		ImGui::End();
 
 		VkDeviceSize offsets[]{ 0 };
@@ -163,7 +116,15 @@ namespace Quadbit {
 		pipeline->Bind(commandBuffer);
 		SetViewportAndScissor(commandBuffer);
 
+		// Matrix from light's point of view
+		static float zNear = 1.0f;
+		static float zFar = 300.0f;
+
+		glm::mat4 lightProj = glm::ortho(-200.0f, 200.0f, -200.0f, 200.0f, zNear, zFar);
+		glm::mat4 lightView = glm::lookAt(glm::vec3(100.0f, 150.0f, 100.0f), glm::vec3(0.0f), glm::vec3(0, 1.0f, 0));
+
 		auto* sunUBO = context_.resourceManager->GetUniformBufferPtr<SunUBO>(sunUBO_);
+		sunUBO->lightViewProj = (lightProj * lightView);
 		sunUBO->sunAltitude = context_.sunAltitude;
 		sunUBO->sunAzimuth = context_.sunAzimuth;
 
@@ -178,7 +139,7 @@ namespace Quadbit {
 					vkCmdBindIndexBuffer(commandBuffer, context_.resourceManager->buffers_[scene.indexHandle].buf, primitive.indexOffset * sizeof(uint32_t), VK_INDEX_TYPE_UINT32);
 
 					RenderMeshPushConstants* pushConstants = scene.GetSafePushConstPtr<RenderMeshPushConstants>();
-					auto model = transform.model * mesh.localTransform;
+					auto model = glm::translate(transform.model, -mesh.axisAlignedBB.min) * mesh.localTransform;
 					pushConstants->model = model;
 					pushConstants->mvp = camera->perspective * camera->view * model;
 
@@ -245,7 +206,7 @@ namespace Quadbit {
 		return material;
 	}
 
-	PBRSceneComponent PBRPipeline::LoadScene(const char* path)
+	PBRSceneComponent PBRPipeline::LoadModel(const char* path)
 	{
 		eastl::string extension = VkUtils::GetFileExtension(path);
 		PBRSceneComponent scene;
@@ -280,6 +241,23 @@ namespace Quadbit {
 			ParseNode(model, model.nodes[node], scene, vertices, indices, glm::mat4(1.0f));
 		}
 
+		// Find the AABB
+		for (const auto& mesh : scene.meshes) {
+			if (mesh.axisAlignedBB.valid && !mesh.axisAlignedBB.valid) {
+				scene.axisAlignedBB = mesh.axisAlignedBB;
+				scene.axisAlignedBB.valid = true;
+			}
+			scene.axisAlignedBB.min = glm::min(scene.axisAlignedBB.min, mesh.axisAlignedBB.min);
+			scene.axisAlignedBB.max = glm::max(scene.axisAlignedBB.max, mesh.axisAlignedBB.max);
+		}
+
+		// Compute extents
+		scene.extents = {
+			scene.axisAlignedBB.max.x - scene.axisAlignedBB.min.x,
+			scene.axisAlignedBB.max.y - scene.axisAlignedBB.min.y,
+			scene.axisAlignedBB.max.z - scene.axisAlignedBB.min.z
+		};
+
 		scene.vertexHandle = context_.resourceManager->CreateVertexBuffer(vertices.data(), sizeof(QbVkVertex), static_cast<uint32_t>(vertices.size()));
 		scene.indexHandle = context_.resourceManager->CreateIndexBuffer(indices);
 
@@ -298,8 +276,11 @@ namespace Quadbit {
 		primitive.indexCount = static_cast<uint32_t>(plane.indices.size());
 		primitive.indexOffset = 0;
 		primitive.vertexOffset = 0;
+		primitive.boundingBox = BoundingBox(glm::vec3(0.0f), glm::vec3(xSize, 0.0f, zSize));
 		QbVkPBRMesh mesh;
 		mesh.localTransform = glm::mat4(1.0f);
+		mesh.boundingBox = primitive.boundingBox;
+		mesh.axisAlignedBB = mesh.boundingBox.ComputeAABB(mesh.localTransform);
 		mesh.primitives.push_back(primitive);
 
 		scene.meshes.push_back(mesh);
@@ -307,7 +288,7 @@ namespace Quadbit {
 		return scene;
 	}
 
-	void PBRPipeline::DestroyScene(const Entity& entity) {
+	void PBRPipeline::DestroyModel(const Entity& entity) {
 		const auto& entityManager = context_.entityManager;
 		QB_ASSERT(entityManager->HasComponent<PBRSceneComponent>(entity));
 		const auto& model = entityManager->GetComponentPtr<PBRSceneComponent>(entity);
@@ -332,15 +313,13 @@ namespace Quadbit {
 
 	void PBRPipeline::SetViewportAndScissor(VkCommandBuffer& commandBuffer) {
 		// Dynamic update viewport and scissor for user-defined pipelines (also doesn't necessitate rebuilding the pipeline on window resize)
-		VkViewport viewport{};
-		VkRect2D scissor{};
 		// In our case the viewport covers the entire window
-		viewport.width = static_cast<float>(context_.swapchain.extent.width);
-		viewport.height = static_cast<float>(context_.swapchain.extent.height);
-		viewport.minDepth = 0.0f;
-		viewport.maxDepth = 1.0f;
+		VkViewport viewport = VkUtils::Init::Viewport(
+			static_cast<float>(context_.swapchain.extent.width),
+			static_cast<float>(context_.swapchain.extent.height), 0.0f, 1.0f);
 		vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 		// And so does the scissor
+		VkRect2D scissor{};
 		scissor.offset = { 0, 0 };
 		scissor.extent = context_.swapchain.extent;
 		vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
@@ -422,24 +401,24 @@ namespace Quadbit {
 		// Even though the data read is in double precision, we will 
 		// take the precision hit and store them as floats since it should
 		// be plenty precision for simple transforms
-		glm::f64mat4 translation = glm::f64mat4(1.0f);
+		glm::mat4 translation = glm::mat4(1.0f);
 		if (node.translation.size() == 3) {
-			translation = glm::translate(translation, glm::make_vec3(node.translation.data()));
+			translation = glm::translate(translation, glm::vec3(glm::make_vec3(node.translation.data())));
 		} 
-		glm::f64mat4 rotation = glm::f64mat4(1.0f);
+		glm::mat4 rotation = glm::mat4(1.0f);
 		if (node.rotation.size() == 4) {
-			rotation = glm::f64mat4(glm::make_quat(node.rotation.data()));
+			rotation = glm::mat4(glm::f64mat4(glm::make_quat(node.rotation.data())));
 		}
-		glm::f64mat4 scale = glm::f64mat4(1.0f);
+		glm::mat4 scale = glm::mat4(1.0f);
 		if (node.scale.size() == 3) {
-			scale = glm::scale(scale, glm::make_vec3(node.scale.data()));
+			scale = glm::scale(scale, glm::vec3(glm::make_vec3(node.scale.data())));
 		}
 		glm::mat4 transform = glm::mat4(1.0f);
 		if (node.matrix.size() == 16) {
-			transform = translation * rotation * scale * glm::make_mat4x4(node.matrix.data());
+			transform = parentTransform * (translation * rotation * scale * glm::mat4(glm::make_mat4x4(node.matrix.data())));
 		}
 		else {
-			transform = translation * rotation * scale;
+			transform = parentTransform * (translation * rotation * scale);
 		}
 
 		// Let parent transform data propagate down through children on recurse
@@ -453,6 +432,7 @@ namespace Quadbit {
 		if (node.mesh > -1) {
 			QbVkPBRMesh mesh = ParseMesh(model, model.meshes[node.mesh], vertices, indices, scene.materials);
 			mesh.localTransform = transform;
+			mesh.axisAlignedBB = mesh.boundingBox.ComputeAABB(mesh.localTransform);
 			scene.meshes.push_back(mesh);
 		}
 	}
@@ -469,6 +449,9 @@ namespace Quadbit {
 
 			const auto vertexOffset = static_cast<uint32_t>(vertices.size());
 			const auto indexOffset = static_cast<uint32_t>(indices.size());
+
+			glm::vec3 posMin{};
+			glm::vec3 posMax{};
 
 			int positionStride = 0;
 			int normalStride = 0;
@@ -488,6 +471,8 @@ namespace Quadbit {
 					positions = reinterpret_cast<const float*>(&buffer.data[accessor.byteOffset + bufferView.byteOffset]);
 					positionStride = accessor.ByteStride(bufferView) / sizeof(float);
 					QB_ASSERT(positions != nullptr && positionStride > 0);
+					posMin = glm::vec3(accessor.minValues[0], accessor.minValues[1], accessor.minValues[2]);
+					posMax = glm::vec3(accessor.maxValues[0], accessor.maxValues[1], accessor.maxValues[2]);
 				}
 				else if (name.compare("NORMAL") == 0) {
 					normals = reinterpret_cast<const float*>(&buffer.data[accessor.byteOffset + bufferView.byteOffset]);
@@ -509,12 +494,8 @@ namespace Quadbit {
 			for (int i = 0; i < vertexCount; i++) {
 				QbVkVertex vertex{};
 				vertex.position = glm::make_vec3(&positions[i * positionStride]);
-				if (normals != nullptr) {
-					vertex.normal = glm::normalize(glm::make_vec3(&normals[i * normalStride]));
-					// Reorient normals to comply with blender export
-					eastl::swap(vertex.normal.y, vertex.normal.z);
-					vertex.normal.y *= -1.0f;
-				}
+				//vertex.position.y *= -1.0f;
+				if (normals != nullptr) vertex.normal = glm::normalize(glm::make_vec3(&normals[i * normalStride]));
 				if (uvs0 != nullptr) vertex.uv0 = glm::make_vec2(&uvs0[i * uv0Stride]);
 				if (uvs1 != nullptr) vertex.uv1 = glm::make_vec2(&uvs1[i * uv1Stride]);
 				vertices.push_back(vertex);
@@ -558,7 +539,18 @@ namespace Quadbit {
 			qbPrimitive.indexOffset = indexOffset;
 			qbPrimitive.indexCount = static_cast<uint32_t>(indices.size()) - indexOffset;
 			qbPrimitive.material = primitive.material;
+			qbPrimitive.boundingBox = BoundingBox(posMin, posMax);
+
 			qbMesh.primitives.push_back(qbPrimitive);
+		}
+
+		for (const auto& primitive : qbMesh.primitives) {
+			if (primitive.boundingBox.valid && !qbMesh.boundingBox.valid) {
+				qbMesh.boundingBox = primitive.boundingBox;
+				qbMesh.boundingBox.valid = true;
+			}
+			qbMesh.boundingBox.min = glm::min(qbMesh.boundingBox.min, primitive.boundingBox.min);
+			qbMesh.boundingBox.max = glm::max(qbMesh.boundingBox.max, primitive.boundingBox.max);
 		}
 
 		return qbMesh;

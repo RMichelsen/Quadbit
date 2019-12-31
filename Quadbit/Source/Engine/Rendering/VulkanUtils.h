@@ -222,10 +222,13 @@ namespace Quadbit::VkUtils {
 			return renderPassCreateInfo;
 		}
 
-		inline VkViewport Viewport(float height, float width, float minDepth, float maxDepth) {
+		// This functions returns a flipped viewport to match OpenGL conventions
+		inline VkViewport Viewport(float width, float height, float minDepth, float maxDepth) {
 			VkViewport viewport{};
-			viewport.height = height;
+			viewport.x = 0.0f;
+			viewport.y = 0.0f;
 			viewport.width = width;
+			viewport.height = height;
 			viewport.minDepth = minDepth;
 			viewport.maxDepth = maxDepth;
 			return viewport;

@@ -10,38 +10,58 @@
 
 namespace Quadbit {
     // Max instances here refers to the maximum number shader resource instances
+    // Note: if fragmentPath is nullptr, the pipeline will be created with a vertex shader only
 	QbVkPipeline::QbVkPipeline(QbVkContext& context, const char* vertexPath, const char* vertexEntry,
         const char* fragmentPath, const char* fragmentEntry, const QbVkPipelineDescription pipelineDescription,
         const VkRenderPass renderPass, const uint32_t maxInstances, 
         const eastl::vector<eastl::tuple<VkFormat, uint32_t>>& vertexAttributeOverride) : context_(context) {
 
+        QB_ASSERT(vertexPath != nullptr && "Can't create pipeline, no vertex path specified");
+
         graphicsResources_ = eastl::make_unique<GraphicsResources>();
         graphicsResources_->vertexPath = vertexPath;
         graphicsResources_->vertexEntry = vertexEntry;
-        graphicsResources_->fragmentPath = fragmentPath;
-        graphicsResources_->fragmentEntry = fragmentEntry;
+        graphicsResources_->fragmentPath = fragmentPath != nullptr ? fragmentPath : "";
+        graphicsResources_->fragmentEntry = fragmentEntry != nullptr ? fragmentEntry : "";
         graphicsResources_->renderPass = renderPass;
 
-        auto vertexBytecode = context_.shaderCompiler->CompileShader(vertexPath, QbVkShaderType::QBVK_SHADER_TYPE_VERTEX);
-        auto fragmentBytecode = context_.shaderCompiler->CompileShader(fragmentPath, QbVkShaderType::QBVK_SHADER_TYPE_FRAGMENT);
-        QB_ASSERT(!vertexBytecode.empty() && "Can't continue pipeline creation, shader compilation failed!");
-        QB_ASSERT(!fragmentBytecode.empty() && "Can't continue pipeline creation, shader compilation failed!");
-
         QbVkShaderInstance shaderInstance(context_);
-        shaderInstance.AddShader(vertexBytecode.data(), vertexBytecode.size(), vertexEntry, VK_SHADER_STAGE_VERTEX_BIT);
-        shaderInstance.AddShader(fragmentBytecode.data(), fragmentBytecode.size(), fragmentEntry, VK_SHADER_STAGE_FRAGMENT_BIT);
-
-        spirv_cross::Compiler vertexCompiler(vertexBytecode.data(), vertexBytecode.size());
-        spirv_cross::Compiler fragmentCompiler(fragmentBytecode.data(), fragmentBytecode.size());
-        const auto vertexResources = vertexCompiler.get_shader_resources();
-        const auto fragmentResources = fragmentCompiler.get_shader_resources();
-        
-		// Build the descriptor set layout
-		eastl::vector<eastl::vector<VkDescriptorSetLayoutBinding>> setLayoutBindings;
+        eastl::vector<eastl::vector<VkDescriptorSetLayoutBinding>> setLayoutBindings;
         eastl::vector<VkDescriptorPoolSize> poolSizes;
 
+        // Parse shader descriptor set layouts and push constants
+        // TODO: WHAT IF PUSH CONSTANTS ARE THE SAME??
+        eastl::fixed_vector<VkPushConstantRange, 2> pushConstantRanges;
+
+        auto vertexBytecode = context_.shaderCompiler->CompileShader(vertexPath, QbVkShaderType::QBVK_SHADER_TYPE_VERTEX);
+        QB_ASSERT(!vertexBytecode.empty() && "Can't continue pipeline creation, shader compilation failed!");
+        shaderInstance.AddShader(vertexBytecode.data(), vertexBytecode.size(), vertexEntry, VK_SHADER_STAGE_VERTEX_BIT);
+        spirv_cross::Compiler vertexCompiler(vertexBytecode.data(), vertexBytecode.size());
+        const auto vertexResources = vertexCompiler.get_shader_resources();
         ParseShader(vertexCompiler, vertexResources, setLayoutBindings, poolSizes, VK_SHADER_STAGE_VERTEX_BIT);
-        ParseShader(fragmentCompiler, fragmentResources, setLayoutBindings, poolSizes, VK_SHADER_STAGE_FRAGMENT_BIT);
+        if (!vertexResources.push_constant_buffers.empty()) {
+            VkPushConstantRange range{};
+            range.size = static_cast<uint32_t>(vertexCompiler.get_declared_struct_size(
+                vertexCompiler.get_type(vertexResources.push_constant_buffers.front().base_type_id)));
+            range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+            pushConstantRanges.push_back(range);
+        }
+
+        if (fragmentPath != nullptr) {
+            auto fragmentBytecode = context_.shaderCompiler->CompileShader(fragmentPath, QbVkShaderType::QBVK_SHADER_TYPE_FRAGMENT);
+            QB_ASSERT(!fragmentBytecode.empty() && "Can't continue pipeline creation, shader compilation failed!");
+            shaderInstance.AddShader(fragmentBytecode.data(), fragmentBytecode.size(), fragmentEntry, VK_SHADER_STAGE_FRAGMENT_BIT);
+            spirv_cross::Compiler fragmentCompiler(fragmentBytecode.data(), fragmentBytecode.size());
+            const auto fragmentResources = fragmentCompiler.get_shader_resources();
+            ParseShader(fragmentCompiler, fragmentResources, setLayoutBindings, poolSizes, VK_SHADER_STAGE_FRAGMENT_BIT);
+            if (!fragmentResources.push_constant_buffers.empty()) {
+                VkPushConstantRange range{};
+                range.size = static_cast<uint32_t>(fragmentCompiler.get_declared_struct_size(
+                    fragmentCompiler.get_type(fragmentResources.push_constant_buffers.front().base_type_id)));
+                range.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+                pushConstantRanges.push_back(range);
+            }
+        }
 
         // Create descriptor set layouts
         descriptorSetLayouts_.resize(setLayoutBindings.size());
@@ -107,11 +127,19 @@ namespace Quadbit {
         persistentPipelineInfo_.inputAssemblyInfo =
             VkUtils::Init::PipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 
-        persistentPipelineInfo_.viewport = VkViewport{};
-        persistentPipelineInfo_.viewport.width = static_cast<float>(context_.swapchain.extent.width);
-        persistentPipelineInfo_.viewport.height = static_cast<float>(context_.swapchain.extent.height);
-        persistentPipelineInfo_.viewport.minDepth = 0.0f;
-        persistentPipelineInfo_.viewport.maxDepth = 1.0f;
+        
+        if (pipelineDescription.viewportExtents.width == 0.0f && pipelineDescription.viewportExtents.height == 0.0f) {
+            persistentPipelineInfo_.viewport = VkUtils::Init::Viewport(
+                static_cast<float>(context_.swapchain.extent.width),
+                static_cast<float>(context_.swapchain.extent.height), 0.0f, 1.0f);
+        }
+        else {
+            persistentPipelineInfo_.viewport = VkUtils::Init::Viewport(
+                static_cast<float>(pipelineDescription.viewportExtents.width),
+                static_cast<float>(pipelineDescription.viewportExtents.height), 0.0f, 1.0f);
+        }
+
+
         persistentPipelineInfo_.scissor = VkRect2D{};
         persistentPipelineInfo_.scissor.extent = context_.swapchain.extent;
 
@@ -134,29 +162,13 @@ namespace Quadbit {
             persistentPipelineInfo_.colourBlendInfo = VkUtils::Init::PipelineColorBlendStateCreateInfo(0, nullptr);
         }
 
-
         VkPipelineLayoutCreateInfo pipelineLayoutInfo = VkUtils::Init::PipelineLayoutCreateInfo();
         pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(descriptorSetLayouts_.size());
         pipelineLayoutInfo.pSetLayouts = (!descriptorSetLayouts_.empty()) ? descriptorSetLayouts_.data() : nullptr;
 
-        // Check for push constants
-        eastl::fixed_vector<VkPushConstantRange, 2> pushConstantRanges;
-        if (!vertexResources.push_constant_buffers.empty()) {
-            VkPushConstantRange range{};
-            range.size = static_cast<uint32_t>(vertexCompiler.get_declared_struct_size(
-                vertexCompiler.get_type(vertexResources.push_constant_buffers.front().base_type_id)));
-            range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-            pushConstantRanges.push_back(range);
-        }
-        if (!fragmentResources.push_constant_buffers.empty()) {
-            VkPushConstantRange range{};
-            range.size = static_cast<uint32_t>(fragmentCompiler.get_declared_struct_size(
-                fragmentCompiler.get_type(fragmentResources.push_constant_buffers.front().base_type_id)));
-            range.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-            pushConstantRanges.push_back(range);
-        }
         pipelineLayoutInfo.pushConstantRangeCount = static_cast<uint32_t>(pushConstantRanges.size());
         pipelineLayoutInfo.pPushConstantRanges = (!pushConstantRanges.empty()) ? pushConstantRanges.data() : nullptr;
+
         VK_CHECK(vkCreatePipelineLayout(context_.device, &pipelineLayoutInfo, nullptr, &pipelineLayout_));
 
         persistentPipelineInfo_.rasterizationInfo = Presets::GetRasterization(pipelineDescription.rasterization);
@@ -164,7 +176,7 @@ namespace Quadbit {
         persistentPipelineInfo_.dynamicStateInfo = Presets::GetDynamicState(pipelineDescription.dynamicState);;
 
         VkGraphicsPipelineCreateInfo pipelineInfo = VkUtils::Init::GraphicsPipelineCreateInfo();
-        pipelineInfo.stageCount = 2;
+        pipelineInfo.stageCount = static_cast<uint32_t>(shaderInstance.stages.size());
         pipelineInfo.pStages = shaderInstance.stages.data();
         pipelineInfo.pVertexInputState = &persistentPipelineInfo_.vertexInputInfo;
         pipelineInfo.pInputAssemblyState = &persistentPipelineInfo_.inputAssemblyInfo;
@@ -316,20 +328,21 @@ namespace Quadbit {
 
     void QbVkPipeline::Rebuild() {
         if (!compute_) {
+            QbVkShaderInstance shaderInstance(context_);
+
+            if (graphicsResources_->fragmentPath.compare("") != 0) {
+                auto fragmentBytecode = context_.shaderCompiler->CompileShader(graphicsResources_->fragmentPath.c_str(),
+                    QbVkShaderType::QBVK_SHADER_TYPE_FRAGMENT);
+                if (fragmentBytecode.empty()) return;
+                shaderInstance.AddShader(fragmentBytecode.data(), fragmentBytecode.size(), graphicsResources_->fragmentEntry.c_str(), VK_SHADER_STAGE_FRAGMENT_BIT);
+            }
             auto vertexBytecode = context_.shaderCompiler->CompileShader(graphicsResources_->vertexPath.c_str(), 
                 QbVkShaderType::QBVK_SHADER_TYPE_VERTEX);
-            auto fragmentBytecode = context_.shaderCompiler->CompileShader(graphicsResources_->fragmentPath.c_str(), 
-                QbVkShaderType::QBVK_SHADER_TYPE_FRAGMENT);
-            if (vertexBytecode.empty() || fragmentBytecode.empty()) {
-                return;
-            }
-
-            QbVkShaderInstance shaderInstance(context_);
+            if (vertexBytecode.empty()) return;
             shaderInstance.AddShader(vertexBytecode.data(), vertexBytecode.size(), graphicsResources_->vertexEntry.c_str(), VK_SHADER_STAGE_VERTEX_BIT);
-            shaderInstance.AddShader(fragmentBytecode.data(), fragmentBytecode.size(), graphicsResources_->fragmentEntry.c_str(), VK_SHADER_STAGE_FRAGMENT_BIT);
 
             VkGraphicsPipelineCreateInfo pipelineInfo = VkUtils::Init::GraphicsPipelineCreateInfo();
-            pipelineInfo.stageCount = 2;
+            pipelineInfo.stageCount = static_cast<uint32_t>(shaderInstance.stages.size());
             pipelineInfo.pStages = shaderInstance.stages.data();
             pipelineInfo.pVertexInputState = &persistentPipelineInfo_.vertexInputInfo;
             pipelineInfo.pInputAssemblyState = &persistentPipelineInfo_.inputAssemblyInfo;

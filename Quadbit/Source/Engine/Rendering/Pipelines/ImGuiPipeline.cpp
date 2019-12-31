@@ -96,8 +96,11 @@ namespace Quadbit {
 		pipeline->Bind(commandBuffer);
 		pipeline->BindDescriptorSets(commandBuffer);
 
-		// Set the viewport
-		VkViewport viewport = VkUtils::Init::Viewport(io.DisplaySize.y, io.DisplaySize.x, 0.0f, 1.0f);
+		VkViewport viewport{};
+		viewport.width = static_cast<float>(context_.swapchain.extent.width);
+		viewport.height = static_cast<float>(context_.swapchain.extent.height);
+		viewport.minDepth = 0.0f;
+		viewport.maxDepth = 1.0f;
 		vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
 		// Update the push constants for scale and translation

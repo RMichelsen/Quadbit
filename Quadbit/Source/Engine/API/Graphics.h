@@ -84,9 +84,9 @@ namespace Quadbit {
 		QbVkPBRMaterial CreatePBRMaterial(QbVkTextureHandle baseColourTexture, QbVkTextureHandle metallicRoughnessTexture = QBVK_TEXTURE_NULL_HANDLE,
 			QbVkTextureHandle normalTexture = QBVK_TEXTURE_NULL_HANDLE, QbVkTextureHandle occlusionTexture = QBVK_TEXTURE_NULL_HANDLE, 
 			QbVkTextureHandle emissiveTexture = QBVK_TEXTURE_NULL_HANDLE);
-		PBRSceneComponent LoadPBRScene(const char* path);
+		PBRSceneComponent LoadPBRModel(const char* path);
 		PBRSceneComponent CreatePBRPlane(uint32_t xSize, uint32_t zSize, const QbVkPBRMaterial& material);
-		void DestroyPBRScene(const Entity& entity);
+		void DestroyPBRModel(const Entity& entity);
 
 		template<typename T>
 		CustomMeshComponent CreateMesh(const eastl::vector<T>& vertices, uint32_t vertexStride, 

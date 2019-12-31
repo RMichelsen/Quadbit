@@ -13,6 +13,7 @@
 
 namespace Quadbit {
 	struct SunUBO {
+		glm::mat4 lightViewProj;
 		float sunAzimuth;
 		float sunAltitude;
 	};
@@ -27,9 +28,9 @@ namespace Quadbit {
 		QbVkPBRMaterial CreateMaterial(QbVkTextureHandle baseColourTexture, QbVkTextureHandle metallicRoughnessTexture = QBVK_TEXTURE_NULL_HANDLE,
 			QbVkTextureHandle normalTexture = QBVK_TEXTURE_NULL_HANDLE, QbVkTextureHandle occlusionTexture = QBVK_TEXTURE_NULL_HANDLE, 
 			QbVkTextureHandle emissiveTexture = QBVK_TEXTURE_NULL_HANDLE);
-		PBRSceneComponent LoadScene(const char* path);
+		PBRSceneComponent LoadModel(const char* path);
 		PBRSceneComponent CreatePlane(uint32_t xSize, uint32_t zSize, const QbVkPBRMaterial& material);
-		void DestroyScene(const Entity& entity);
+		void DestroyModel(const Entity& entity);
 
 		QbVkPipelineHandle pipeline_;
 		QbVkPipelineHandle skyPipeline_;

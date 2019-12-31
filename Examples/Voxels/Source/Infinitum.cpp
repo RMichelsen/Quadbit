@@ -62,15 +62,25 @@ void Infinitum::Init() {
 	fastnoiseRegions_->SetCellularDistanceFunction(FastNoiseSIMD::CellularDistanceFunction::Euclidean);
 	fastnoiseRegions_->SetCellularJitter(0.3f);
 
-	// Spawn base
-	for(auto i = 0; i < VOXEL_BLOCK_WIDTH * 10; i += VOXEL_BLOCK_WIDTH) {
-		for(auto j = 0; j < VOXEL_BLOCK_WIDTH * 10; j += VOXEL_BLOCK_WIDTH) {
-			auto entity = entityManager_->Create();
-			entityManager_->AddComponent<Quadbit::RenderTransformComponent>(entity, Quadbit::RenderTransformComponent(1.0f, glm::vec3(i, 0.0f, j), glm::quat()));
-			entityManager_->AddComponents<VoxelBlockComponent, VoxelBlockUpdateTag>(entity);
-			chunks_.push_back(entity);
-		}
-	}
+	//// Spawn base
+	//for(auto i = 0; i < VOXEL_BLOCK_WIDTH * 10; i += VOXEL_BLOCK_WIDTH) {
+	//	for(auto j = 0; j < VOXEL_BLOCK_WIDTH * 10; j += VOXEL_BLOCK_WIDTH) {
+	//		auto entity = entityManager_->Create();
+	//		entityManager_->AddComponent<Quadbit::RenderTransformComponent>(entity, Quadbit::RenderTransformComponent(1.0f, glm::vec3(i, 0.0f, j), glm::quat()));
+	//		entityManager_->AddComponents<VoxelBlockComponent, VoxelBlockUpdateTag>(entity);
+	//		chunks_.push_back(entity);
+	//	}
+	//}
+
+	auto entity = entityManager_->Create();
+	entityManager_->AddComponent<Quadbit::RenderTransformComponent>(entity, Quadbit::RenderTransformComponent(2.0f, glm::vec3(0.0f, 10.0f, 0.0f), glm::quat()));
+	entityManager_->AddComponents<VoxelBlockComponent, VoxelBlockUpdateTag>(entity);
+	chunks_.push_back(entity);
+
+	entity = entityManager_->Create();
+	entityManager_->AddComponent<Quadbit::RenderTransformComponent>(entity, Quadbit::RenderTransformComponent(1.0f, glm::vec3(0.0f, -10.0f, 0.0f), glm::quat()));
+	entityManager_->AddComponents<VoxelBlockComponent, VoxelBlockUpdateTag>(entity);
+	chunks_.push_back(entity);
 }
 
 void Infinitum::Simulate(float deltaTime) {

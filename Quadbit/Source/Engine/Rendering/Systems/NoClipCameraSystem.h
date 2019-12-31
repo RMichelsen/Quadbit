@@ -12,9 +12,9 @@ namespace Quadbit {
 	struct NoClipCameraSystem : ComponentSystem {
 		void Init() {
 			entityManager_->ForEach<RenderCamera>([&](Entity entity, RenderCamera& camera) {
-				camera.front.x = cos(glm::radians(camera.yaw)) * cos(glm::radians(camera.pitch));
+				camera.front.x = sin(glm::radians(camera.yaw)) * cos(glm::radians(camera.pitch));
 				camera.front.y = sin(glm::radians(camera.pitch));
-				camera.front.z = sin(glm::radians(camera.yaw)) * cos(glm::radians(camera.pitch));
+				camera.front.z = cos(glm::radians(camera.yaw)) * cos(glm::radians(camera.pitch));
 				camera.front = glm::normalize(camera.front);
 				camera.view = glm::lookAt(camera.position, camera.position + camera.front, camera.up);
 				});
@@ -36,15 +36,15 @@ namespace Quadbit {
 				if (inputHandler->mouseDrag_.right.active || inputHandler->keyState_[0x41] || inputHandler->keyState_[0x44] ||
 					inputHandler->keyState_[0x53] || inputHandler->keyState_[0x57]) {
 
-					const float cameraSpeed = 100.0f * deltaTime;
+					const float cameraSpeed = 20.0f * deltaTime;
 
 					// 'W'
 					if (inputHandler->keyState_[0x57]) {
-						camera.position += camera.front * cameraSpeed;
+						camera.position -= camera.front * cameraSpeed;
 					}
 					// 'S'
 					if (inputHandler->keyState_[0x53]) {
-						camera.position -= camera.front * cameraSpeed;
+						camera.position += camera.front * cameraSpeed;
 					}
 					// 'D'
 					if (inputHandler->keyState_[0x44]) {
@@ -62,7 +62,7 @@ namespace Quadbit {
 							camera.yaw += static_cast<float>(inputHandler->mouseDelta_.x)* dragSpeed;
 						}
 						if (inputHandler->mouseDelta_.y != 0) {
-							camera.pitch -= static_cast<float>(inputHandler->mouseDelta_.y)* dragSpeed;
+							camera.pitch += static_cast<float>(inputHandler->mouseDelta_.y)* dragSpeed;
 							// Put constraints on pitch.
 							// 1.5533rad is approx 89deg
 							if (camera.pitch > 89.0f) {
@@ -73,9 +73,9 @@ namespace Quadbit {
 							}
 						}
 						// Update camera front (direction)
-						camera.front.x = cos(glm::radians(camera.yaw)) * cos(glm::radians(camera.pitch));
+						camera.front.x = sin(glm::radians(camera.yaw)) * cos(glm::radians(camera.pitch));
 						camera.front.y = sin(glm::radians(camera.pitch));
-						camera.front.z = sin(glm::radians(camera.yaw)) * cos(glm::radians(camera.pitch));
+						camera.front.z = cos(glm::radians(camera.yaw)) * cos(glm::radians(camera.pitch));
 						camera.front = glm::normalize(camera.front);
 					}
 					// Update view matrix

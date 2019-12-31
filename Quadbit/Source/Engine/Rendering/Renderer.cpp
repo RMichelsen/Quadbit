@@ -48,6 +48,8 @@ inline constexpr const char* DEVICE_EXT_NAMES[DEVICE_EXT_COUNT]{
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
 
+inline constexpr uint32_t SHADOWMAP_RESOLUTION = 1024;
+
 namespace Quadbit {
 	QbVkRenderer::QbVkRenderer(HINSTANCE hInstance, HWND hwnd, InputHandler* inputHandler, EntityManager* entityManager) :
 	    localHandle_(hInstance), 
@@ -88,7 +90,7 @@ namespace Quadbit {
 		// Set up camera
 		context_->fallbackCamera = context_->entityManager->Create();
 		context_->entityManager->AddComponent<RenderCamera>(context_->fallbackCamera, 
-			Quadbit::RenderCamera(145.0f, -42.0f, glm::vec3(130.0f, 190.0f, 25.0f), 16.0f / 9.0f, 10000.0f));
+			Quadbit::RenderCamera(180, 55, glm::vec3(10.0f, 30.0f, -10.0f), 16.0f / 9.0f, 1000.0f));
 	}
 
 	QbVkRenderer::~QbVkRenderer() {
@@ -349,6 +351,7 @@ namespace Quadbit {
 		deviceFeatures.fillModeNonSolid = VK_TRUE;
 		deviceFeatures.samplerAnisotropy = VK_TRUE;
 		deviceFeatures.depthClamp = VK_TRUE;
+		deviceFeatures.depthBiasClamp = VK_TRUE;
 		//deviceFeatures.sampleRateShading = VK_TRUE;
 
 		// Now we will fill out the actual information for device creation
@@ -443,11 +446,12 @@ namespace Quadbit {
 
 	void QbVkRenderer::CreateShadowmapResources() {
 		// Prepare the shadowmap texture
-		VkImageCreateInfo imageInfo = VkUtils::Init::ImageCreateInfo(2048, 2048, VkUtils::FindDepthFormat(*context_),
+		VkImageCreateInfo imageInfo = VkUtils::Init::ImageCreateInfo(SHADOWMAP_RESOLUTION, SHADOWMAP_RESOLUTION, VkUtils::FindDepthFormat(*context_),
 			VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
 
 		VkSamplerCreateInfo samplerInfo = VkUtils::Init::SamplerCreateInfo(VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, 
-			VK_FALSE, 1.0f, VK_COMPARE_OP_NEVER, VK_SAMPLER_MIPMAP_MODE_LINEAR);
+			VK_FALSE, 1.0f, VK_COMPARE_OP_LESS, VK_SAMPLER_MIPMAP_MODE_LINEAR);
+		samplerInfo.compareEnable = VK_TRUE;
 		samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
 
 		context_->shadowmapResources.texture = context_->resourceManager->CreateTexture(&imageInfo, VK_IMAGE_ASPECT_DEPTH_BIT, 
@@ -506,9 +510,10 @@ namespace Quadbit {
 		pipelineDescription.dynamicState = QbVkPipelineDynamicState::QBVK_DYNAMICSTATE_DEPTHBIAS;
 		pipelineDescription.enableMSAA = false;
 		pipelineDescription.rasterization = QbVkPipelineRasterization::QBVK_PIPELINE_RASTERIZATION_SHADOWMAP;
+		pipelineDescription.viewportExtents = { SHADOWMAP_RESOLUTION, SHADOWMAP_RESOLUTION };
 
 		context_->shadowmapResources.pipeline = context_->resourceManager->CreateGraphicsPipeline("Assets/Quadbit/Shaders/shadowmap.vert", "main", 
-			"Assets/Quadbit/Shaders/shadowmap.frag", "main", pipelineDescription, context_->shadowmapResources.renderPass);
+			nullptr, nullptr, pipelineDescription, context_->shadowmapResources.renderPass);
 	}
 
 	void QbVkRenderer::CreateSwapChain() {
@@ -753,40 +758,44 @@ namespace Quadbit {
 		commandBufferInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 		VK_CHECK(vkBeginCommandBuffer(commandBuffer, &commandBufferInfo));
 
+		auto& shadowmapResources = context_->shadowmapResources;
 
-		//auto& shadowmapResources = context_->shadowmapResources;
+		VkUtils::CreateFrameBuffer(*context_, SHADOWMAP_RESOLUTION, SHADOWMAP_RESOLUTION,
+			shadowmapResources.framebuffers[resourceIndex], shadowmapResources.renderPass,
+			{ context_->resourceManager->textures_[shadowmapResources.texture].descriptor.imageView });
 
-		//VkUtils::CreateFrameBuffer(*context_, 2048, 2048, shadowmapResources.framebuffers[resourceIndex], shadowmapResources.renderPass,
-		//	{ context_->resourceManager->textures_[shadowmapResources.texture].descriptor.imageView });
+		VkRenderPassBeginInfo renderPassInfo = VkUtils::Init::RenderPassBeginInfo();
+		renderPassInfo.renderPass = context_->shadowmapResources.renderPass;
+		renderPassInfo.renderArea.offset = { 0, 0 };
+		renderPassInfo.renderArea.extent = { SHADOWMAP_RESOLUTION, SHADOWMAP_RESOLUTION };
 
-		//VkRenderPassBeginInfo renderPassInfo = VkUtils::Init::RenderPassBeginInfo();
-		//renderPassInfo.renderPass = context_->shadowmapResources.renderPass;
-		//renderPassInfo.renderArea.offset = { 0, 0 };
-		//renderPassInfo.renderArea.extent = { 2048, 2048 };
+		// This specifies the clear values to use for the VK_ATTACHMENT_LOAD_OP_CLEAR operation (in the color and depth attachments)
+		renderPassInfo.clearValueCount = 1;
+		renderPassInfo.pClearValues = &clearValues[1];
+		renderPassInfo.framebuffer = shadowmapResources.framebuffers[resourceIndex];
 
-		//// This specifies the clear values to use for the VK_ATTACHMENT_LOAD_OP_CLEAR operation (in the color and depth attachments)
-		//renderPassInfo.clearValueCount = 1;
-		//renderPassInfo.pClearValues = &clearValues[1];
-		//renderPassInfo.framebuffer = shadowmapResources.framebuffers[resourceIndex];
+		vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+		
 
-		//vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+		// Depth bias parameters to reduce shadow artifacts
+		constexpr float depthBiasConstant = 1.25f;
+		constexpr float depthBiasSlope = 1.75f;
+		constexpr float depthBiasClamp = 0.0078125f;
 
-		//constexpr float depthBiasConstant = 1.25f;
-		//constexpr float depthBiasSlope = 1.75f;
-		//vkCmdSetDepthBias(commandBuffer, depthBiasConstant, 0.0f, depthBiasSlope);
+		vkCmdSetDepthBias(commandBuffer, depthBiasConstant, depthBiasClamp, depthBiasSlope);
 
-		//auto& pipeline = context_->resourceManager->pipelines_[shadowmapResources.pipeline];
-		//pipeline->Bind(commandBuffer);
+		auto& pipeline = context_->resourceManager->pipelines_[shadowmapResources.pipeline];
+		pipeline->Bind(commandBuffer);
 
-		//pbrPipeline_->DrawShadows(resourceIndex, commandBuffer);
+		pbrPipeline_->DrawShadows(resourceIndex, commandBuffer);
 
-		//vkCmdEndRenderPass(commandBuffer);
+		vkCmdEndRenderPass(commandBuffer);
 
 		// Create the frame buffer
 		VkUtils::CreateFrameBuffer(*context_, context_->swapchain.extent.width, context_->swapchain.extent.height, 
 			framebuffer, context_->mainRenderPass, { context_->multisamplingResources.msaaImageView, context_->depthResources.imageView, imageView });
 
-		auto renderPassInfo = VkUtils::Init::RenderPassBeginInfo();
+		renderPassInfo = VkUtils::Init::RenderPassBeginInfo();
 		renderPassInfo.renderPass = context_->mainRenderPass;
 		renderPassInfo.renderArea.offset = { 0, 0 };
 		renderPassInfo.renderArea.extent = context_->swapchain.extent;

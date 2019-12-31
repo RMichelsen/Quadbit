@@ -6,9 +6,10 @@ layout(location = 2) in vec2 inUV0;
 layout(location = 3) in vec2 inUV1;
 
 layout(push_constant) uniform PushConstants {
-	mat4 depthMVP;
+	mat4 lightViewProj;
+    mat4 model;
 } pc;
 
 void main() {
-    gl_Position = pc.depthMVP * vec4(inPosition, 1.0);
+    gl_Position = pc.lightViewProj * pc.model * vec4(inPosition, 1.0);
 }

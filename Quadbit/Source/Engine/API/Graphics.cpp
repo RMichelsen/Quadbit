@@ -146,16 +146,16 @@ namespace Quadbit {
 		return renderer_->pbrPipeline_->CreateMaterial(baseColourTexture, metallicRoughnessTexture, normalTexture, occlusionTexture, emissiveTexture);
 	}
 
-	PBRSceneComponent Graphics::LoadPBRScene(const char* path) {
-		return renderer_->pbrPipeline_->LoadScene(path);
+	PBRSceneComponent Graphics::LoadPBRModel(const char* path) {
+		return renderer_->pbrPipeline_->LoadModel(path);
 	}
 
 	PBRSceneComponent Graphics::CreatePBRPlane(uint32_t xSize, uint32_t zSize, const QbVkPBRMaterial& material) {
 		return renderer_->pbrPipeline_->CreatePlane(xSize, zSize, material);
 	}
 
-	void Graphics::DestroyPBRScene(const Entity& entity) {
-		renderer_->pbrPipeline_->DestroyScene(entity);
+	void Graphics::DestroyPBRModel(const Entity& entity) {
+		renderer_->pbrPipeline_->DestroyModel(entity);
 	}
 
 	void Graphics::DestroyMesh(const Entity& entity) {

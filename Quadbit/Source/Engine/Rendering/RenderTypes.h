@@ -10,6 +10,7 @@
 #include <glm/gtx/quaternion.hpp>
 
 #include "Engine/Core/Logging.h"
+#include "Engine/Core/MathHelpers.h"
 #include "Engine/Rendering/VulkanTypes.h"
 
 namespace Quadbit {
@@ -155,7 +156,44 @@ namespace Quadbit {
 		}
 	};
 
+	// AABB calc from Sascha Willems Vulkan examples
+	// https://github.com/SaschaWillems/
+	struct BoundingBox {
+		glm::vec3 min{};
+		glm::vec3 max{};
+		bool valid = false;
+		BoundingBox() {}
+		BoundingBox(glm::vec3 min, glm::vec3 max) : min(min), max(max) {}
+		BoundingBox ComputeAABB(glm::mat4 M) {
+			glm::vec3 min = glm::vec3(M[3]);
+			glm::vec3 max = min;
+			glm::vec3 v0, v1;
+
+			glm::vec3 right = glm::vec3(M[0]);
+			v0 = right * this->min.x;
+			v1 = right * this->max.x;
+			min += glm::min(v0, v1);
+			max += glm::max(v0, v1);
+
+			glm::vec3 up = glm::vec3(M[1]);
+			v0 = up * this->min.y;
+			v1 = up * this->max.y;
+			min += glm::min(v0, v1);
+			max += glm::max(v0, v1);
+
+			glm::vec3 back = glm::vec3(M[2]);
+			v0 = back * this->min.z;
+			v1 = back * this->max.z;
+			min += glm::min(v0, v1);
+			max += glm::max(v0, v1);
+
+			return BoundingBox(min, max);
+		}
+	};
+
 	struct QbVkPBRPrimitive {
+		BoundingBox boundingBox;
+
 		uint32_t material;
 		uint32_t vertexOffset;
 		uint32_t indexOffset;
@@ -163,11 +201,17 @@ namespace Quadbit {
 	};
 
 	struct QbVkPBRMesh {
+		BoundingBox boundingBox;
+		BoundingBox axisAlignedBB;
+
 		glm::mat4 localTransform;
 		eastl::vector<QbVkPBRPrimitive> primitives;
 	};
 
 	struct PBRSceneComponent {
+		BoundingBox axisAlignedBB;
+		glm::vec3 extents;
+
 		QbVkResourceHandle<QbVkBuffer> vertexHandle;
 		QbVkResourceHandle<QbVkBuffer> indexHandle;
 
@@ -233,8 +277,7 @@ namespace Quadbit {
 			aspectRatio(aspectRatio), viewDistance(viewDist), yaw(camYaw), pitch(camPitch),
 			view(glm::mat4(1)), dragActive(false) {
 
-			perspective = glm::perspective(glm::radians(45.0f), aspectRatio, 0.1f, viewDistance);
-			perspective[1][1] *= -1;
+			perspective = MakeInfiniteProjection(45.0f, aspectRatio, 1.0f, 0.000001f);
 		}
 	};
 }

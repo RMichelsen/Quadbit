@@ -43,6 +43,7 @@ set(QUADBIT_SOURCES
    Source/Engine/Core/Entry.h
    Source/Engine/Core/Entry.cpp
    Source/Engine/Core/Game.h
+   Source/Engine/Core/MathHelpers.h
    Source/Engine/Core/Logging.h
    Source/Engine/Core/Sfinae.h
    Source/Engine/Core/Time.h
