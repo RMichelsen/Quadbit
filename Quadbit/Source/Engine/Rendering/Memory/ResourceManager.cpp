@@ -340,7 +340,8 @@ namespace Quadbit {
 		if (emptyTexture_ != QBVK_TEXTURE_NULL_HANDLE) return emptyTexture_;
 
 		// Create an empty texture for use when a material has empty slots
-		auto samplerInfo = VkUtils::Init::SamplerCreateInfo(VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_TRUE, 16.0f, VK_COMPARE_OP_ALWAYS, VK_SAMPLER_MIPMAP_MODE_LINEAR);
+		auto samplerInfo = VkUtils::Init::SamplerCreateInfo(VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_TRUE, 16.0f, 
+			VK_FALSE, VK_COMPARE_OP_ALWAYS, VK_SAMPLER_MIPMAP_MODE_LINEAR);
 		emptyTexture_ = CreateTexture(1, 1, &samplerInfo);
 		return emptyTexture_;
 	}

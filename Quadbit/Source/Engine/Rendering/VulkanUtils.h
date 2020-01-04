@@ -223,6 +223,17 @@ namespace Quadbit::VkUtils {
 		}
 
 		// This functions returns a flipped viewport to match OpenGL conventions
+		inline VkViewport FlippedViewport(float width, float height, float minDepth, float maxDepth) {
+			VkViewport viewport{};
+			viewport.x = 0.0f;
+			viewport.y = height;
+			viewport.width = width;
+			viewport.height = -height;
+			viewport.minDepth = minDepth;
+			viewport.maxDepth = maxDepth;
+			return viewport;
+		}
+
 		inline VkViewport Viewport(float width, float height, float minDepth, float maxDepth) {
 			VkViewport viewport{};
 			viewport.x = 0.0f;
@@ -385,7 +396,7 @@ namespace Quadbit::VkUtils {
 		}
 
 		inline VkSamplerCreateInfo SamplerCreateInfo(VkFilter samplerFilter, VkSamplerAddressMode addressMode, VkBool32 enableAnisotropy,
-			float maxAnisotropy, VkCompareOp compareOperation, VkSamplerMipmapMode samplerMipmapMode, float maxLod = 0.0f) {
+			float maxAnisotropy, VkBool32 compareEnable, VkCompareOp compareOperation, VkSamplerMipmapMode samplerMipmapMode, float maxLod = 0.0f) {
 
 			VkSamplerCreateInfo samplerCreateInfo{};
 			samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -397,7 +408,7 @@ namespace Quadbit::VkUtils {
 			samplerCreateInfo.anisotropyEnable = enableAnisotropy;
 			samplerCreateInfo.maxAnisotropy = maxAnisotropy;
 			samplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
-			samplerCreateInfo.compareEnable = VK_FALSE;
+			samplerCreateInfo.compareEnable = compareEnable;
 			samplerCreateInfo.compareOp = compareOperation;
 			samplerCreateInfo.mipmapMode = samplerMipmapMode;
 			samplerCreateInfo.maxLod = maxLod;

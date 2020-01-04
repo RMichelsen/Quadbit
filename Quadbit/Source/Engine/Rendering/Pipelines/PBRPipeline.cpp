@@ -38,12 +38,13 @@ namespace Quadbit {
 		context.entityManager->RegisterComponents<CustomMeshComponent, ResourceDeleteComponent, PBRSceneComponent, RenderTransformComponent,
 			RenderCamera, CameraUpdateAspectRatioTag>();
 
-		QbVkPipelineDescription pipelineDescription;
+		QbVkPipelineDescription pipelineDescription{};
 		pipelineDescription.colourBlending = QbVkPipelineColourBlending::QBVK_COLOURBLENDING_DISABLE;
 		pipelineDescription.depth = QbVkPipelineDepth::QBVK_PIPELINE_DEPTH_ENABLE;
 		pipelineDescription.dynamicState = QbVkPipelineDynamicState::QBVK_DYNAMICSTATE_VIEWPORTSCISSOR;
 		pipelineDescription.enableMSAA = true;
 		pipelineDescription.rasterization = QbVkPipelineRasterization::QBVK_PIPELINE_RASTERIZATION_DEFAULT;
+		pipelineDescription.viewportFlipped = true;
 
 		pipeline_ = context_.resourceManager->CreateGraphicsPipeline("Assets/Quadbit/Shaders/default_vert.glsl", "main",
 			"Assets/Quadbit/Shaders/default_frag.glsl", "main", pipelineDescription, context_.mainRenderPass, 1024);
@@ -314,14 +315,15 @@ namespace Quadbit {
 	void PBRPipeline::SetViewportAndScissor(VkCommandBuffer& commandBuffer) {
 		// Dynamic update viewport and scissor for user-defined pipelines (also doesn't necessitate rebuilding the pipeline on window resize)
 		// In our case the viewport covers the entire window
-		VkViewport viewport = VkUtils::Init::Viewport(
+		// The viewport is flipped to match OpenGL conventions (Y up)
+		VkViewport viewport = VkUtils::Init::FlippedViewport(
 			static_cast<float>(context_.swapchain.extent.width),
 			static_cast<float>(context_.swapchain.extent.height), 0.0f, 1.0f);
 		vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 		// And so does the scissor
 		VkRect2D scissor{};
 		scissor.offset = { 0, 0 };
-		scissor.extent = context_.swapchain.extent;
+		scissor.extent = context_.swapchain.extent; 
 		vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 	}
 

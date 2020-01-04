@@ -82,6 +82,16 @@ float CalcShadow(vec4 shadowCoord) {
 	return ambient + (light / 18.0);
 }
 
+
+
+float CalculateSmoothAttenuation(vec3 p, vec3 l) {
+	vec3 dir = l - p;
+	float r2 = length(dir);
+	// vec2 attenConst = vec2(1 / 10^2, 2 / 10);
+	float attenuation = clamp(2.0 / r2, 0.0, 1.0);
+	return attenuation;
+}
+
 void main() {
 	vec4 baseColour = (ubo.baseColourTextureIndex > -1) ?
 		texture(baseColourMap, ubo.baseColourTextureIndex == 0 ? inUV0 : inUV1) : 
@@ -112,7 +122,10 @@ void main() {
 	vec3 diffuse = max(dot(normal, L), 0.0) * baseColour.xyz;
 	float shadow = CalcShadow(inLightSpaceCoords);
 
-	outColour = vec4(diffuse * shadow, 1.0);
+	vec3 plight = vec3(0.9, 0.85, 0.7) * 1.0 * CalculateSmoothAttenuation(inPos, vec3(5.0, 5.0, 5.0));
+
+
+	outColour = vec4(plight + (diffuse * shadow), 1.0);
 	//vec2 screenRelativeCoord = vec2(gl_FragCoord.x / 2538.0, 1 - gl_FragCoord.y / 1384.0);
 	//outColour = vec4(shadow * 0.6, 0, 0, 1);
 }

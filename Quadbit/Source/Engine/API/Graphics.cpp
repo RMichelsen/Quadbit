@@ -51,9 +51,9 @@ namespace Quadbit {
 	}
 
 	VkSamplerCreateInfo Graphics::CreateImageSamplerInfo(VkFilter samplerFilter, VkSamplerAddressMode addressMode, VkBool32 enableAnisotropy,
-		float maxAnisotropy, VkCompareOp compareOperation, VkSamplerMipmapMode samplerMipmapMode, float maxLod) {
-		auto samplerInfo = VkUtils::Init::SamplerCreateInfo(samplerFilter, addressMode, enableAnisotropy, maxAnisotropy, compareOperation, samplerMipmapMode, maxLod);
-		return samplerInfo;
+		float maxAnisotropy, VkBool32 compareEnable, VkCompareOp compareOperation, VkSamplerMipmapMode samplerMipmapMode, float maxLod) {
+		return VkUtils::Init::SamplerCreateInfo(samplerFilter, addressMode, enableAnisotropy, maxAnisotropy,
+			compareEnable, compareOperation, samplerMipmapMode, maxLod);
 	}
 #pragma endregion
 

@@ -35,6 +35,7 @@ namespace Quadbit {
 		QbVkPipelineDynamicState dynamicState;
 		bool enableMSAA;
 		VkExtent2D viewportExtents;
+		bool viewportFlipped;
 	};
 
 	namespace Presets {

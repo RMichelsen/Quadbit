@@ -31,15 +31,13 @@ const mat4 biasMat = mat4 (
 	0.5, 0.5, 0.0, 1.0 );
 
 void main() {
-	outPos = inPosition;
-
+	outPos = (pc.model * vec4(inPosition, 1.0)).xyz;
 	outNormal = transpose(inverse(mat3(pc.model))) * inNormal;
 	outUV0 = inUV0;
 	outUV1 = inUV1;
 	outSunViewVec = vec3(sin(ubo.altitude) * cos(ubo.azimuth), cos(ubo.altitude), sin(ubo.altitude) * sin(ubo.azimuth));
-	outViewVec = -(pc.model * vec4(outPos, 1.0)).xyz;
-	outLightSpaceCoords = (biasMat * ubo.lightViewProj * pc.model) * vec4(outPos, 1.0);
+	outViewVec = -(pc.model * vec4(inPosition, 1.0)).xyz;
+	outLightSpaceCoords = (biasMat * ubo.lightViewProj * pc.model) * vec4(inPosition, 1.0);
 
-	gl_Position = pc.MVP * vec4(outPos, 1.0);
-	gl_Position.y = -gl_Position.y;
+	gl_Position = pc.MVP * vec4(inPosition, 1.0);
 }

@@ -58,7 +58,7 @@ namespace Quadbit {
 		QbVkTextureHandle LoadTexture(const char* imagePath, bool generateMips = false, VkSamplerCreateInfo* samplerInfo = nullptr);
 
 		VkSamplerCreateInfo CreateImageSamplerInfo(VkFilter samplerFilter, VkSamplerAddressMode addressMode, VkBool32 enableAnisotropy,
-			float maxAnisotropy, VkCompareOp compareOperation, VkSamplerMipmapMode samplerMipmapMode, float maxLod = 0.0f);
+			float maxAnisotropy, VkBool32 compareEnable, VkCompareOp compareOperation, VkSamplerMipmapMode samplerMipmapMode, float maxLod = 0.0f);
 
 		/*****************************/
 		/*    Objects and Meshes     */

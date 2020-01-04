@@ -128,17 +128,13 @@ namespace Quadbit {
             VkUtils::Init::PipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 
         
-        if (pipelineDescription.viewportExtents.width == 0.0f && pipelineDescription.viewportExtents.height == 0.0f) {
-            persistentPipelineInfo_.viewport = VkUtils::Init::Viewport(
-                static_cast<float>(context_.swapchain.extent.width),
-                static_cast<float>(context_.swapchain.extent.height), 0.0f, 1.0f);
-        }
-        else {
-            persistentPipelineInfo_.viewport = VkUtils::Init::Viewport(
-                static_cast<float>(pipelineDescription.viewportExtents.width),
-                static_cast<float>(pipelineDescription.viewportExtents.height), 0.0f, 1.0f);
-        }
+        const bool defaultExtents = (pipelineDescription.viewportExtents.width == 0.0f && pipelineDescription.viewportExtents.height == 0.0f);
+        float width = defaultExtents ? static_cast<float>(context_.swapchain.extent.width) : static_cast<float>(pipelineDescription.viewportExtents.width);
+        float height = defaultExtents ? static_cast<float>(context_.swapchain.extent.height) : static_cast<float>(pipelineDescription.viewportExtents.height);
 
+        persistentPipelineInfo_.viewport = pipelineDescription.viewportFlipped ?
+            VkUtils::Init::FlippedViewport(width, height, 0.0f, 1.0f) :
+            VkUtils::Init::Viewport(width, height, 0.0f, 1.0f);
 
         persistentPipelineInfo_.scissor = VkRect2D{};
         persistentPipelineInfo_.scissor.extent = context_.swapchain.extent;

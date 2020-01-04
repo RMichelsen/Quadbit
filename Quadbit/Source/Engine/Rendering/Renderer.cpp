@@ -48,7 +48,7 @@ inline constexpr const char* DEVICE_EXT_NAMES[DEVICE_EXT_COUNT]{
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
 
-inline constexpr uint32_t SHADOWMAP_RESOLUTION = 1024;
+inline constexpr uint32_t SHADOWMAP_RESOLUTION = 2048;
 
 namespace Quadbit {
 	QbVkRenderer::QbVkRenderer(HINSTANCE hInstance, HWND hwnd, InputHandler* inputHandler, EntityManager* entityManager) :
@@ -90,7 +90,7 @@ namespace Quadbit {
 		// Set up camera
 		context_->fallbackCamera = context_->entityManager->Create();
 		context_->entityManager->AddComponent<RenderCamera>(context_->fallbackCamera, 
-			Quadbit::RenderCamera(180, 55, glm::vec3(10.0f, 30.0f, -10.0f), 16.0f / 9.0f, 1000.0f));
+			Quadbit::RenderCamera(180.0f, 55.0f, glm::vec3(10.0f, 30.0f, -10.0f), 16.0f / 9.0f, 1000.0f));
 	}
 
 	QbVkRenderer::~QbVkRenderer() {
@@ -450,8 +450,7 @@ namespace Quadbit {
 			VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
 
 		VkSamplerCreateInfo samplerInfo = VkUtils::Init::SamplerCreateInfo(VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, 
-			VK_FALSE, 1.0f, VK_COMPARE_OP_LESS, VK_SAMPLER_MIPMAP_MODE_LINEAR);
-		samplerInfo.compareEnable = VK_TRUE;
+			VK_FALSE, 1.0f, VK_TRUE, VK_COMPARE_OP_LESS, VK_SAMPLER_MIPMAP_MODE_LINEAR);
 		samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
 
 		context_->shadowmapResources.texture = context_->resourceManager->CreateTexture(&imageInfo, VK_IMAGE_ASPECT_DEPTH_BIT, 
@@ -511,6 +510,7 @@ namespace Quadbit {
 		pipelineDescription.enableMSAA = false;
 		pipelineDescription.rasterization = QbVkPipelineRasterization::QBVK_PIPELINE_RASTERIZATION_SHADOWMAP;
 		pipelineDescription.viewportExtents = { SHADOWMAP_RESOLUTION, SHADOWMAP_RESOLUTION };
+		pipelineDescription.viewportFlipped = false;
 
 		context_->shadowmapResources.pipeline = context_->resourceManager->CreateGraphicsPipeline("Assets/Quadbit/Shaders/shadowmap.vert", "main", 
 			nullptr, nullptr, pipelineDescription, context_->shadowmapResources.renderPass);
@@ -776,7 +776,6 @@ namespace Quadbit {
 
 		vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 		
-
 		// Depth bias parameters to reduce shadow artifacts
 		constexpr float depthBiasConstant = 1.25f;
 		constexpr float depthBiasSlope = 1.75f;
