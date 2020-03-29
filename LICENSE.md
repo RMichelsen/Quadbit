@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2019 Rasmus Ishøy Michelsen
+Copyright (c) 2020 Rasmus IshÃ¸y Michelsen
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
